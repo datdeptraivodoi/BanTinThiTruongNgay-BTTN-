@@ -1,0 +1,57 @@
+name: MB Treasury Automated Market Report (BTTN)
+
+on:
+  schedule:
+    # 04:00 UTC = 11:00 Giờ Việt Nam (Chạy Thứ 2 đến Thứ 6) - Bản Tin Thị Trường Ngày
+    - cron: '0 4 * * 1-5'
+
+  # Cho phép bấm nút "Run workflow" để test bất kỳ lúc nào trên web GitHub
+  workflow_dispatch:
+    inputs:
+      report_type:
+        description: 'Chọn loại bản tin cần chạy thử'
+        required: true
+        default: 'midday'
+        type: choice
+        options:
+          - midday
+          - morning
+
+jobs:
+  build-and-send-report:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 1. Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 2. Cài đặt môi trường Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: 3. Cài đặt LibreOffice và bộ Font tiếng Việt (để xuất PDF không lỗi)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libreoffice fonts-dejavu fonts-liberation fonts-noto-cjk
+
+    - name: 4. Cài đặt các thư viện Python
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 5. Khởi chạy hệ thống xuất bản Bản Tin Thị Trường Ngày
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+        SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          TARGET_TYPE="${{ github.event.inputs.report_type }}"
+        else
+          TARGET_TYPE="midday"
+        fi
+
+        echo ">>> Bắt đầu tạo báo cáo loại: $TARGET_TYPE"
+        python market_report.py --type $TARGET_TYPE

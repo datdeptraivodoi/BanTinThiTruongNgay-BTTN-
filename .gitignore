@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cấu hình môi trường & bí mật
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# File tạm thời của MS Office
+~$*
+
+# File Word & PDF sinh ra (Chỉ giữ lại template.docx)
+*.docx
+!template.docx
+*.pdf
+
+# File nháp & cào dữ liệu tạm thời
+article_dump.txt
+sbv_raw.html
+scratch_*.txt
+te.html
+te_commodities.txt
+test_*.docx
+BT_Thu_Nghiem_MB.docx
+
+# Hệ điều hành & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
