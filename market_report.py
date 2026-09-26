@@ -47,7 +47,7 @@ except ImportError:
 # ==============================================================================
 # CẤU HÌNH HỆ THỐNG
 # ==============================================================================
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
 

@@ -43,7 +43,7 @@ jobs:
 
     - name: 5. Khởi chạy hệ thống xuất bản Bản Tin Thị Trường Ngày
       env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
         SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
         SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
       run: |
@@ -55,3 +55,13 @@ jobs:
 
         echo ">>> Bắt đầu tạo báo cáo loại: $TARGET_TYPE"
         python market_report.py --type $TARGET_TYPE
+
+    - name: 6. Lưu trữ file Word và PDF (Artifacts tải về trực tiếp)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: BanTinThiTruongNgay-${{ github.run_number }}
+        path: |
+          *.docx
+          *.pdf
+        if-no-files-found: warn
