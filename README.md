@@ -29,16 +29,16 @@ Báo cáo tuân thủ nghiêm ngặt theo mẫu chuẩn [`template.docx`](templa
 
 ---
 
-## 🛡️ Cơ Chế Bảo Vệ & Chống Rate Limit Tuyệt Đối
+## 🛡️ Cơ Chế Bảo Vệ 2 Tầng & Chống Rate Limit Tuyệt Đối
 1. **Single-Batch Request:** Toàn bộ tin tức trong phiên gom lại thành 1 yêu cầu duy nhất $\rightarrow$ Tiết kiệm tối đa hạn ngạch API.
-2. **Cơ chế Thác nước AI (Waterfall Fallback):**
-   * Ưu tiên 1: `gemini-3.8-flash`
-   * Dự phòng 2: `gemini-3.7-flash`
-   * Dự phòng 3: `gemini-3.6-flash`
-   * Dự phòng 4: `gemini-3.5-flash`
+2. **Tầng 1 (Chính) - Cơ chế Thác nước Google Gemini (Waterfall Fallback):**
+   * Ưu tiên 1: `gemini-3.8-flash` $\rightarrow$ `gemini-3.7-flash` $\rightarrow$ `gemini-3.6-flash` $\rightarrow$ `gemini-3.5-flash`
    * Phao cứu sinh: `gemini-3.5-flash-lite` (500 RPD, 15 RPM)
    * Kế tiếp: `gemini-3.1-flash-lite`, `gemini-3-flash`, `gemini-2.5-flash`, `gemini-1.5-flash`.
-   * Tự động bắt mã lỗi `429 (ResourceExhausted)` để đổi model tự động, đảm bảo báo cáo xuất bản đúng giờ.
+   * Tự động bắt mã lỗi `429 (ResourceExhausted)` để đổi model tức thì.
+3. **Tầng 2 (Dự phòng khẩn cấp) - OpenRouter Ling 3.0 Flash Fin:**
+   * Model: `inclusionai/ling-3.0-flash-fin:free` (chuyên biệt cho Tài chính & Đầu tư).
+   * Phản hồi siêu tốc (~2.15 giây), tự động kích hoạt nếu toàn bộ các model Google Gemini gặp sự cố mạng hoặc bảo trì.
 
 ---
 
@@ -46,7 +46,8 @@ Báo cáo tuân thủ nghiêm ngặt theo mẫu chuẩn [`template.docx`](templa
 
 ### 1. Cấu hình Secrets trên GitHub
 Vào **Settings** $\rightarrow$ **Secrets and variables** $\rightarrow$ **Actions** $\rightarrow$ Nhấn **New repository secret**:
-* `GEMINI_API_KEY`: API Key lấy từ [Google AI Studio](https://aistudio.google.com/).
+* `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`): API Key từ [Google AI Studio](https://aistudio.google.com/).
+* `OPENROUTER_API_KEY`: API Key từ [OpenRouter](https://openrouter.ai/keys) (Dự phòng tầng 2).
 * `SENDER_EMAIL`: Địa chỉ Gmail gửi bản tin (ví dụ: `your-email@gmail.com`).
 * `SENDER_PASSWORD`: Mật khẩu ứng dụng 16 ký tự của Gmail (App Password).
 

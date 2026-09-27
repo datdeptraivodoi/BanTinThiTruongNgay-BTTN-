@@ -460,7 +460,57 @@ NGUYÊN TẮC BẮT BUỘC:
             time.sleep(2)
             continue
 
-    raise RuntimeError("Tất cả các model trong danh sách ưu tiên đều không thể kết nối hoặc đã hết hạn mức!")
+    # TẦNG DỰ PHÒNG 2: OPENROUTER (LING 3.0 FLASH FIN FREE)
+    openrouter_res = call_openrouter_fallback(prompt)
+    if openrouter_res:
+        return openrouter_res
+
+    raise RuntimeError("Tất cả các model Google Gemini và tầng dự phòng OpenRouter đều không thể kết nối hoặc đã hết hạn mức!")
+
+def call_openrouter_fallback(prompt):
+    """Tầng dự phòng 2: Kích hoạt OpenRouter Ling 3.0 Flash Fin khi Google Gemini gặp sự cố."""
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("Open_Router_API_Key")
+    if not openrouter_key:
+        print("[THÔNG BÁO] Không tìm thấy OPENROUTER_API_KEY để gọi tầng dự phòng OpenRouter.")
+        return None
+
+    model_id = "inclusionai/ling-3.0-flash-fin:free"
+    print(f"\n--> [DỰ PHÒNG TẦNG 2] Đang kích hoạt OpenRouter: {model_id}...")
+
+    headers = {
+        "Authorization": f"Bearer {openrouter_key}",
+        "HTTP-Referer": "https://mbbank.com.vn",
+        "X-Title": "MB Treasury Report Automation",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": model_id,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "reasoning": {"effort": "none"},
+        "temperature": 0.2,
+        "max_tokens": 4000
+    }
+
+    try:
+        t0 = time.time()
+        r = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=90)
+        if r.status_code == 200:
+            data = r.json()
+            msg = data["choices"][0]["message"]
+            text = msg.get("content") or msg.get("reasoning_content") or ""
+            if text:
+                print(f"✓ Hoàn tất phân tích thành công với OpenRouter ({model_id}) trong {time.time() - t0:.2f}s!")
+                log_word_count_stats(text)
+                return text
+        else:
+            print(f"[CẢNH BÁO] OpenRouter trả về mã lỗi {r.status_code}: {r.text[:200]}")
+    except Exception as e:
+        print(f"[CẢNH BÁO] Lỗi kết nối OpenRouter: {e}")
+
+    return None
 
 # ==============================================================================
 # BƯỚC 3: TẠO FILE WORD ĐẸP MẮT (PHONG CÁCH MB NAVY)
