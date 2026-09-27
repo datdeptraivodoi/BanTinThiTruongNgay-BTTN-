@@ -416,7 +416,7 @@ Bố cục báo cáo bắt buộc gồm 5 phần chính với CÁC QUY ĐỊNH N
    • Thị trường Năng lượng (Dầu Brent) & Kim loại quý (Vàng):
      - QUY ĐỊNH ĐỘ DÀI TỔNG THỂ CHO CẢ PHẦN: BẮT BUỘC tối thiểu 125 từ, tối đa 135 từ tiếng Việt.
      - Phân bổ: Đoạn phân tích giá dầu Brent chiếm khoảng 90 - 100 từ (dựa vào bài viết mới nhất trên Vietnambiz chủ đề Dầu mỏ, chỉ update thông tin dầu Brent, tăng/giảm quanh mức bao nhiêu, nguyên nhân do đâu). Đoạn cập nhật giá vàng chiếm khoảng 30 - 35 từ (BẮT BUỘC NGẮN GỌN ĐÚNG 2 CÂU).
-     - Đoạn nhận định Dự kiến: BẮT BUỘC CHỈ NÊU RA 1 MỨC DỰ BÁO duy nhất (không nêu khoảng biên độ), bắt đầu bằng "Dự kiến: ..."
+     - Đoạn nhận định Dự kiến: BẮT BUỘC TRONG ĐÚNG 1 CÂU VÀ TỐI ĐA 15 TỪ (chỉ nêu 1 mức dự báo duy nhất cho dầu Brent và vàng, không nêu khoảng), bắt đầu bằng "Dự kiến: ..."
 
 4. THỊ TRƯỜNG TÀI CHÍNH VIỆT NAM (TRANG 1)
    • Thị trường tiền tệ liên ngân hàng:
@@ -1098,7 +1098,7 @@ def create_word_doc(content, report_title, date_str, output_path):
         p_oil_fc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         p_oil_fc.paragraph_format.space_before = Pt(0)
         p_oil_fc.paragraph_format.space_after = Pt(0)
-        r_oil_fc = p_oil_fc.add_run("Dự kiến: Giá dầu Brent dao động quanh 104 USD/thùng; giá vàng dao động quanh mức 2.650 USD/ounce.")
+        r_oil_fc = p_oil_fc.add_run("Dự kiến: Dầu Brent dao động quanh 104 USD/thùng; vàng dao động quanh 2.650 USD/ounce.")
         set_font(r_oil_fc, name="Times New Roman", size_pt=11.0, color_rgb=(192, 0, 0), bold=True)
 
         # Hàng 11: Cà phê (Độ dài đúng 135 từ; Bắt đầu bằng "Cập nhật giá cà phê thế giới,"; Dự báo 1 mức)

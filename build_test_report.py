@@ -759,7 +759,7 @@ def generate_mb_test_report(template_path, output_path):
     p_oil_fc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     p_oil_fc.paragraph_format.space_before = Pt(0)
     p_oil_fc.paragraph_format.space_after = Pt(0)
-    r_oil_fc = p_oil_fc.add_run("Dự kiến: Giá dầu Brent dao động quanh 104 USD/thùng; giá vàng dao động quanh mức 2.650 USD/ounce.")
+    r_oil_fc = p_oil_fc.add_run("Dự kiến: Dầu Brent dao động quanh 104 USD/thùng; vàng dao động quanh 2.650 USD/ounce.")
     set_font(r_oil_fc, name="Times New Roman", size_pt=11.0, color_rgb=(192, 0, 0), bold=True)
 
     # Hàng 11 Ô 2: Cà phê (Độ dài đúng 135 từ; Bắt đầu bằng "Cập nhật giá cà phê thế giới,"; Dự báo 1 mức)

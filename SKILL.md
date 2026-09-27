@@ -64,8 +64,8 @@ Nhiệm vụ: Theo dõi, sàng lọc dữ liệu vĩ mô và tài chính toàn c
 - **Yêu cầu nội dung Giá vàng:** BẮT BUỘC ngắn gọn **đúng 2 câu** cập nhật nhanh diễn biến vàng thế giới và trong nước.
 - **Quy định số từ cho cả phần:** **BẮT BUỘC tối thiểu 125 từ, tối đa 135 từ**. (Dầu Brent chiếm khoảng 90 - 100 từ, Vàng chiếm khoảng 30 - 35 từ).
 - **Phần Dự báo (Dự kiến - BẮT BUỘC):**
-  Chỉ nêu ra **1 MỨC DỰ BÁO DUY NHẤT** (không đưa ra khoảng từ bao nhiêu đến bao nhiêu).
-  *Ví dụ:* `"Dự kiến: Giá dầu Brent dao động quanh 104 USD/thùng; giá vàng dao động quanh mức 2.650 USD/ounce."`
+  BẮT BUỘC trong **đúng 1 câu** và **tối đa 15 từ**, chỉ nêu ra **1 MỨC DỰ BÁO DUY NHẤT** (không đưa ra khoảng từ bao nhiêu đến bao nhiêu).
+  *Ví dụ:* `"Dự kiến: Dầu Brent dao động quanh 104 USD/thùng; vàng dao động quanh 2.650 USD/ounce."` (15 từ).
 
 ---
 
@@ -81,7 +81,7 @@ Agent bắt buộc phải đếm và khống chế số từ tiếng Việt nằ
 | **Nhật Bản - Japan (Trang 2)** | **100 từ** | **130 từ** | Tình hình kinh tế Nhật, chính sách tiền tệ BoJ, lạm phát, tiền lương và biến động đồng Yên JPY. |
 | **Trung Quốc - China (Trang 2)** | **50 từ** | **70 từ** | Dữ liệu sản xuất, bán lẻ, chính sách lãi suất PBoC, bất động sản và tỷ giá USD/CNY. |
 | **Cà phê - Arabica & Robusta (Trang 3)** | **130 từ** | **135 từ** | **Chuẩn xác 135 từ** (hoặc 130 - 135 từ). Bắt đầu bằng *"Cập nhật giá cà phê thế giới,"*. Dự báo 1 mức duy nhất. |
-| **Năng lượng & Kim loại (Dầu Brent + Vàng)** | **125 từ** | **135 từ** | **Tổng cả phần Dầu Brent và Vàng [125 - 135 từ]**. Dầu Brent ~95 từ, Vàng ~35 từ (đúng 2 câu). Dự báo 1 mức duy nhất. |
+| **Năng lượng & Kim loại (Dầu Brent + Vàng)** | **125 từ** | **135 từ** | **Tổng cả phần Dầu Brent và Vàng [125 - 135 từ]**. Dầu Brent ~95 từ, Vàng ~35 từ (đúng 2 câu). Đoạn đỏ *"Dự kiến: ..."* BẮT BUỘC trong đúng 1 câu có tối đa 15 từ, chỉ nêu 1 mức dự báo. |
 
 ---
 
