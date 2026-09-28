@@ -1,0 +1,21 @@
+name: BTTN checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice fonts-dejavu fonts-liberation libgl1
+          python -m pip install -r requirements-dev.txt
+      - run: python -m ruff check .
+      - run: python -m pytest -q
+      - name: Render offline fixture through production pipeline
+        run: python build_test_report.py

@@ -1,0 +1,5239 @@
+{
+  "version": 1,
+  "purpose": "fixture",
+  "as_of": "2026-09-24T12:00:00+07:00",
+  "sources": {
+    "vira": {
+      "id": "vira",
+      "url": "https://example.com/test-fixture/vira",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "sha256": "",
+      "kind": "market"
+    },
+    "market": {
+      "id": "market",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "sha256": "",
+      "kind": "market"
+    },
+    "news_a": {
+      "id": "news_a",
+      "url": "https://example.com/test-fixture/news_a",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "sha256": "",
+      "kind": "news"
+    },
+    "news_b": {
+      "id": "news_b",
+      "url": "https://example.com/test-fixture/news_b",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "sha256": "",
+      "kind": "news"
+    },
+    "news_c": {
+      "id": "news_c",
+      "url": "https://example.com/test-fixture/news_c",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "sha256": "",
+      "kind": "news"
+    },
+    "derived_swap_ON": {
+      "id": "derived_swap_ON",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_ON - USD_ON; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_1W": {
+      "id": "derived_swap_1W",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_1W - USD_1W; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_2W": {
+      "id": "derived_swap_2W",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_2W - USD_2W; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_1M": {
+      "id": "derived_swap_1M",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_1M - USD_1M; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_2M": {
+      "id": "derived_swap_2M",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_2M - USD_2M; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_3M": {
+      "id": "derived_swap_3M",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_3M - USD_3M; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_6M": {
+      "id": "derived_swap_6M",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_6M - USD_6M; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_9M": {
+      "id": "derived_swap_9M",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_9M - USD_9M; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    },
+    "derived_swap_1Y": {
+      "id": "derived_swap_1Y",
+      "url": "https://example.com/test-fixture/market",
+      "published_at": "2026-09-24T11:00:00+07:00",
+      "retrieved_at": "2026-09-24T12:00:00+07:00",
+      "text": "VND_1Y - USD_1Y; same VIRA edition; indicative interest differential",
+      "sha256": "",
+      "kind": "derived"
+    }
+  },
+  "observations": {
+    "VND_ON": {
+      "id": "VND_ON",
+      "label": "VND_ON",
+      "value": "2.50",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "ON",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_ON": {
+      "id": "USD_ON",
+      "label": "USD_ON",
+      "value": "3.85",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "ON",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_ON": {
+      "id": "SOFR_ON",
+      "label": "SOFR_ON",
+      "value": "3.90",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "ON",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_1W": {
+      "id": "VND_1W",
+      "label": "VND_1W",
+      "value": "3.00",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_1W": {
+      "id": "USD_1W",
+      "label": "USD_1W",
+      "value": "3.95",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_1W": {
+      "id": "SOFR_1W",
+      "label": "SOFR_1W",
+      "value": "4.00",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_2W": {
+      "id": "VND_2W",
+      "label": "VND_2W",
+      "value": "3.50",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "2W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_2W": {
+      "id": "USD_2W",
+      "label": "USD_2W",
+      "value": "4.05",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "2W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_2W": {
+      "id": "SOFR_2W",
+      "label": "SOFR_2W",
+      "value": "4.10",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "2W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_1M": {
+      "id": "VND_1M",
+      "label": "VND_1M",
+      "value": "4.00",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_1M": {
+      "id": "USD_1M",
+      "label": "USD_1M",
+      "value": "4.15",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_1M": {
+      "id": "SOFR_1M",
+      "label": "SOFR_1M",
+      "value": "4.20",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_2M": {
+      "id": "VND_2M",
+      "label": "VND_2M",
+      "value": "4.50",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "2M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_2M": {
+      "id": "USD_2M",
+      "label": "USD_2M",
+      "value": "4.25",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "2M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_2M": {
+      "id": "SOFR_2M",
+      "label": "SOFR_2M",
+      "value": "4.30",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "2M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_3M": {
+      "id": "VND_3M",
+      "label": "VND_3M",
+      "value": "5.00",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "3M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_3M": {
+      "id": "USD_3M",
+      "label": "USD_3M",
+      "value": "4.35",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "3M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_3M": {
+      "id": "SOFR_3M",
+      "label": "SOFR_3M",
+      "value": "4.40",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "3M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_6M": {
+      "id": "VND_6M",
+      "label": "VND_6M",
+      "value": "5.50",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "6M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_6M": {
+      "id": "USD_6M",
+      "label": "USD_6M",
+      "value": "4.45",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "6M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_6M": {
+      "id": "SOFR_6M",
+      "label": "SOFR_6M",
+      "value": "4.50",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "6M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_9M": {
+      "id": "VND_9M",
+      "label": "VND_9M",
+      "value": "6.00",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "9M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_9M": {
+      "id": "USD_9M",
+      "label": "USD_9M",
+      "value": "4.55",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "9M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_9M": {
+      "id": "SOFR_9M",
+      "label": "SOFR_9M",
+      "value": "4.60",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "9M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "VND_1Y": {
+      "id": "VND_1Y",
+      "label": "VND_1Y",
+      "value": "6.50",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "USD_1Y": {
+      "id": "USD_1Y",
+      "label": "USD_1Y",
+      "value": "4.65",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SOFR_1Y": {
+      "id": "SOFR_1Y",
+      "label": "SOFR_1Y",
+      "value": "4.70",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "1Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "BOND_Vietnam": {
+      "id": "BOND_Vietnam",
+      "label": "BOND_Vietnam",
+      "value": "4.47",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "10Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "BOND_United States": {
+      "id": "BOND_United States",
+      "label": "BOND_United States",
+      "value": "4.47",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "10Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "BOND_Germany": {
+      "id": "BOND_Germany",
+      "label": "BOND_Germany",
+      "value": "4.47",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "10Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "BOND_Japan": {
+      "id": "BOND_Japan",
+      "label": "BOND_Japan",
+      "value": "4.47",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "10Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "BOND_China": {
+      "id": "BOND_China",
+      "label": "BOND_China",
+      "value": "4.47",
+      "unit": "%/năm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": "10Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "EURUSD": {
+      "id": "EURUSD",
+      "label": "EURUSD",
+      "value": "1.12",
+      "unit": "USD/EUR",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "1.0528"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "1.05392"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "1.05504"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "1.05616"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "1.05728"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "1.05840"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "1.05952"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "1.06064"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "1.06176"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "1.06288"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "1.0640"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "1.06512"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "1.06624"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "1.06736"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "1.06848"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "1.06960"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "1.07072"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "1.07184"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "1.07296"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "1.07408"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "1.0752"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "1.07632"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "1.07744"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "1.07856"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "1.07968"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "1.08080"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "1.08192"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "1.08304"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "1.08416"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "1.08528"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "1.0864"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "1.08752"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "1.08864"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "1.08976"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "1.09088"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "1.09200"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "1.09312"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "1.09424"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "1.09536"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "1.09648"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "1.0976"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "1.09872"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "1.09984"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "1.10096"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "1.10208"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "1.10320"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "1.10432"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "1.10544"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "1.10656"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "1.10768"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "1.1088"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "1.10992"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "1.11104"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "1.11216"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "1.11328"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "1.11440"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "1.11552"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "1.11664"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "1.11776"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "1.11888"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "1.12"
+        }
+      ]
+    },
+    "USDJPY": {
+      "id": "USDJPY",
+      "label": "USDJPY",
+      "value": "145",
+      "unit": "JPY/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "136.30"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "136.445"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "136.590"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "136.735"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "136.880"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "137.025"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "137.170"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "137.315"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "137.460"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "137.605"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "137.75"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "137.895"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "138.040"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "138.185"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "138.330"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "138.475"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "138.620"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "138.765"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "138.910"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "139.055"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "139.20"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "139.345"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "139.490"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "139.635"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "139.780"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "139.925"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "140.070"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "140.215"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "140.360"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "140.505"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "140.65"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "140.795"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "140.940"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "141.085"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "141.230"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "141.375"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "141.520"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "141.665"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "141.810"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "141.955"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "142.10"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "142.245"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "142.390"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "142.535"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "142.680"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "142.825"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "142.970"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "143.115"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "143.260"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "143.405"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "143.55"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "143.695"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "143.840"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "143.985"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "144.130"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "144.275"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "144.420"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "144.565"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "144.710"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "144.855"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "145"
+        }
+      ]
+    },
+    "USDCNY": {
+      "id": "USDCNY",
+      "label": "USDCNY",
+      "value": "7.1",
+      "unit": "CNY/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "6.674"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "6.6811"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "6.6882"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "6.6953"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "6.7024"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "6.7095"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "6.7166"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "6.7237"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "6.7308"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "6.7379"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "6.745"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "6.7521"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "6.7592"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "6.7663"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "6.7734"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "6.7805"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "6.7876"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "6.7947"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "6.8018"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "6.8089"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "6.816"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "6.8231"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "6.8302"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "6.8373"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "6.8444"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "6.8515"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "6.8586"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "6.8657"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "6.8728"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "6.8799"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "6.887"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "6.8941"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "6.9012"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "6.9083"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "6.9154"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "6.9225"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "6.9296"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "6.9367"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "6.9438"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "6.9509"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "6.958"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "6.9651"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "6.9722"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "6.9793"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "6.9864"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "6.9935"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "7.0006"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "7.0077"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "7.0148"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "7.0219"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "7.029"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "7.0361"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "7.0432"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "7.0503"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "7.0574"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "7.0645"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "7.0716"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "7.0787"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "7.0858"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "7.0929"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "7.1"
+        }
+      ]
+    },
+    "USDVND": {
+      "id": "USDVND",
+      "label": "USDVND",
+      "value": "26000",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "24440.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "24466.000"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "24492.000"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "24518.000"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "24544.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "24570.000"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "24596.000"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "24622.000"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "24648.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "24674.000"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "24700.00"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "24726.000"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "24752.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "24778.000"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "24804.000"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "24830.000"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "24856.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "24882.000"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "24908.000"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "24934.000"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "24960.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "24986.000"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "25012.000"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "25038.000"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "25064.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "25090.000"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "25116.000"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "25142.000"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "25168.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "25194.000"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "25220.00"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "25246.000"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "25272.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "25298.000"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "25324.000"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "25350.000"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "25376.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "25402.000"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "25428.000"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "25454.000"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "25480.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "25506.000"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "25532.000"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "25558.000"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "25584.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "25610.000"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "25636.000"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "25662.000"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "25688.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "25714.000"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "25740.00"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "25766.000"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "25792.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "25818.000"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "25844.000"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "25870.000"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "25896.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "25922.000"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "25948.000"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "25974.000"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "26000"
+        }
+      ]
+    },
+    "DOW": {
+      "id": "DOW",
+      "label": "DOW",
+      "value": "250",
+      "unit": "điểm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "NIKKEI": {
+      "id": "NIKKEI",
+      "label": "NIKKEI",
+      "value": "250",
+      "unit": "điểm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "DAX": {
+      "id": "DAX",
+      "label": "DAX",
+      "value": "250",
+      "unit": "điểm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "DXY": {
+      "id": "DXY",
+      "label": "DXY",
+      "value": "250",
+      "unit": "điểm",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "ROBUSTA": {
+      "id": "ROBUSTA",
+      "label": "ROBUSTA",
+      "value": "250",
+      "unit": "USD/tấn",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "ARABICA": {
+      "id": "ARABICA",
+      "label": "ARABICA",
+      "value": "250",
+      "unit": "USc/lb",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "CORN": {
+      "id": "CORN",
+      "label": "CORN",
+      "value": "250",
+      "unit": "USc/bushel",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "SOY": {
+      "id": "SOY",
+      "label": "SOY",
+      "value": "250",
+      "unit": "USc/bushel",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "COTTON": {
+      "id": "COTTON",
+      "label": "COTTON",
+      "value": "250",
+      "unit": "USc/lb",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "BRENT": {
+      "id": "BRENT",
+      "label": "BRENT",
+      "value": "75",
+      "unit": "USD/thùng",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "70.50"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "70.575"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "70.650"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "70.725"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "70.800"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "70.875"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "70.950"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "71.025"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "71.100"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "71.175"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "71.25"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "71.325"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "71.400"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "71.475"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "71.550"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "71.625"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "71.700"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "71.775"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "71.850"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "71.925"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "72.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "72.075"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "72.150"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "72.225"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "72.300"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "72.375"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "72.450"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "72.525"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "72.600"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "72.675"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "72.75"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "72.825"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "72.900"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "72.975"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "73.050"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "73.125"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "73.200"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "73.275"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "73.350"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "73.425"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "73.50"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "73.575"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "73.650"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "73.725"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "73.800"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "73.875"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "73.950"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "74.025"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "74.100"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "74.175"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "74.25"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "74.325"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "74.400"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "74.475"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "74.550"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "74.625"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "74.700"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "74.775"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "74.850"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "74.925"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "75"
+        }
+      ]
+    },
+    "GAS": {
+      "id": "GAS",
+      "label": "GAS",
+      "value": "250",
+      "unit": "USD/MMBtu",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "GOLD": {
+      "id": "GOLD",
+      "label": "GOLD",
+      "value": "2700",
+      "unit": "USD/oz",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "2538.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "2540.700"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "2543.400"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "2546.100"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "2548.800"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "2551.500"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "2554.200"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "2556.900"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "2559.600"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "2562.300"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "2565.00"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "2567.700"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "2570.400"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "2573.100"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "2575.800"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "2578.500"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "2581.200"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "2583.900"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "2586.600"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "2589.300"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "2592.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "2594.700"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "2597.400"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "2600.100"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "2602.800"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "2605.500"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "2608.200"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "2610.900"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "2613.600"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "2616.300"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "2619.00"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "2621.700"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "2624.400"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "2627.100"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "2629.800"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "2632.500"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "2635.200"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "2637.900"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "2640.600"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "2643.300"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "2646.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "2648.700"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "2651.400"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "2654.100"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "2656.800"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "2659.500"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "2662.200"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "2664.900"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "2667.600"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "2670.300"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "2673.00"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "2675.700"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "2678.400"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "2681.100"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "2683.800"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "2686.500"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "2689.200"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "2691.900"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "2694.600"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "2697.300"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "2700"
+        }
+      ]
+    },
+    "SILVER": {
+      "id": "SILVER",
+      "label": "SILVER",
+      "value": "250",
+      "unit": "USD/oz",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": "0.25",
+      "annual_pct": "1.5",
+      "annual_basis": "YoY",
+      "series": [
+        {
+          "at": "2026-07-26T12:00:00+07:00",
+          "value": "235.00"
+        },
+        {
+          "at": "2026-07-27T12:00:00+07:00",
+          "value": "235.250"
+        },
+        {
+          "at": "2026-07-28T12:00:00+07:00",
+          "value": "235.500"
+        },
+        {
+          "at": "2026-07-29T12:00:00+07:00",
+          "value": "235.750"
+        },
+        {
+          "at": "2026-07-30T12:00:00+07:00",
+          "value": "236.000"
+        },
+        {
+          "at": "2026-07-31T12:00:00+07:00",
+          "value": "236.250"
+        },
+        {
+          "at": "2026-08-01T12:00:00+07:00",
+          "value": "236.500"
+        },
+        {
+          "at": "2026-08-02T12:00:00+07:00",
+          "value": "236.750"
+        },
+        {
+          "at": "2026-08-03T12:00:00+07:00",
+          "value": "237.000"
+        },
+        {
+          "at": "2026-08-04T12:00:00+07:00",
+          "value": "237.250"
+        },
+        {
+          "at": "2026-08-05T12:00:00+07:00",
+          "value": "237.50"
+        },
+        {
+          "at": "2026-08-06T12:00:00+07:00",
+          "value": "237.750"
+        },
+        {
+          "at": "2026-08-07T12:00:00+07:00",
+          "value": "238.000"
+        },
+        {
+          "at": "2026-08-08T12:00:00+07:00",
+          "value": "238.250"
+        },
+        {
+          "at": "2026-08-09T12:00:00+07:00",
+          "value": "238.500"
+        },
+        {
+          "at": "2026-08-10T12:00:00+07:00",
+          "value": "238.750"
+        },
+        {
+          "at": "2026-08-11T12:00:00+07:00",
+          "value": "239.000"
+        },
+        {
+          "at": "2026-08-12T12:00:00+07:00",
+          "value": "239.250"
+        },
+        {
+          "at": "2026-08-13T12:00:00+07:00",
+          "value": "239.500"
+        },
+        {
+          "at": "2026-08-14T12:00:00+07:00",
+          "value": "239.750"
+        },
+        {
+          "at": "2026-08-15T12:00:00+07:00",
+          "value": "240.00"
+        },
+        {
+          "at": "2026-08-16T12:00:00+07:00",
+          "value": "240.250"
+        },
+        {
+          "at": "2026-08-17T12:00:00+07:00",
+          "value": "240.500"
+        },
+        {
+          "at": "2026-08-18T12:00:00+07:00",
+          "value": "240.750"
+        },
+        {
+          "at": "2026-08-19T12:00:00+07:00",
+          "value": "241.000"
+        },
+        {
+          "at": "2026-08-20T12:00:00+07:00",
+          "value": "241.250"
+        },
+        {
+          "at": "2026-08-21T12:00:00+07:00",
+          "value": "241.500"
+        },
+        {
+          "at": "2026-08-22T12:00:00+07:00",
+          "value": "241.750"
+        },
+        {
+          "at": "2026-08-23T12:00:00+07:00",
+          "value": "242.000"
+        },
+        {
+          "at": "2026-08-24T12:00:00+07:00",
+          "value": "242.250"
+        },
+        {
+          "at": "2026-08-25T12:00:00+07:00",
+          "value": "242.50"
+        },
+        {
+          "at": "2026-08-26T12:00:00+07:00",
+          "value": "242.750"
+        },
+        {
+          "at": "2026-08-27T12:00:00+07:00",
+          "value": "243.000"
+        },
+        {
+          "at": "2026-08-28T12:00:00+07:00",
+          "value": "243.250"
+        },
+        {
+          "at": "2026-08-29T12:00:00+07:00",
+          "value": "243.500"
+        },
+        {
+          "at": "2026-08-30T12:00:00+07:00",
+          "value": "243.750"
+        },
+        {
+          "at": "2026-08-31T12:00:00+07:00",
+          "value": "244.000"
+        },
+        {
+          "at": "2026-09-01T12:00:00+07:00",
+          "value": "244.250"
+        },
+        {
+          "at": "2026-09-02T12:00:00+07:00",
+          "value": "244.500"
+        },
+        {
+          "at": "2026-09-03T12:00:00+07:00",
+          "value": "244.750"
+        },
+        {
+          "at": "2026-09-04T12:00:00+07:00",
+          "value": "245.00"
+        },
+        {
+          "at": "2026-09-05T12:00:00+07:00",
+          "value": "245.250"
+        },
+        {
+          "at": "2026-09-06T12:00:00+07:00",
+          "value": "245.500"
+        },
+        {
+          "at": "2026-09-07T12:00:00+07:00",
+          "value": "245.750"
+        },
+        {
+          "at": "2026-09-08T12:00:00+07:00",
+          "value": "246.000"
+        },
+        {
+          "at": "2026-09-09T12:00:00+07:00",
+          "value": "246.250"
+        },
+        {
+          "at": "2026-09-10T12:00:00+07:00",
+          "value": "246.500"
+        },
+        {
+          "at": "2026-09-11T12:00:00+07:00",
+          "value": "246.750"
+        },
+        {
+          "at": "2026-09-12T12:00:00+07:00",
+          "value": "247.000"
+        },
+        {
+          "at": "2026-09-13T12:00:00+07:00",
+          "value": "247.250"
+        },
+        {
+          "at": "2026-09-14T12:00:00+07:00",
+          "value": "247.50"
+        },
+        {
+          "at": "2026-09-15T12:00:00+07:00",
+          "value": "247.750"
+        },
+        {
+          "at": "2026-09-16T12:00:00+07:00",
+          "value": "248.000"
+        },
+        {
+          "at": "2026-09-17T12:00:00+07:00",
+          "value": "248.250"
+        },
+        {
+          "at": "2026-09-18T12:00:00+07:00",
+          "value": "248.500"
+        },
+        {
+          "at": "2026-09-19T12:00:00+07:00",
+          "value": "248.750"
+        },
+        {
+          "at": "2026-09-20T12:00:00+07:00",
+          "value": "249.000"
+        },
+        {
+          "at": "2026-09-21T12:00:00+07:00",
+          "value": "249.250"
+        },
+        {
+          "at": "2026-09-22T12:00:00+07:00",
+          "value": "249.500"
+        },
+        {
+          "at": "2026-09-23T12:00:00+07:00",
+          "value": "249.750"
+        },
+        {
+          "at": "2026-09-24T12:00:00+07:00",
+          "value": "250"
+        }
+      ]
+    },
+    "SBV_CENTRAL": {
+      "id": "SBV_CENTRAL",
+      "label": "SBV_CENTRAL",
+      "value": "25000",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SBV_FLOOR": {
+      "id": "SBV_FLOOR",
+      "label": "SBV_FLOOR",
+      "value": "23750",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SBV_CEILING": {
+      "id": "SBV_CEILING",
+      "label": "SBV_CEILING",
+      "value": "26250",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SBV_BUY": {
+      "id": "SBV_BUY",
+      "label": "SBV_BUY",
+      "value": "23800",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SBV_SELL": {
+      "id": "SBV_SELL",
+      "label": "SBV_SELL",
+      "value": "26200",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "MB_BUY": {
+      "id": "MB_BUY",
+      "label": "MB_BUY",
+      "value": "25800",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "MB_SELL": {
+      "id": "MB_SELL",
+      "label": "MB_SELL",
+      "value": "26000",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "MB_BUY_PREV": {
+      "id": "MB_BUY_PREV",
+      "label": "MB_BUY_PREV",
+      "value": "25700",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "MB_SELL_PREV": {
+      "id": "MB_SELL_PREV",
+      "label": "MB_SELL_PREV",
+      "value": "25900",
+      "unit": "VND/USD",
+      "source_id": "market",
+      "trading_date": "2026-09-24",
+      "basis": "SYNTHETIC FIXTURE",
+      "tenor": null,
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_ON": {
+      "id": "SWAP_ON",
+      "label": "Chênh lệch VND−USD ON",
+      "value": "-1.35",
+      "unit": "điểm %",
+      "source_id": "derived_swap_ON",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "ON",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_1W": {
+      "id": "SWAP_1W",
+      "label": "Chênh lệch VND−USD 1W",
+      "value": "-0.95",
+      "unit": "điểm %",
+      "source_id": "derived_swap_1W",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "1W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_2W": {
+      "id": "SWAP_2W",
+      "label": "Chênh lệch VND−USD 2W",
+      "value": "-0.55",
+      "unit": "điểm %",
+      "source_id": "derived_swap_2W",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "2W",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_1M": {
+      "id": "SWAP_1M",
+      "label": "Chênh lệch VND−USD 1M",
+      "value": "-0.15",
+      "unit": "điểm %",
+      "source_id": "derived_swap_1M",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "1M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_2M": {
+      "id": "SWAP_2M",
+      "label": "Chênh lệch VND−USD 2M",
+      "value": "0.25",
+      "unit": "điểm %",
+      "source_id": "derived_swap_2M",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "2M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_3M": {
+      "id": "SWAP_3M",
+      "label": "Chênh lệch VND−USD 3M",
+      "value": "0.65",
+      "unit": "điểm %",
+      "source_id": "derived_swap_3M",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "3M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_6M": {
+      "id": "SWAP_6M",
+      "label": "Chênh lệch VND−USD 6M",
+      "value": "1.05",
+      "unit": "điểm %",
+      "source_id": "derived_swap_6M",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "6M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_9M": {
+      "id": "SWAP_9M",
+      "label": "Chênh lệch VND−USD 9M",
+      "value": "1.45",
+      "unit": "điểm %",
+      "source_id": "derived_swap_9M",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "9M",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    },
+    "SWAP_1Y": {
+      "id": "SWAP_1Y",
+      "label": "Chênh lệch VND−USD 1Y",
+      "value": "1.85",
+      "unit": "điểm %",
+      "source_id": "derived_swap_1Y",
+      "trading_date": "2026-09-24",
+      "basis": "VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
+      "tenor": "1Y",
+      "daily_pct": null,
+      "annual_pct": null,
+      "annual_basis": null,
+      "series": []
+    }
+  },
+  "issues": []
+}

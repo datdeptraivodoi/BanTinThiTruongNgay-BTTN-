@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "forecasts_enabled": false,
+  "word_limits": {
+    "interbank": [88, 95], "usd_vnd": [75, 80], "eur_usd": [150, 200],
+    "japan": [100, 130], "china": [50, 70], "coffee": [130, 135],
+    "energy_metals": [125, 135]
+  },
+  "required_observations": [
+    "VND_ON", "VND_1W", "VND_1M", "VND_3M", "VND_6M",
+    "USD_ON", "USD_1W", "USD_1M", "USD_3M", "USD_6M", "BOND_Vietnam",
+    "EURUSD", "USDJPY", "USDCNY", "SBV_CENTRAL", "MB_BUY", "MB_SELL"
+  ],
+  "source_max_age_days": 4,
+  "news_max_age_hours": 36,
+  "notes": "Word counts use whitespace after placeholder substitution. Annual change is explicitly YoY. Rate differential uses VNIBOR VND minus VNIBOR USD from the same VIRA edition, in percentage points; it is not an executable FX swap quote. Forecasts stay blank."
+}

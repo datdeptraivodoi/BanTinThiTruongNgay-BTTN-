@@ -1,0 +1,269 @@
+import hashlib
+import math
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, time, timedelta, timezone
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+from email.utils import parsedate_to_datetime
+from urllib.parse import quote, quote_plus, urljoin, urlparse
+
+import feedparser
+from bs4 import BeautifulSoup
+
+from .calculations import percentage
+from .http import Http
+from .models import Observation, Point, Snapshot, Source, previous_weekday
+
+# Identity and units are explicit. Unsupported legacy rows remain unavailable.
+INSTRUMENTS = {
+    "EURUSD": ("EURUSD=X", "EUR-USD", "USD/EUR"),
+    "USDJPY": ("USDJPY=X", "USD-JPY", "JPY/USD"),
+    "USDCNY": ("USDCNY=X", "USD-CNY", "CNY/USD"),
+    "USDVND": ("USDVND=X", "USD-VND", "VND/USD"),
+    "DOW": ("^DJI", "Dow Jones", "điểm"),
+    "NIKKEI": ("^N225", "Nikkei 225", "điểm"),
+    "DAX": ("^GDAXI", "DAX", "điểm"),
+    "DXY": ("DX-Y.NYB", "USD Index", "điểm"),
+    "ROBUSTA": ("RC=F", "Robusta futures", "USD/tấn"),
+    "ARABICA": ("KC=F", "Arabica futures", "USc/lb"),
+    "CORN": ("ZC=F", "Ngô futures", "USc/bushel"),
+    "SOY": ("ZS=F", "Đậu tương futures", "USc/bushel"),
+    "COTTON": ("CT=F", "Cotton futures", "USc/lb"),
+    "BRENT": ("BZ=F", "Dầu Brent futures", "USD/thùng"),
+    "GAS": ("NG=F", "Khí tự nhiên futures", "USD/MMBtu"),
+    "GOLD": ("GC=F", "Vàng futures", "USD/oz"),
+    "SILVER": ("SI=F", "Bạc futures", "USD/oz"),
+}
+
+
+def yahoo_observation(payload, key, as_of, source_id):
+    result = payload["chart"]["result"][0]
+    meta = result["meta"]
+    # Keep timestamps paired with prices: filtering only closes shifts sessions.
+    raw_points = []
+    for stamp, close in zip(result["timestamp"], result["indicators"]["quote"][0]["close"]):
+        at = datetime.fromtimestamp(stamp, timezone.utc)
+        if close is not None and math.isfinite(close) and at <= as_of:
+            raw_points.append(Point(at=at, value=Decimal(str(close))))
+    raw_points.sort(key=lambda p: p.at)
+    market_at = datetime.fromtimestamp(meta.get("regularMarketTime", 0), timezone.utc)
+    live = meta.get("regularMarketPrice")
+    if live is not None and market_at <= as_of and market_at.year > 2000:
+        latest = Point(at=market_at, value=Decimal(str(live)))
+        # Same session's daily bar cannot be used as the preceding close.
+        from zoneinfo import ZoneInfo
+
+        exchange_tz = ZoneInfo(meta.get("exchangeTimezoneName", "UTC"))
+        current_date = market_at.astimezone(exchange_tz).date()
+        history = [p for p in raw_points if p.at.astimezone(exchange_tz).date() < current_date]
+    else:
+        # Historical intraday reproduction requires a stored snapshot. A daily
+        # candle's timestamp is its OPEN, so today's full candle is excluded.
+        history = [p for p in raw_points if p.at.date() < as_of.date()]
+        if not history:
+            raise ValueError(f"No completed observations for {key}")
+        latest = history.pop()
+    if latest.value <= 0 or not history:
+        raise ValueError(f"Missing price or previous completed session for {key}")
+    previous = history[-1]
+    day_change = percentage(latest.value, previous.value)
+    anniversary = latest.at.date() - timedelta(days=365)
+    yearly = [p for p in history if p.at.date() <= anniversary]
+    annual = None
+    if yearly and (anniversary - yearly[-1].at.date()).days <= 7:
+        annual = percentage(latest.value, yearly[-1].value)
+    _, label, unit = INSTRUMENTS[key]
+    return Observation(id=key, label=label, value=latest.value, unit=unit,
+        source_id=source_id, trading_date=latest.at.date(), basis="Yahoo last price vs preceding completed session; futures continuous contract",
+        daily_pct=day_change, annual_pct=annual, annual_basis="YoY" if annual is not None else None,
+        series=(history + [latest])[-90:])
+
+
+def collect_yahoo(http, snapshot):
+    def fetch(item):
+        key, (symbol, _, _) = item
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol, safe='')}?interval=1d&range=2y"
+        worker = Http(http.directory)
+        response = worker.get(url)
+        obs = yahoo_observation(response.json(), key, snapshot.as_of, f"yf_{key}")
+        source = Source(id=obs.source_id, url=url, published_at=obs.series[-1].at,
+            retrieved_at=datetime.now(timezone.utc), text=f"{obs.label}: {obs.value} {obs.unit}; {obs.basis}",
+            sha256=hashlib.sha256(response.content).hexdigest())
+        return obs, source
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = {pool.submit(fetch, item): item[0] for item in INSTRUMENTS.items()}
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                obs, source = future.result()
+                snapshot.observations[key] = obs
+                snapshot.sources[source.id] = source
+            except Exception as exc:
+                snapshot.add_issue("YAHOO_MISSING", f"{key}: {type(exc).__name__}")
+
+
+def parse_vnd(text):
+    text = str(text).strip().replace(" ", "")
+    if re.fullmatch(r"\d{2}\.\d{3},\d{2}", text):
+        text = text.replace(".", "").replace(",", ".")
+    elif re.fullmatch(r"\d{2},\d{3}\.\d{2}", text):
+        text = text.replace(",", "")
+    elif re.fullmatch(r"\d{2}[.,]\d{3}", text):
+        text = text.replace(".", "").replace(",", "")
+    value = Decimal(text)
+    if not Decimal("10000") <= value <= Decimal("100000"):
+        raise ValueError("USD-VND rate outside expected range")
+    return value
+
+
+def parse_sbv(html):
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text(" ", strip=True)
+    if "Request Rejected" in text:
+        raise ValueError("SBV rejected the request")
+    tables = soup.find_all("table")
+    if not tables:
+        raise ValueError("SBV did not return rate tables")
+    central = re.search(r"1\s*Đô\s*la\s*Mỹ\s*=\s*([\d.,]+)", tables[0].get_text(" "), re.I)
+    dates = re.findall(r"(\d{1,2})/(\d{1,2})/(20\d{2})", tables[0].get_text(" "))
+    if not central or not dates:
+        raise ValueError("Missing SBV fixing or effective date")
+    day, month, year = dates[0]
+    effective = datetime(int(year), int(month), int(day)).date()
+    rates = {"SBV_CENTRAL": parse_vnd(central.group(1))}
+    for table in tables[1:]:
+        for row in table.select("tr"):
+            cols = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+            if len(cols) >= 5 and "USD" in cols[1]:
+                rates["SBV_BUY"] = parse_vnd(cols[3])
+                rates["SBV_SELL"] = parse_vnd(cols[4])
+                break
+    return effective, rates
+
+
+def collect_sbv(http, snapshot):
+    url = "https://sbv.gov.vn/vi/t%E1%BB%B7-gi%C3%A1"
+    response = http.get(url)
+    day, rates = parse_sbv(response.text)
+    at = datetime.combine(day, time(0), tzinfo=snapshot.as_of.tzinfo)
+    snapshot.sources["sbv"] = Source(id="sbv", url=url, published_at=at,
+        retrieved_at=datetime.now(timezone.utc), sha256=hashlib.sha256(response.content).hexdigest())
+    central = rates["SBV_CENTRAL"]
+    rates["SBV_CEILING"] = (central * Decimal("1.05")).to_integral_value(rounding=ROUND_FLOOR)
+    rates["SBV_FLOOR"] = (central * Decimal("0.95")).to_integral_value(rounding=ROUND_CEILING)
+    for key, value in rates.items():
+        snapshot.observations[key] = Observation(id=key, label=key, value=value, unit="VND/USD",
+            source_id="sbv", trading_date=day, basis="SBV published fixing; floor/ceiling derived at ±5%")
+
+
+def parse_mb(payload):
+    items = payload if isinstance(payload, list) else payload.get("lst", [])
+    dollars = [i for i in items if i.get("currencyCode") == "USD"]
+    chosen = [i for i in dollars if i.get("usd_default") or re.search(r"50[-,]100", i.get("name", ""))]
+    if len(chosen) != 1:
+        raise ValueError("Missing/ambiguous MB default USD denomination")
+    row = chosen[0]
+    buy, sell = parse_vnd(row["buy_bank_transfer"]), parse_vnd(row["sell_bank_transfer"])
+    if buy > sell:
+        raise ValueError("MB buy is greater than sell")
+    return buy, sell
+
+
+def collect_mb(http, snapshot):
+    url = "https://www.mbbank.com.vn/ExchangeRate"
+    page = BeautifulSoup(http.get(url).text, "html.parser")
+    token = page.find("input", {"name": "__RequestVerificationToken"})
+    headers = {"Referer": url, "X-Requested-With": "XMLHttpRequest",
+               "Accept": "application/json, text/plain, */*"}
+    if token:
+        headers["MB-XSRF-Token-FormOnline"] = token.get("value", "")
+    today = snapshot.as_of.date()
+    for suffix, day in [("", today), ("_PREV", previous_weekday(today))]:
+        endpoint = f"https://www.mbbank.com.vn/api/getExchangeRate/{day.isoformat()}"
+        try:
+            response = http.get(endpoint, headers=headers)
+            buy, sell = parse_mb(response.json())
+            sid = f"mb{suffix}"
+            snapshot.sources[sid] = Source(id=sid, url=endpoint,
+                published_at=datetime.combine(day, time(0), tzinfo=snapshot.as_of.tzinfo),
+                retrieved_at=datetime.now(timezone.utc), sha256=hashlib.sha256(response.content).hexdigest())
+            for name, value in [("BUY", buy), ("SELL", sell)]:
+                key = f"MB_{name}{suffix}"
+                snapshot.observations[key] = Observation(id=key, label=key, value=value, unit="VND/USD",
+                    source_id=sid, trading_date=day, basis="MB transfer rate requested for explicit date; previous weekday, unavailable holidays remain missing")
+        except Exception as exc:
+            snapshot.add_issue("MB_MISSING", f"{day}: {type(exc).__name__}")
+
+
+def collect_news(http, snapshot):
+    query = 'site:tradingeconomics.com ("Euro Area" OR "United States" OR Japan OR China) when:1d'
+    feeds = [f"https://news.google.com/rss/search?q={quote_plus(query)}&hl=en-US&gl=US&ceid=US:en",
+             "https://vietnambiz.vn/rss/tai-chinh.rss"]
+    candidates = []
+    for url in feeds:
+        try:
+            feed = feedparser.parse(http.get(url).content)
+            for entry in feed.entries[:15]:
+                try:
+                    at = parsedate_to_datetime(entry.get("published", ""))
+                    if at.tzinfo is None:
+                        continue
+                    text = BeautifulSoup(entry.get("summary", ""), "html.parser").get_text(" ", strip=True)
+                    candidates.append((entry.get("link", ""), at, entry.get("title", "") + "\n" + text))
+                except (ValueError, TypeError):
+                    continue
+        except Exception as exc:
+            snapshot.add_issue("NEWS_FEED", f"{urlparse(url).hostname}: {type(exc).__name__}")
+    # Full articles for coffee/oil and VIRA domestic market commentary.
+    listings = [("https://vietnambiz.vn/chu-de/ca-phe-34.htm", "a[href]"),
+                ("https://vietnambiz.vn/chu-de/dau-mo-60.htm", "a[href]"),
+                ("https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html", ".story__title a")]
+    for url, selector in listings:
+        try:
+            soup = BeautifulSoup(http.get(url).text, "html.parser")
+            links = []
+            for a in soup.select(selector):
+                href = urljoin(url, a.get("href", ""))
+                title = a.get("title", "") or a.get_text(" ", strip=True)
+                is_article = (len(title) > 20 and "/chu-de/" not in href and href.endswith(".htm"))
+                is_vira = (urlparse(href).hostname == "vira.org.vn"
+                           and "/Ban-tin-Kinh-te-Tai-chinh-ngay/Ban-tin" in href)
+                if (urlparse(href).hostname == urlparse(url).hostname and href not in links
+                        and (is_article or is_vira)):
+                    links.append(href)
+                if len(links) >= 4:
+                    break
+            for link in links:
+                detail = BeautifulSoup(http.get(link).text, "html.parser")
+                meta = detail.find("meta", property="article:published_time")
+                if not meta:
+                    continue
+                at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
+                if at.tzinfo is None:
+                    continue
+                body = detail.select_one("#abody, .vnbcbc-body, .detail-content")
+                if body:
+                    candidates.append((link, at, body.get_text(" ", strip=True)[:18000]))
+        except Exception as exc:
+            snapshot.add_issue("NEWS_ARTICLE", f"{urlparse(url).hostname}: {type(exc).__name__}")
+    for url, at, text in candidates:
+        if not url.startswith("https://") or not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=36):
+            continue
+        sid = "news_" + hashlib.sha256(url.encode()).hexdigest()[:12]
+        snapshot.sources[sid] = Source(id=sid, url=url, published_at=at,
+            retrieved_at=datetime.now(timezone.utc), text=text, kind="news")
+
+
+def collect_snapshot(http, as_of):
+    from .calculations import derive_swaps
+    from .vira import collect_vira
+
+    snapshot = Snapshot(as_of=as_of)
+    for name, collector in [("VIRA", collect_vira), ("SBV", collect_sbv), ("MB", collect_mb),
+                            ("YAHOO", collect_yahoo), ("NEWS", collect_news)]:
+        try:
+            collector(http, snapshot)
+        except Exception as exc:
+            snapshot.add_issue(f"{name}_SOURCE", f"{name}: {type(exc).__name__}: {exc}")
+    derive_swaps(snapshot)
+    return snapshot

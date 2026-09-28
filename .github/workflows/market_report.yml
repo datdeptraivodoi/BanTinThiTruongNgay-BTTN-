@@ -1,68 +1,74 @@
-name: MB Treasury Automated Market Report (BTTN)
+name: BTTN midday
 
 on:
   schedule:
-    # 04:00 UTC = 11:00 Giờ Việt Nam (Chạy Thứ 2 đến Thứ 6) - Bản Tin Thị Trường Ngày
-    - cron: '0 4 * * 1-5'
-
-  # Cho phép bấm nút "Run workflow" để test bất kỳ lúc nào trên web GitHub
+    # 12:00 Asia/Ho_Chi_Minh (UTC+7), Monday-Friday. GitHub may queue runs late.
+    - cron: '0 5 * * 1-5'
   workflow_dispatch:
     inputs:
-      report_type:
-        description: 'Chọn loại bản tin cần chạy thử'
-        required: true
-        default: 'midday'
-        type: choice
-        options:
-          - midday
-          - morning
+      send_email:
+        description: 'Send after validation (otherwise preview only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bttn-publication
+  cancel-in-progress: false
 
 jobs:
-  build-and-send-report:
+  publish:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 30
     steps:
-    - name: 1. Checkout repository
-      uses: actions/checkout@v4
-
-    - name: 2. Cài đặt môi trường Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-        cache: 'pip'
-
-    - name: 3. Cài đặt LibreOffice và bộ Font tiếng Việt (để xuất PDF không lỗi)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libreoffice fonts-dejavu fonts-liberation fonts-noto-cjk
-
-    - name: 4. Cài đặt các thư viện Python
-      run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: 5. Khởi chạy hệ thống xuất bản Bản Tin Thị Trường Ngày
-      env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.Open_Router_API_Key }}
-        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-        SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TARGET_TYPE="${{ github.event.inputs.report_type }}"
-        else
-          TARGET_TYPE="midday"
-        fi
-
-        echo ">>> Bắt đầu tạo báo cáo loại: $TARGET_TYPE"
-        python market_report.py --type $TARGET_TYPE
-
-    - name: 6. Lưu trữ file Word và PDF (Artifacts tải về trực tiếp)
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: BanTinThiTruongNgay-${{ github.run_number }}
-        path: |
-          *.docx
-          *.pdf
-        if-no-files-found: warn
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice fonts-dejavu fonts-liberation libgl1
+          python -m pip install -r requirements-dev.txt
+      - name: Regression tests
+        run: python -m pytest -q
+      - name: Restore delivery ledger
+        id: ledger
+        uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: bttn-ledger-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: bttn-ledger-
+      - name: Collect, validate, render and publish
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.Open_Router_API_Key }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'inclusionai/ling-3.0-flash-fin:free' }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn' }}
+          SEND_EMAIL: ${{ github.event_name == 'schedule' || inputs.send_email }}
+        run: |
+          if [ "$SEND_EMAIL" = "true" ]; then
+            python market_report.py --type midday --send
+          else
+            python market_report.py --type midday --dry-run
+          fi
+      - name: Persist delivery ledger even after SMTP uncertainty
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: bttn-ledger-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Save report and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BTTN-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output/
+          retention-days: 7
+          if-no-files-found: warn

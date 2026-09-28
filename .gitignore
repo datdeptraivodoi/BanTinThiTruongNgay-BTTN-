@@ -34,3 +34,8 @@ Thumbs.db
 .idea/
 *.log
 push_to_github.bat
+
+output/
+.state/
+.pytest_cache/
+.ruff_cache/

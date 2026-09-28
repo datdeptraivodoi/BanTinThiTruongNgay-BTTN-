@@ -1,58 +1,69 @@
-# HỆ THỐNG TỔNG HỢP BẢN TIN THỊ TRƯỜNG NGÀY (BTTN) - MB TREASURY
+# Bản tin thị trường ngày BTTN
 
-Hệ thống tự động hóa 100% xuất bản **Bản Tin Thị Trường Ngày** cho Khối Kinh doanh Tiền tệ & Thị trường Vốn (MB Treasury), tích hợp Google Gemini AI, tự động thu thập số liệu đa nguồn, điền biểu mẫu Word (`.docx`) chuẩn nhận diện thương hiệu MB, chuyển đổi PDF và gửi email định kỳ.
+Pipeline Python tạo bản tin từ dữ liệu có nguồn, nội dung AI dạng JSON và template Word. Workflow bắt đầu **12:00 giờ Việt Nam, thứ Hai–thứ Sáu** (`05:00 UTC`). Đây là giờ trigger; GitHub Actions có thể xếp hàng nên không bảo đảm email đến đúng 12:00.
 
----
+## Các thay đổi
 
-## ⏰ Lịch Phát Hành Định Kỳ (Thứ 2 - Thứ 6)
-* **11:00 AM (Giờ Việt Nam):** Tự động khởi chạy, quét dữ liệu thị trường, sinh file **Word (`.docx`)** và **PDF (`.pdf`)** chuẩn 3 trang $\rightarrow$ Gửi email tự động tới các hòm thư nội bộ.
+- `bttn/sources.py`, `vira.py`: thu thập, lưu bản gốc và hash; mỗi số có nguồn, thời điểm, đơn vị, ngày giao dịch và cách tính.
+- VIRA Market Watch: chọn ấn bản theo thời gian xuất bản, bỏ bài cũ ghim đầu trang và bài sau cutoff. Bảng ảnh được OCR cục bộ ở bốn cấu hình; một ô chỉ được dùng khi ít nhất hai lần đọc đồng ý và không có kết quả trái nhau. OCR đồng thuận vẫn không thay thế kiểm tra nghiệp vụ; thay đổi bố cục nguồn có thể khiến bản tin bị chặn.
+- VNIBOR VND/USD, SOFR và lợi suất trái phiếu lấy từ VIRA. Lợi suất trái phiếu hiện là chuẩn **10 năm theo quốc gia**, không tự tạo đường cong nhiều kỳ hạn.
+- Swap tham khảo = **lãi suất VND − lãi suất USD**, cùng kỳ hạn và cùng ấn bản, đơn vị **điểm phần trăm**. VND có ngày fixing riêng; USD ghi Last trong ấn bản, không khẳng định hai fixing cùng thời điểm. Đây không phải báo giá FX swap mua/bán.
+- AI chỉ tạo nội dung theo schema. Các số trong văn xuôi phải dùng `{{OBSERVATION_ID}}`; Python thay bằng giá trị đã kiểm tra. Giới hạn từ, nguồn, cấu trúc đoạn và việc tạm dừng dự báo đều được kiểm tra trước khi dựng file.
+- Mọi ô dữ liệu, bảng và biểu đồ động cũ trong template bị xóa trước khi dựng lại. Không dùng số mẫu làm fallback. Nội dung AI thực sự xuất hiện trong Word.
+- Biến động ngày so với phiên hoàn tất liền trước, không dùng `chartPreviousClose` của toàn khoảng tải. Biến động năm ghi rõ **YoY**.
+- Phần dự báo và ý tưởng sản phẩm để trống. Thiếu nguồn cho mục tùy chọn thì hiện `—`; thiếu dữ liệu bắt buộc thì dừng và không gửi email.
+- PDF phải được xuất mới qua LibreOffice, đủ ba trang và không còn placeholder. Gửi thất bại trả mã lỗi. Ledger ngăn tự gửi lại khi SMTP có kết quả không chắc chắn.
 
----
+## Nguồn và giới hạn hiện tại
 
-## 📋 Cấu Trúc Báo Cáo Chuẩn 3 Trang & Giới Hạn Nghiệp Vụ
-Báo cáo tuân thủ nghiêm ngặt theo mẫu chuẩn [`template.docx`](template.docx) và quy tắc tại [`SKILL.md`](SKILL.md):
+| Nhóm | Nguồn | Khi thiếu |
+|---|---|---|
+| VNIBOR, SOFR, trái phiếu | [VIRA Market Watch](https://vira.org.vn/tin/Market-Watch.html) | Chặn nếu thiếu kỳ hạn bắt buộc hoặc chưa có ấn bản ngày phát hành |
+| Tỷ giá trung tâm | [NHNN](https://sbv.gov.vn/vi/tỷ-giá) | Chặn; trang có thể trả Request Rejected |
+| Tỷ giá chuyển khoản USD | [MBBank](https://www.mbbank.com.vn/ExchangeRate) | Chặn nếu thiếu ngày hiện tại; ngày trước thiếu thì để — |
+| FX, chỉ số, một số hợp đồng hàng hóa | Yahoo Finance chart API | FX bắt buộc thiếu thì chặn; chỉ tiêu tùy chọn để — |
+| Tin tức | RSS và bài VietnamBiz, VIRA; Google News RSS tìm Trading Economics | Cần ít nhất ba nguồn trong cửa sổ 36 giờ; RSS có thể chỉ cung cấp tóm tắt |
 
-| Trang | Chuyên mục | Nguồn dữ liệu & Chỉ tiêu | Giới hạn độ dài / Format |
-| :---: | :--- | :--- | :--- |
-| **Trang 1** | **Tỷ giá NHNN** | Web SBV (`sbv.gov.vn`) | Tỷ giá Trung tâm, Trần (+5%), Sàn (-5%), Mua & Bán |
-| **Trang 1** | **Tỷ giá MBBank** | API MBBank (`mbbank.com.vn`) | Giá Mua CK / Bán CK ngày $T$ và $T-1$ |
-| **Trang 1** | **TT Tiền tệ LNH** | Nghiệp vụ OMO, Lãi suất LNH | **88 – 95 từ**; Nhận định Dự kiến **14 – 16 từ** |
-| **Trang 1** | **TT Ngoại hối USD-VND**| Diễn biến tỷ giá liên ngân hàng | **75 – 80 từ**; Nhận định Dự kiến **đúng 12 từ** |
-| **Trang 1** | **Biểu đồ thị trường** | 3 Biểu đồ Lãi suất, Tỷ giá, Trái phiếu| Kích thước chuẩn OpenXML (2.10", 2.08", 1.94") |
-| **Trang 2** | **USD kết hợp EUR** | DXY, Fed, ECB, Tỷ giá EUR-USD | **150 – 200 từ**; Mở đầu chuẩn phiên $T-1$ và $T$ |
-| **Trang 2** | **Nhật Bản (JPY)** | BoJ, Tiền lương, Lạm phát, USD-JPY | **100 – 130 từ**; Mở đầu chuẩn tỷ giá đóng cửa |
-| **Trang 2** | **Trung Quốc (CNY)** | PBoC, Tăng trưởng, BĐS, USD-CNY | **50 – 70 từ**; Mở đầu biến động USD-CNY |
-| **Trang 2** | **Chỉ số CK Quốc tế** | Dow Jones, Nikkei 225, DAX | Times New Roman 10pt Bold, Xanh tăng / Đỏ giảm |
-| **Trang 3** | **Cà phê (Robusta & Arabica)**| Vietnambiz & Sàn quốc tế | **Đúng 135 từ**; Bắt đầu "Cập nhật giá cà phê thế giới," |
-| **Trang 3** | **Năng lượng & Kim loại**| Dầu Brent (Vietnambiz) & Giá Vàng| **125 – 135 từ** (Dầu ~95 từ, Vàng ~35 từ đúng 2 câu) |
-| **Trang 3** | **Bảng Giá Hàng Hóa** | 18 mặt hàng (TradingEconomics/Yahoo)| Font Times New Roman 8pt Bold, Xanh tăng / Đỏ giảm |
+CRB Spot, LME Index, cao su, RON92 và kim loại LME chưa có adapter được xác minh nên để `—`. Không thay bằng chỉ số/hợp đồng khác chỉ vì tên gần giống. Dữ liệu futures Yahoo không phải báo giá spot và có thể có hiệu ứng đổi hợp đồng. Mỗi lần chạy lưu ngày/nguồn cụ thể trong `snapshot.json`; không coi tất cả là giá realtime.
 
----
+Lịch ngày làm việc hiện bỏ thứ Bảy/Chủ nhật, chưa tích hợp lịch nghỉ lễ từng thị trường. Yêu cầu VIRA, NHNN và MB đúng ngày sẽ chặn phát hành khi chưa có số mới, kể cả ngày nghỉ. Không phát hành bản tin nếu nguồn bị lỗi; đây là hành vi chủ ý. Kiểm tra JSON/nguồn/số không chứng minh hoàn toàn mọi quan hệ nhân quả trong văn xuôi; vẫn cần review biên tập trước khi đổi model chính.
 
-## 🛡️ Cơ Chế Bảo Vệ 2 Tầng & Chống Rate Limit Tuyệt Đối
-1. **Single-Batch Request:** Toàn bộ tin tức trong phiên gom lại thành 1 yêu cầu duy nhất $\rightarrow$ Tiết kiệm tối đa hạn ngạch API.
-2. **Tầng 1 (Chính) - Cơ chế Thác nước Google Gemini (Waterfall Fallback):**
-   * Ưu tiên 1: `gemini-3.8-flash` $\rightarrow$ `gemini-3.7-flash` $\rightarrow$ `gemini-3.6-flash` $\rightarrow$ `gemini-3.5-flash`
-   * Phao cứu sinh: `gemini-3.5-flash-lite` (500 RPD, 15 RPM)
-   * Kế tiếp: `gemini-3.1-flash-lite`, `gemini-3-flash`, `gemini-2.5-flash`, `gemini-1.5-flash`.
-   * Tự động bắt mã lỗi `429 (ResourceExhausted)` để đổi model tức thì.
-3. **Tầng 2 (Dự phòng khẩn cấp) - OpenRouter Ling 3.0 Flash Fin:**
-   * Model: `inclusionai/ling-3.0-flash-fin:free` (chuyên biệt cho Tài chính & Đầu tư).
-   * Phản hồi siêu tốc (~2.15 giây), tự động kích hoạt nếu toàn bộ các model Google Gemini gặp sự cố mạng hoặc bảo trì.
+## Cài đặt và chạy
 
----
+Python 3.12; cài LibreOffice, font Times New Roman hoặc Liberation Serif tương thích. PDF được kiểm tra lại do khác biệt font có thể làm đổi số trang.
 
-## 🚀 Thiết Lập Chạy Tự Động Trên GitHub Actions
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+$env:LIBREOFFICE_PATH = 'C:\Program Files\LibreOffice\program\soffice.exe'
+.\.venv\Scripts\python -m pytest -q
+.\.venv\Scripts\python build_test_report.py
+```
 
-### 1. Cấu hình Secrets trên GitHub
-Vào **Settings** $\rightarrow$ **Secrets and variables** $\rightarrow$ **Actions** $\rightarrow$ Nhấn **New repository secret**:
-* `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`): API Key từ [Google AI Studio](https://aistudio.google.com/).
-* `OPENROUTER_API_KEY`: API Key từ [OpenRouter](https://openrouter.ai/keys) (Dự phòng tầng 2).
-* `SENDER_EMAIL`: Địa chỉ Gmail gửi bản tin (ví dụ: `your-email@gmail.com`).
-* `SENDER_PASSWORD`: Mật khẩu ứng dụng 16 ký tự của Gmail (App Password).
+`build_test_report.py` chỉ dùng fixtures có nhãn KIỂM THỬ, qua cùng pipeline sản xuất, không gọi model/nguồn mạng và không gửi email. Fixtures nằm trong `tests/fixtures`, hoàn toàn tách dữ liệu sản xuất. `--send` từ chối snapshot fixture.
 
-### 2. Kiểm tra chạy thử (Manual Trigger)
-1. Vào tab **Actions** trên GitHub repository.
-2. Chọn workflow **MB Treasury Automated Market Report (BTTN)**.
-3. Nhấn **Run workflow** $\rightarrow$ Chọn `midday` $\rightarrow$ Nhấn nút xanh **Run workflow**.
-4. Quá trình chạy mất khoảng 1-2 phút; hệ thống sẽ gửi email đính kèm file DOCX và PDF chuẩn nhận diện MB Bank.
+```powershell
+# Kiểm tra nguồn, không gọi AI và không gửi
+python market_report.py --collect-only
+# Tạo bản xem trước (mặc định), có gọi model khi dữ liệu đạt
+python market_report.py --dry-run
+# Phát hành sau mọi kiểm tra; chỉ ngày làm việc 12:00–15:00 VN
+python market_report.py --send
+# Tái hiện bản đã lưu, không gọi nguồn hoặc AI
+python market_report.py --snapshot path/to/snapshot.json --content path/to/content.json --dry-run
+```
+
+`--as-of` yêu cầu ISO timestamp có múi giờ. Muốn tái hiện chính xác giá intraday cũ phải dùng snapshot đã lưu, không lấy nến ngày hiện tại để suy ngược intraday. Mỗi lần chạy có thư mục riêng dưới `output/`, gồm raw sources, OCR, snapshot, validation, phản hồi model, biểu đồ, Word, PDF và manifest hash/thời gian. Lỗi trả mã khác không; `--collect-only` trả 2 khi dữ liệu chưa đạt. Không lưu API key vào các log này.
+
+## Model và GitHub Actions
+
+Cấu hình ít nhất một key: `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`), `OPENROUTER_API_KEY` (tương thích secret cũ `Open_Router_API_Key`). Các tên model cấu hình qua `GEMINI_MODEL`, `OPENROUTER_MODEL`; giá trị mặc định giữ baseline Gemini và Ling Fin fallback trong `.env.example`. Tên model phải tồn tại và tài khoản phải có quyền gọi. Chưa tự động nâng Ling Fin thành model chính khi chưa có đánh giá trên bản tin thực tế.
+
+Mỗi provider tối đa hai lần thử; đầu ra sai sẽ được yêu cầu sửa rồi mới chuyển fallback. Có thể chạy chỉ bằng OpenRouter mà không cần key Gemini. Bản free không gửi response_format bắt buộc; vẫn phải qua cùng Pydantic và kiểm tra nội dung. Không lấy reasoning_content làm bản tin. Nhật ký `model-attempts.json` ghi model, thời gian, usage và lỗi kiểm tra để so sánh sau này. Skills cải thiện chỉ dẫn, không tương đương fine-tuning trọng số.
+
+Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biến `RECIPIENTS` có thể cấu hình trong GitHub Repository Variables; mặc định giữ danh sách nhận cũ. Workflow schedule gọi `--send`. Chạy thủ công mặc định chỉ preview, bật `send_email` nếu muốn gửi; cùng giới hạn giờ và dữ liệu áp dụng. Workflow kiểm tra riêng chạy trên push/PR và không cần secrets.
+
+`.state/` lưu trạng thái gửi theo ngày. Workflow dùng concurrency và Actions cache để lưu qua các lần chạy. Cache có thể bị xóa/evict và ledger ở máy khác không được đồng bộ; đây không phải bảo đảm exactly-once toàn cục. Nếu trạng thái `unknown`/`partial_or_unknown`, kiểm tra hộp thư người gửi và danh sách nhận trước khi xử lý ledger. Không xóa ledger để retry mù. Chạy nhiều môi trường sản xuất cần kho ledger bền vững dùng chung.
+
+Không chạy workflow gửi thư chỉ để kiểm thử code. Xem `validation-data.json`, `validation-content.json` và `manifest.json` trong artifact khi workflow bị chặn.
