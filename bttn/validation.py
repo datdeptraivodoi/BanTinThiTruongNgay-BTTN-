@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .models import Issue, ReportContent, Snapshot, business_days_between, previous_weekday
@@ -30,11 +30,26 @@ def resolve(text: str, snapshot: Snapshot) -> str:
     return result
 
 
+def expected_session_date(as_of: datetime, snapshot: Snapshot | None = None) -> date:
+    day = as_of.date()
+    if day.weekday() >= 5:
+        return previous_weekday(day + timedelta(days=1))
+    # Before morning publication hours (midday report publication / morning releases ~11:00 VN)
+    if as_of.hour < 11:
+        if snapshot:
+            vira = snapshot.sources.get("vira")
+            if vira and vira.published_at.date() == day:
+                return day
+        return previous_weekday(day)
+    return day
+
+
 def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
     result = [i for i in snapshot.issues if i.severity == "error"]
     cfg = rules()
     def error(code, message):
         result.append(Issue(severity="error", code=code, message=message))
+    expected = expected_session_date(snapshot.as_of, snapshot)
     for key in cfg["required_observations"]:
         if key not in snapshot.observations:
             error("REQUIRED_DATA", f"Thiếu số liệu bắt buộc: {key}")
@@ -48,7 +63,7 @@ def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
         if source.published_at > snapshot.as_of or obs.trading_date > snapshot.as_of.date():
             error("FUTURE_DATA", f"{key}: dữ liệu sau thời điểm chốt")
         max_b_days = cfg.get("source_max_age_business_days", 3)
-        b_days = business_days_between(obs.trading_date, snapshot.as_of.date())
+        b_days = business_days_between(obs.trading_date, expected)
         if b_days > max_b_days:
             error("STALE_DATA", f"{key}: số liệu cũ ngày {obs.trading_date} ({b_days} ngày làm việc)")
         if obs.annual_pct is not None and not obs.annual_basis:
@@ -66,8 +81,6 @@ def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
             error("NONFINITE", key)
         if source.kind != "derived" and not source.url.startswith("https://"):
             error("SOURCE_URL", key)
-    day = snapshot.as_of.date()
-    expected = previous_weekday(day + timedelta(days=1)) if day.weekday() >= 5 else day
     vira = snapshot.sources.get("vira")
     if not vira or vira.published_at.date() != expected:
         error("VIRA_EDITION", f"Cần Market Watch ngày {expected}; chưa nhận được ấn bản phù hợp")

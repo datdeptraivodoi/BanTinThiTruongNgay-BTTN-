@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -8,6 +9,8 @@ import requests
 
 from .models import ReportContent
 from .validation import ROOT, rules, validate_content
+
+LOG = logging.getLogger("bttn.analysis")
 
 
 def make_prompt(snapshot):
@@ -66,22 +69,62 @@ def openrouter(prompt, schema, model, key):
     return choice["message"]["content"], data.get("usage", {})
 
 
+def extract_error_info(exc: Exception) -> tuple[str, int | None, str]:
+    err_type = type(exc).__name__
+    status_code = None
+    err_msg = str(exc)
+
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        status_code = exc.response.status_code
+    elif hasattr(exc, "code"):
+        try:
+            status_code = int(exc.code)
+        except (ValueError, TypeError):
+            pass
+    elif hasattr(exc, "status_code"):
+        try:
+            status_code = int(exc.status_code)
+        except (ValueError, TypeError):
+            pass
+
+    if status_code is None:
+        if "503" in err_msg or "UNAVAILABLE" in err_msg:
+            status_code = 503
+        elif "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+            status_code = 429
+        elif "500" in err_msg:
+            status_code = 500
+        elif "502" in err_msg:
+            status_code = 502
+        elif "504" in err_msg:
+            status_code = 504
+
+    return err_type, status_code, err_msg
+
+
 def generate(snapshot, directory: Path):
     prompt = make_prompt(snapshot)
     (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
     schema = ReportContent.model_json_schema()
+
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    openrouter_key = (
+        os.getenv("OPENROUTER_API_KEY")
+        or os.getenv("OPEN_ROUTER_API_KEY")
+        or os.getenv("Open_Router_API_Key")
+        or os.getenv("OPENROUTER_KEY")
+    )
+
     providers = [
-        ("gemini", os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
-         os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"), gemini),
-        ("openrouter", os.getenv("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash-fin:free"),
-         os.getenv("OPENROUTER_API_KEY") or os.getenv("Open_Router_API_Key"), openrouter),
+        ("gemini", os.getenv("GEMINI_MODEL", "gemini-3.8-flash"), gemini_key, gemini, 3),
+        ("openrouter", os.getenv("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash-fin:free"), openrouter_key, openrouter, 2),
     ]
     attempts = []
-    for provider, model, key, call in providers:
+    for provider, model, key, call, max_attempts in providers:
         if not key:
             continue
         current_prompt = prompt
-        for attempt in range(2):
+        for attempt in range(max_attempts):
             started = time.monotonic()
             record = {"provider": provider, "model": model, "attempt": attempt + 1,
                       "prompt_sha256": hashlib.sha256(current_prompt.encode()).hexdigest()}
@@ -98,13 +141,36 @@ def generate(snapshot, directory: Path):
                     record["status"] = "valid"
                     return content
             except Exception as exc:
-                # Do not put provider exception bodies/URLs containing keys in logs.
-                record["error"] = type(exc).__name__
-                if isinstance(exc, requests.HTTPError):
-                    record["http_status"] = exc.response.status_code
-                current_prompt = prompt + "\nYour response must be a complete JSON object, matching the schema exactly."
+                err_type, status_code, err_msg = extract_error_info(exc)
+                record["error"] = err_type
+                if status_code:
+                    record["http_status"] = status_code
+
+                is_transient = status_code in (429, 500, 502, 503, 504) or isinstance(exc, (requests.ConnectionError, requests.Timeout))
+                if is_transient:
+                    error_desc = f"HTTP {status_code} Service Unavailable" if status_code == 503 else (f"HTTP {status_code}" if status_code else err_type)
+                    record["error_message"] = error_desc
+                    # Keep prompt intact for service errors (do not alter prompt to repair JSON)
+                    if attempt + 1 < max_attempts:
+                        delay = (2 ** attempt) * 2  # 2s on attempt 0, 4s on attempt 1
+                        LOG.warning("%s attempt %d/%d failed with service error (%s); retrying in %ds...", provider, attempt + 1, max_attempts, error_desc, delay)
+                        time.sleep(delay)
+                        continue
+                else:
+                    current_prompt = prompt + "\nYour response must be a complete JSON object, matching the schema exactly."
             finally:
                 record["elapsed_seconds"] = round(time.monotonic() - started, 3)
                 attempts.append(record)
                 (directory / "model-attempts.json").write_text(json.dumps(attempts, ensure_ascii=False, indent=2), encoding="utf-8")
-    raise RuntimeError("No provider produced valid content. See model-attempts.json; no report was sent.")
+
+    # Informative exception if all providers failed
+    gemini_record = [a for a in attempts if a["provider"] == "gemini"]
+    has_503 = any(a.get("http_status") == 503 or "503" in str(a.get("error", "")) or "503" in str(a.get("error_message", "")) for a in gemini_record)
+
+    if has_503 and not openrouter_key:
+        error_msg = "Gemini HTTP 503; chưa có fallback khả dụng (thiếu OPENROUTER_API_KEY). See model-attempts.json; no report was sent."
+    elif has_503:
+        error_msg = "Gemini HTTP 503; OpenRouter fallback cũng không tạo được nội dung hợp lệ. See model-attempts.json; no report was sent."
+    else:
+        error_msg = "No provider produced valid content. See model-attempts.json; no report was sent."
+    raise RuntimeError(error_msg)

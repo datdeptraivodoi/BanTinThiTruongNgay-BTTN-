@@ -13,7 +13,7 @@ from bttn.models import ReportContent, Snapshot, business_days_between, parse_as
 from bttn.rendering import render
 from bttn.summary import generate_markdown_summary, write_step_summary
 from bttn.sources import parse_mb, parse_sbv, parse_vnd, yahoo_observation
-from bttn.validation import resolve, validate_content, validate_snapshot
+from bttn.validation import expected_session_date, resolve, validate_content, validate_snapshot
 from bttn.vira import editions, number, parse_tokens
 
 FIXTURES = Path(__file__).parent / 'fixtures'
@@ -335,5 +335,95 @@ def test_early_delivery_window_block(tmp_path, monkeypatch):
     m = json.loads(manifests[0].read_text(encoding='utf-8'))
     assert m['status'] == 'blocked_timing'
     assert '12:00–15:00 VN' in m['timing_issue']
+
+
+def test_expected_session_date():
+    from datetime import date
+    # Tuesday 29/09 at 00:10 (before morning publication 11:00) -> Monday 28/09
+    tue_midnight = parse_as_of('2026-09-29T00:10:00+07:00')
+    assert expected_session_date(tue_midnight) == date(2026, 9, 28)
+
+    # Tuesday 29/09 at 12:00 (midday) -> Tuesday 29/09
+    tue_midday = parse_as_of('2026-09-29T12:00:00+07:00')
+    assert expected_session_date(tue_midday) == date(2026, 9, 29)
+
+    # Monday 28/09 at 08:00 (before 11:00) -> Friday 25/09
+    mon_morning = parse_as_of('2026-09-28T08:00:00+07:00')
+    assert expected_session_date(mon_morning) == date(2026, 9, 25)
+
+    # Saturday 26/09 at 15:00 -> Friday 25/09
+    sat = parse_as_of('2026-09-26T15:00:00+07:00')
+    assert expected_session_date(sat) == date(2026, 9, 25)
+
+
+def test_midnight_validation_uses_previous_session(snapshot):
+    from datetime import date
+    # Run at 00:10 on Tuesday 29/09 with Monday 28/09 VIRA and 23/09 VNIBOR
+    snapshot.as_of = parse_as_of('2026-09-29T00:10:00+07:00')
+    snapshot.sources['vira'].published_at = parse_as_of('2026-09-28T11:00:00+07:00')
+    snapshot.observations['MB_BUY'].trading_date = date(2026, 9, 28)
+    snapshot.observations['MB_SELL'].trading_date = date(2026, 9, 28)
+    snapshot.observations['SBV_CENTRAL'].trading_date = date(2026, 9, 28)
+
+    for tenor in ["ON", "1W", "1M", "3M", "6M"]:
+        snapshot.observations[f'VND_{tenor}'].trading_date = date(2026, 9, 23)
+
+    for s in snapshot.sources.values():
+        if s.kind == 'news':
+            s.published_at = snapshot.as_of - timedelta(hours=5)
+
+    issues = validate_snapshot(snapshot)
+    assert not issues
+
+
+def test_gemini_503_retries_and_falls_back_to_openrouter(snapshot, content, monkeypatch, tmp_path):
+    monkeypatch.setenv('GEMINI_API_KEY', 'fake-gemini-key')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'fake-openrouter-key')
+
+    slept = []
+    monkeypatch.setattr('time.sleep', lambda s: slept.append(s))
+
+    class Mock503Error(Exception):
+        code = 503
+
+    gemini_mock = MagicMock(side_effect=Mock503Error('HTTP/1.1 503 Service Unavailable'))
+    openrouter_mock = MagicMock(return_value=(content.model_dump_json(), {'total_tokens': 100}))
+
+    monkeypatch.setattr(analysis, 'gemini', gemini_mock)
+    monkeypatch.setattr(analysis, 'openrouter', openrouter_mock)
+
+    res = analysis.generate(snapshot, tmp_path)
+    assert res == content
+    assert gemini_mock.call_count == 3  # 3 attempts with backoff
+    assert len(slept) == 2  # 2 backoff sleeps
+    assert openrouter_mock.call_count == 1
+
+
+def test_gemini_503_without_openrouter_key_informative_error(snapshot, monkeypatch, tmp_path):
+    monkeypatch.setenv('GEMINI_API_KEY', 'fake-gemini-key')
+    for key in ['OPENROUTER_API_KEY', 'OPEN_ROUTER_API_KEY', 'Open_Router_API_Key', 'OPENROUTER_KEY']:
+        monkeypatch.delenv(key, raising=False)
+
+    monkeypatch.setattr('time.sleep', lambda s: None)
+
+    class Mock503Error(Exception):
+        code = 503
+
+    gemini_mock = MagicMock(side_effect=Mock503Error('HTTP/1.1 503 Service Unavailable'))
+    monkeypatch.setattr(analysis, 'gemini', gemini_mock)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        analysis.generate(snapshot, tmp_path)
+
+    err = str(exc_info.value)
+    assert 'Gemini HTTP 503' in err
+    assert 'chưa có fallback khả dụng' in err
+    assert 'OPENROUTER_API_KEY' in err
+
+    manifest = {'status': 'failed', 'error_type': 'RuntimeError', 'error_message': err}
+    md = generate_markdown_summary(manifest, snapshot=snapshot, directory=tmp_path)
+    assert '❌ THẤT BẠI (FAILED) - Gemini HTTP 503; chưa có fallback khả dụng' in md
+    assert 'OPENROUTER_API_KEY' in md
+
 
 

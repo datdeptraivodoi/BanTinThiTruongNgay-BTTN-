@@ -46,7 +46,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.Open_Router_API_Key }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPEN_ROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY }}
+          OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY || secrets.OPENROUTER_API_KEY || secrets.Open_Router_API_Key }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'inclusionai/ling-3.0-flash-fin:free' }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}

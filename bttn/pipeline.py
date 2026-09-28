@@ -136,6 +136,7 @@ def run(args):
             manifest["status"] = "failed"
         manifest["error_type"] = type(exc).__name__
         message = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else type(exc).__name__
+        manifest["error_message"] = message
         LOG.error("%s. Run directory: %s", message, directory)
         return 1
     finally:

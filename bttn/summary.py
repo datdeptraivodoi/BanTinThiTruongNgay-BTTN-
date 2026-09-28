@@ -1,7 +1,9 @@
+import json
 import os
 from pathlib import Path
 
 from .models import Issue, Snapshot, business_days_between
+from .validation import expected_session_date
 
 
 def generate_markdown_summary(
@@ -10,10 +12,15 @@ def generate_markdown_summary(
     data_issues: list[Issue] | None = None,
     content_issues: list[Issue] | None = None,
     timing_issue: str | None = None,
+    directory: Path | None = None,
 ) -> str:
     lines = []
     status = manifest.get("status", "unknown")
+    error_message = manifest.get("error_message", "")
+    error_type = manifest.get("error_type", "")
     send_requested = manifest.get("send_requested", False)
+
+    is_gemini_503 = "503" in error_message or "503" in error_type
 
     # 1. Header & Status Badge
     status_badges = {
@@ -27,7 +34,12 @@ def generate_markdown_summary(
         "failed": ("❌ THẤT BẠI (FAILED)", "Quá trình thực thi gặp lỗi hệ thống hoặc ngoại lệ chưa xử lý."),
     }
 
-    title, desc = status_badges.get(status, (f"ℹ️ TRẠNG THÁI: {status.upper()}", ""))
+    if status == "failed" and is_gemini_503:
+        title = "❌ THẤT BẠI (FAILED) - Gemini HTTP 503; chưa có fallback khả dụng"
+        desc = "Dịch vụ Gemini gặp lỗi HTTP 503 Service Unavailable (tạm thời quá tải). OpenRouter chưa hoạt động dự phòng (thiếu OPENROUTER_API_KEY hoặc chưa cấu hình trong GitHub Secrets)."
+    else:
+        title, desc = status_badges.get(status, (f"ℹ️ TRẠNG THÁI: {status.upper()}", ""))
+
     lines.append(f"# {title}\n")
     if desc:
         lines.append(f"> {desc}\n")
@@ -57,8 +69,12 @@ def generate_markdown_summary(
     if content_issues:
         for iss in content_issues:
             all_issues.append((iss.severity.upper(), iss.code, iss.message))
-    if manifest.get("error_type"):
-        all_issues.append(("LỖI", manifest["error_type"], "Hệ thống gặp ngoại lệ trong quá trình chạy"))
+
+    if error_message:
+        code = "GEMINI_503" if is_gemini_503 else (error_type or "SYSTEM_ERROR")
+        all_issues.append(("LỖI", code, error_message))
+    elif error_type:
+        all_issues.append(("LỖI", error_type, "Hệ thống gặp ngoại lệ trong quá trình chạy"))
 
     if all_issues:
         lines.append("### ⚠️ Vấn đề phát hiện & Lý do chặn\n")
@@ -69,9 +85,41 @@ def generate_markdown_summary(
             lines.append(f"| {sev_icon} {sev} | `{code}` | {msg} |")
         lines.append("")
 
-    # 4. Source Freshness Table
+    # 4. Model attempts table (if available)
+    if directory and (directory / "model-attempts.json").is_file():
+        try:
+            attempts_data = json.loads((directory / "model-attempts.json").read_text(encoding="utf-8"))
+            if attempts_data:
+                lines.append("### 🤖 Nhật ký gọi mô hình AI (Model Attempts)\n")
+                lines.append("| Lần thử | Nhà cung cấp | Model | Trạng thái | Chi tiết lỗi / Ghi chú |")
+                lines.append("| :---: | :--- | :--- | :---: | :--- |")
+                for att in attempts_data:
+                    p = att.get("provider", "—")
+                    m = att.get("model", "—")
+                    num = att.get("attempt", 1)
+                    st = att.get("status")
+                    if st == "valid":
+                        st_icon = "✅ Thành công"
+                        detail = "Nội dung hợp lệ"
+                    else:
+                        st_icon = "🔴 Thất bại"
+                        code = att.get("http_status")
+                        detail = att.get("error_message") or att.get("error") or (f"HTTP {code}" if code else "Lỗi cấu trúc")
+                    lines.append(f"| {num} | **{p.title()}** | `{m}` | {st_icon} | {detail} |")
+                lines.append("")
+        except Exception:
+            pass
+
+    if is_gemini_503:
+        lines.append("> [!TIP]\n"
+                     "> **Khắc phục sự cố khi Gemini quá tải (HTTP 503):** Hệ thống đã có cơ chế tự động chuyển sang mô hình dự phòng (OpenRouter). "
+                     "Để kích hoạt, vui lòng kiểm tra **GitHub Repository -> Settings -> Secrets and variables -> Actions** và đảm bảo secret "
+                     "**OPENROUTER_API_KEY** (hoặc **OPEN_ROUTER_API_KEY**) đã được thêm vào kho lưu trữ.\n")
+
+    # 5. Source Freshness Table
     if snapshot:
-        lines.append("### 🔍 Kiểm tra nguồn dữ liệu & Độ mới (Source Freshness)\n")
+        ref_date = expected_session_date(snapshot.as_of, snapshot)
+        lines.append(f"### 🔍 Kiểm tra nguồn dữ liệu & Độ mới (Phiên kỳ vọng: {ref_date.strftime('%d/%m/%Y')})\n")
         lines.append("| Nguồn / Chỉ tiêu | Ngày số liệu | Độ mới (Ngày làm việc) | Trạng thái |")
         lines.append("| :--- | :---: | :---: | :---: |")
 
@@ -79,8 +127,8 @@ def generate_markdown_summary(
         vira = snapshot.sources.get("vira")
         if vira:
             v_date = vira.published_at.strftime("%d/%m/%Y")
-            v_b_days = business_days_between(vira.published_at.date(), snapshot.as_of.date())
-            v_status = "✅ Hợp lệ" if vira.published_at.date() == snapshot.as_of.date() else f"⚠️ Ngày {v_date}"
+            v_b_days = business_days_between(vira.published_at.date(), ref_date)
+            v_status = "✅ Hợp lệ" if vira.published_at.date() == ref_date else f"⚠️ Ngày {v_date}"
             lines.append(f"| **VIRA Market Watch** | {v_date} | {v_b_days} ngày | {v_status} |")
         else:
             lines.append("| **VIRA Market Watch** | — | — | ❌ Thiếu ấn bản |")
@@ -89,7 +137,7 @@ def generate_markdown_summary(
         vnd_on = snapshot.observations.get("VND_ON")
         if vnd_on:
             vnd_date = vnd_on.trading_date.strftime("%d/%m/%Y")
-            vnd_b_days = business_days_between(vnd_on.trading_date, snapshot.as_of.date())
+            vnd_b_days = business_days_between(vnd_on.trading_date, ref_date)
             vnd_status = "✅ Đạt chuẩn (≤ 3 ngày LV)" if vnd_b_days <= 3 else f"❌ Quá cũ ({vnd_b_days} ngày LV > 3)"
             lines.append(f"| **Lãi suất VNIBOR VND (9 kỳ hạn)** | {vnd_date} | {vnd_b_days} ngày | {vnd_status} |")
         else:
@@ -99,8 +147,8 @@ def generate_markdown_summary(
         sbv = snapshot.observations.get("SBV_CENTRAL")
         if sbv:
             sbv_date = sbv.trading_date.strftime("%d/%m/%Y")
-            sbv_b_days = business_days_between(sbv.trading_date, snapshot.as_of.date())
-            sbv_status = "✅ Hôm nay" if sbv.trading_date == snapshot.as_of.date() else f"⚠️ Phiên {sbv_date}"
+            sbv_b_days = business_days_between(sbv.trading_date, ref_date)
+            sbv_status = "✅ Phiên chuẩn" if sbv.trading_date == ref_date else f"⚠️ Phiên {sbv_date}"
             lines.append(f"| **Tỷ giá trung tâm NHNN (SBV)** | {sbv_date} | {sbv_b_days} ngày | {sbv_status} |")
         else:
             lines.append("| **Tỷ giá trung tâm NHNN (SBV)** | — | — | ❌ Thiếu dữ liệu |")
@@ -109,8 +157,8 @@ def generate_markdown_summary(
         mb = snapshot.observations.get("MB_BUY")
         if mb:
             mb_date = mb.trading_date.strftime("%d/%m/%Y")
-            mb_b_days = business_days_between(mb.trading_date, snapshot.as_of.date())
-            mb_status = "✅ Hôm nay" if mb.trading_date == snapshot.as_of.date() else f"⚠️ Phiên {mb_date}"
+            mb_b_days = business_days_between(mb.trading_date, ref_date)
+            mb_status = "✅ Phiên chuẩn" if mb.trading_date == ref_date else f"⚠️ Phiên {mb_date}"
             lines.append(f"| **Tỷ giá chuyển khoản MBBank** | {mb_date} | {mb_b_days} ngày | {mb_status} |")
         else:
             lines.append("| **Tỷ giá chuyển khoản MBBank** | — | — | ❌ Thiếu dữ liệu |")
@@ -127,7 +175,7 @@ def generate_markdown_summary(
 
         lines.append("")
 
-    # 5. Artifacts
+    # 6. Artifacts
     artifacts = manifest.get("artifacts", {})
     if artifacts:
         lines.append("### 📁 Tài liệu xuất xưởng (Artifacts)\n")
@@ -156,6 +204,7 @@ def write_step_summary(
         data_issues=data_issues,
         content_issues=content_issues,
         timing_issue=timing_issue,
+        directory=directory,
     )
     if directory:
         try:
