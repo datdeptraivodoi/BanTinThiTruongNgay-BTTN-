@@ -2,13 +2,15 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import subprocess
 import time
 from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from .models import ReportContent, Snapshot, parse_as_of
+from .models import Issue, ReportContent, Snapshot, parse_as_of
+from .summary import write_step_summary
 from .validation import ROOT, validate_content, validate_snapshot
 
 LOG = logging.getLogger("bttn")
@@ -19,8 +21,6 @@ def write_json(path, value):
 
 
 def run(args):
-    import os
-
     from .analysis import generate
     from .delivery import send_report
     from .http import Http
@@ -39,7 +39,28 @@ def run(args):
     except (OSError, subprocess.SubprocessError):
         manifest["commit"] = "unknown"
     LOG.info("Run directory: %s", directory)
+
+    snapshot = None
+    data_issues = []
+    content_issues = []
+    timing_issue = None
+
     try:
+        # Early delivery window check: avoids costly generation if schedule delay already missed midday window
+        if args.send and not args.snapshot:
+            now = parse_as_of(None)
+            if (now.date() != as_of.date() or now.weekday() >= 5
+                    or not 12 <= now.hour < 15 or not timedelta(0) <= now - as_of <= timedelta(hours=3)):
+                timing_issue = (
+                    f"Lịch chạy ngoài khung giờ phát hành 12:00–15:00 VN hôm nay "
+                    f"(hiện tại: {now.strftime('%H:%M %d/%m/%Y')}). "
+                    f"Dừng sớm để tránh gửi bản tin trưa vào buổi tối."
+                )
+                LOG.warning(timing_issue)
+                manifest["status"] = "blocked_timing"
+                manifest["timing_issue"] = timing_issue
+                return 1
+
         if args.snapshot:
             snapshot = Snapshot.model_validate_json(Path(args.snapshot).read_text(encoding="utf-8"))
             if args.as_of and snapshot.as_of != as_of:
@@ -49,41 +70,70 @@ def run(args):
         else:
             snapshot = collect_snapshot(Http(directory / "sources"), as_of)
         (directory / "snapshot.json").write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
+
         if args.send and snapshot.purpose != "live":
             raise ValueError("Test fixtures cannot be sent")
+
         data_issues = validate_snapshot(snapshot)
         write_json(directory / "validation-data.json", [i.model_dump() for i in snapshot.issues + data_issues])
+
         if args.collect_only:
             manifest["status"] = "collected" if not data_issues else "blocked_data"
             return 0 if not data_issues else 2
-        if data_issues:
-            raise ValueError("Data validation failed; inspect validation-data.json")
+
+        if data_issues and args.send:
+            LOG.warning("Data validation has issues (%d issues) for --send; producing draft for inspection without sending", len(data_issues))
+
         if args.content:
             content = ReportContent.model_validate_json(Path(args.content).read_text(encoding="utf-8"))
         else:
             content = generate(snapshot, directory)
+
         content_issues = validate_content(content, snapshot)
         write_json(directory / "validation-content.json", [i.model_dump() for i in content_issues])
         (directory / "content.json").write_text(content.model_dump_json(indent=2), encoding="utf-8")
-        if content_issues:
-            raise ValueError("Content validation failed; inspect validation-content.json")
+
+        # Distinct draft vs official publication watermark / label
+        is_draft = not args.send or bool(data_issues or content_issues)
         output = directory / f"BTTN-{snapshot.as_of:%Y%m%d}.docx"
-        render(snapshot, content, ROOT / "template.docx", output)
+        render(snapshot, content, ROOT / "template.docx", output, is_draft=is_draft)
         pdf = convert_and_validate(output)
-        manifest["status"] = "validated_draft"
         manifest["artifacts"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [output, pdf]}
+
+        # If there are data or content issues:
+        # In --send mode: Block delivery and return 1 (artifacts preserved for review)
+        # In --dry-run mode: Return 0 with draft_with_issues status
+        if data_issues:
+            manifest["status"] = "blocked_data" if args.send else "draft_with_issues"
+            if args.send:
+                LOG.error("Sending blocked due to data issues; draft saved to %s", output)
+                return 1
+            return 0
+
+        if content_issues:
+            manifest["status"] = "blocked_content" if args.send else "draft_with_issues"
+            if args.send:
+                LOG.error("Sending blocked due to content issues; draft saved to %s", output)
+                return 1
+            return 0
+
+        manifest["status"] = "validated_draft"
+
         if args.send:
             now = parse_as_of(None)
             if (now.date() != snapshot.as_of.date() or now.weekday() >= 5
                     or not 12 <= now.hour < 15 or not timedelta(0) <= now - snapshot.as_of <= timedelta(hours=3)):
+                manifest["status"] = "blocked_timing"
                 raise ValueError("Only today's weekday midday edition may be sent between 12:00 and 15:00 VN")
             recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn").split(",") if r.strip()]
             send_report(snapshot, [output, pdf], Path(args.state_dir), recipients)
             manifest["status"] = "sent"
+
         LOG.info("Completed: %s", manifest["status"])
         return 0
     except Exception as exc:
-        manifest["status"] = "failed"
+        if manifest["status"] in ("started", "validated_draft"):
+            manifest["status"] = "failed"
         manifest["error_type"] = type(exc).__name__
         message = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else type(exc).__name__
         LOG.error("%s. Run directory: %s", message, directory)
@@ -91,6 +141,9 @@ def run(args):
     finally:
         manifest["elapsed_seconds"] = round(time.monotonic() - started, 3)
         write_json(directory / "manifest.json", manifest)
+        write_step_summary(manifest, snapshot=snapshot, data_issues=data_issues,
+                           content_issues=content_issues, timing_issue=timing_issue,
+                           directory=directory)
 
 
 def main(argv=None):

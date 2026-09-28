@@ -151,7 +151,7 @@ def plot_cell(cell, title, snapshot, keys, directory, name, height=1.55, categor
     paragraph(cell, "Nguồn: VIRA Market Watch" if category else "Nguồn: Yahoo Finance · các phiên có dữ liệu", size=7, color="666666")
 
 
-def render(snapshot, content, template: Path, output: Path):
+def render(snapshot, content, template: Path, output: Path, is_draft: bool = False):
     if not template.is_file():
         raise ValueError("Required template.docx is missing")
     doc = Document(template)
@@ -195,7 +195,12 @@ def render(snapshot, content, template: Path, output: Path):
                 cleared.add(c._tc)
     header = cells(table.rows[2])
     clear(header[1])
-    label = "KIỂM THỬ · KHÔNG PHÁT HÀNH · " if snapshot.purpose == "fixture" else ""
+    if snapshot.purpose == "fixture":
+        label = "KIỂM THỬ · KHÔNG PHÁT HÀNH · "
+    elif is_draft:
+        label = "BẢN NHÁP · KHÔNG PHÁT HÀNH · "
+    else:
+        label = ""
     paragraph(header[1], label + snapshot.as_of.strftime("Ngày %d.%m.%Y · chốt %H:%M"), size=11, bold=True, color=NAVY)
     r3, r4, r5, r7, r8, r9, r11, r12 = [cells(table.rows[i]) for i in [3, 4, 5, 7, 8, 9, 11, 12]]
     heading(r3[0], "Tin tức nổi bật")

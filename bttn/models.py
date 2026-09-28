@@ -83,6 +83,20 @@ def previous_weekday(day: date) -> date:
     return day
 
 
+def business_days_between(start: date, end: date) -> int:
+    from datetime import timedelta
+
+    if start >= end:
+        return 0
+    cur = start + timedelta(days=1)
+    count = 0
+    while cur <= end:
+        if cur.weekday() < 5:
+            count += 1
+        cur += timedelta(days=1)
+    return count
+
+
 def parse_as_of(value: str | None) -> datetime:
     from zoneinfo import ZoneInfo
 

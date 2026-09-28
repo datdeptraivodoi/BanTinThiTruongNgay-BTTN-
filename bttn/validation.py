@@ -3,7 +3,7 @@ import re
 from datetime import timedelta
 from pathlib import Path
 
-from .models import Issue, ReportContent, Snapshot, previous_weekday
+from .models import Issue, ReportContent, Snapshot, business_days_between, previous_weekday
 
 ROOT = Path(__file__).resolve().parents[1]
 TOKEN = re.compile(r"\{\{([A-Za-z0-9_ ]+)\}\}")
@@ -47,8 +47,10 @@ def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
             continue
         if source.published_at > snapshot.as_of or obs.trading_date > snapshot.as_of.date():
             error("FUTURE_DATA", f"{key}: dữ liệu sau thời điểm chốt")
-        if (snapshot.as_of.date() - obs.trading_date).days > cfg["source_max_age_days"]:
-            error("STALE_DATA", f"{key}: số liệu cũ ngày {obs.trading_date}")
+        max_b_days = cfg.get("source_max_age_business_days", 3)
+        b_days = business_days_between(obs.trading_date, snapshot.as_of.date())
+        if b_days > max_b_days:
+            error("STALE_DATA", f"{key}: số liệu cũ ngày {obs.trading_date} ({b_days} ngày làm việc)")
         if obs.annual_pct is not None and not obs.annual_basis:
             error("ANNUAL_BASIS", f"{key}: thiếu định nghĩa biến động năm")
         if obs.annual_pct is not None and obs.annual_basis != "YoY":

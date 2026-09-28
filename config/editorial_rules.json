@@ -11,7 +11,8 @@
     "USD_ON", "USD_1W", "USD_1M", "USD_3M", "USD_6M", "BOND_Vietnam",
     "EURUSD", "USDJPY", "USDCNY", "SBV_CENTRAL", "MB_BUY", "MB_SELL"
   ],
-  "source_max_age_days": 4,
+  "source_max_age_business_days": 3,
+  "source_max_age_days": 5,
   "news_max_age_hours": 36,
-  "notes": "Word counts use whitespace after placeholder substitution. Annual change is explicitly YoY. Rate differential uses VNIBOR VND minus VNIBOR USD from the same VIRA edition, in percentage points; it is not an executable FX swap quote. Forecasts stay blank."
+  "notes": "Word counts use whitespace after placeholder substitution. Annual change is explicitly YoY. Rate differential uses VNIBOR VND minus VNIBOR USD from the same VIRA edition, in percentage points; it is not an executable FX swap quote. Forecasts stay blank. Data freshness is evaluated in business days (excluding weekends)."
 }

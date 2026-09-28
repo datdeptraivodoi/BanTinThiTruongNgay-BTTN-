@@ -9,8 +9,9 @@ import pytest
 
 from bttn import analysis, delivery
 from bttn.calculations import derive_swaps, percentage
-from bttn.models import ReportContent, Snapshot, parse_as_of
+from bttn.models import ReportContent, Snapshot, business_days_between, parse_as_of
 from bttn.rendering import render
+from bttn.summary import generate_markdown_summary, write_step_summary
 from bttn.sources import parse_mb, parse_sbv, parse_vnd, yahoo_observation
 from bttn.validation import resolve, validate_content, validate_snapshot
 from bttn.vira import editions, number, parse_tokens
@@ -215,3 +216,124 @@ def test_fixture_cannot_enter_send_pipeline(tmp_path):
     assert len(manifests) == 1
     assert json.loads(manifests[0].read_text())['status'] == 'failed'
     assert not list(tmp_path.glob('**/*.docx'))
+
+
+def test_business_days_between_weekends():
+    from datetime import date
+    assert business_days_between(date(2026, 9, 28), date(2026, 9, 28)) == 0
+    assert business_days_between(date(2026, 9, 23), date(2026, 9, 24)) == 1
+    # Wednesday 23/09 to Monday 28/09 = 3 business days (Thu 24, Fri 25, Mon 28)
+    assert business_days_between(date(2026, 9, 23), date(2026, 9, 28)) == 3
+    # Friday 25/09 to Monday 28/09 = 1 business day
+    assert business_days_between(date(2026, 9, 25), date(2026, 9, 28)) == 1
+    # Tuesday 22/09 to Monday 28/09 = 4 business days
+    assert business_days_between(date(2026, 9, 22), date(2026, 9, 28)) == 4
+
+
+def test_vira_weekend_gap_freshness(snapshot):
+    from datetime import date
+    snapshot.as_of = parse_as_of('2026-09-28T12:00:00+07:00')
+    snapshot.sources['vira'].published_at = parse_as_of('2026-09-28T11:00:00+07:00')
+    snapshot.observations['MB_BUY'].trading_date = date(2026, 9, 28)
+    snapshot.observations['MB_SELL'].trading_date = date(2026, 9, 28)
+    snapshot.observations['SBV_CENTRAL'].trading_date = date(2026, 9, 28)
+
+    # VNIBOR VND dated Wednesday 23/09/2026 (3 business days old over the weekend)
+    for tenor in ["ON", "1W", "1M", "3M", "6M"]:
+        snapshot.observations[f'VND_{tenor}'].trading_date = date(2026, 9, 23)
+
+    issues = validate_snapshot(snapshot)
+    assert 'STALE_DATA' not in codes(issues)
+
+    # If VNIBOR VND was dated Tuesday 22/09/2026 (4 business days old) -> STALE_DATA
+    snapshot.observations['VND_ON'].trading_date = date(2026, 9, 22)
+    issues_stale = validate_snapshot(snapshot)
+    assert 'STALE_DATA' in codes(issues_stale)
+
+
+def test_step_summary_markdown(snapshot, tmp_path, monkeypatch):
+    summary_file = tmp_path / 'step_summary.md'
+    monkeypatch.setenv('GITHUB_STEP_SUMMARY', str(summary_file))
+    manifest = {
+        'status': 'blocked_timing',
+        'as_of': '2026-09-28T12:00:00+07:00',
+        'send_requested': True,
+        'elapsed_seconds': 1.23,
+        'commit': '11d1006a',
+        'artifacts': {'BTTN-20260928.docx': 'abc1234567890', 'BTTN-20260928.pdf': 'def1234567890'},
+    }
+    content = write_step_summary(manifest, snapshot=snapshot, timing_issue='Lịch chạy muộn 18:17', directory=tmp_path)
+    assert 'CHẶN PHÁT HÀNH (BLOCKED - LỊCH CHẠY MUỘN)' in content
+    assert 'Lịch chạy muộn 18:17' in content
+    assert 'VIRA Market Watch' in content
+    assert 'BTTN-20260928.docx' in content
+    assert summary_file.read_text(encoding='utf-8') == content + '\n\n'
+
+
+def test_dry_run_with_stale_data_creates_draft_with_issues(snapshot, content, tmp_path, monkeypatch):
+    from datetime import date
+    from bttn.pipeline import main
+    snapshot.purpose = 'live'
+    snapshot.observations['VND_ON'].trading_date = date(2026, 9, 10)
+    snap_path = tmp_path / 'live_snap.json'
+    content_path = tmp_path / 'live_content.json'
+    snap_path.write_text(snapshot.model_dump_json(), encoding='utf-8')
+    content_path.write_text(content.model_dump_json(), encoding='utf-8')
+
+    def fake_convert(p):
+        pdf = p.with_suffix('.pdf')
+        pdf.write_bytes(b'%PDF-1.4')
+        return pdf
+
+    monkeypatch.setattr('bttn.rendering.convert_and_validate', fake_convert)
+
+    result = main(['--dry-run', '--snapshot', str(snap_path), '--content', str(content_path), '--output-dir', str(tmp_path)])
+    assert result == 0
+    manifests = list(tmp_path.glob('*/manifest.json'))
+    assert len(manifests) == 1
+    m = json.loads(manifests[0].read_text(encoding='utf-8'))
+    assert m['status'] == 'draft_with_issues'
+    assert any(p.suffix == '.docx' for p in tmp_path.glob('*/*.docx'))
+
+
+def test_send_blocked_when_data_has_issues(snapshot, content, tmp_path, monkeypatch):
+    from datetime import date
+    from bttn.pipeline import main
+    snapshot.purpose = 'live'
+    snapshot.observations['VND_ON'].trading_date = date(2026, 9, 10)
+    snap_path = tmp_path / 'live_snap2.json'
+    content_path = tmp_path / 'live_content2.json'
+    snap_path.write_text(snapshot.model_dump_json(), encoding='utf-8')
+    content_path.write_text(content.model_dump_json(), encoding='utf-8')
+
+    def fake_convert(p):
+        pdf = p.with_suffix('.pdf')
+        pdf.write_bytes(b'%PDF-1.4')
+        return pdf
+
+    monkeypatch.setattr('bttn.rendering.convert_and_validate', fake_convert)
+
+    result = main(['--send', '--snapshot', str(snap_path), '--content', str(content_path), '--output-dir', str(tmp_path)])
+    assert result == 1
+    manifests = list(tmp_path.glob('*/manifest.json'))
+    assert len(manifests) == 1
+    m = json.loads(manifests[0].read_text(encoding='utf-8'))
+    assert m['status'] == 'blocked_data'
+    assert any(p.suffix == '.docx' for p in tmp_path.glob('*/*.docx'))
+
+
+def test_early_delivery_window_block(tmp_path, monkeypatch):
+    from bttn.pipeline import main
+    late_time = parse_as_of('2026-09-28T18:17:00+07:00')
+    orig_parse = parse_as_of
+    monkeypatch.setattr('bttn.pipeline.parse_as_of', lambda val: late_time if val is None else orig_parse(val))
+
+    result = main(['--send', '--as-of', '2026-09-28T12:00:00+07:00', '--output-dir', str(tmp_path)])
+    assert result == 1
+    manifests = list(tmp_path.glob('*/manifest.json'))
+    assert len(manifests) == 1
+    m = json.loads(manifests[0].read_text(encoding='utf-8'))
+    assert m['status'] == 'blocked_timing'
+    assert '12:00–15:00 VN' in m['timing_issue']
+
+
