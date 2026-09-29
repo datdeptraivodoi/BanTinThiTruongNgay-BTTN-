@@ -9,7 +9,14 @@ from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from .models import Issue, ReportContent, Snapshot, create_draft_placeholder_content, parse_as_of
+from .models import (
+    Issue,
+    ReportContent,
+    Snapshot,
+    create_draft_placeholder_content,
+    parse_as_of,
+    sanitize_content_for_draft_render,
+)
 from .summary import write_step_summary
 from .validation import ROOT, validate_content, validate_snapshot
 
@@ -110,7 +117,8 @@ def run(args):
         # Distinct draft vs official publication watermark / label
         is_draft = not args.send or bool(data_issues or content_issues or ai_error)
         output = directory / f"BTTN-{snapshot.as_of:%Y%m%d}.docx"
-        render(snapshot, content, ROOT / "template.docx", output, is_draft=is_draft)
+        render_content = sanitize_content_for_draft_render(content, snapshot, content_issues) if (content_issues or ai_error) else content
+        render(snapshot, render_content, ROOT / "template.docx", output, is_draft=is_draft)
         pdf = convert_and_validate(output)
         manifest["artifacts"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [output, pdf]}
 

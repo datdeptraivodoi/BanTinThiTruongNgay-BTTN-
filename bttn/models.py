@@ -157,3 +157,76 @@ def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> Re
         ),
     )
 
+
+def sanitize_content_for_draft_render(
+    content: ReportContent,
+    snapshot: Snapshot,
+    content_issues: list[Issue] | None = None,
+) -> ReportContent:
+    """Sanitizes content for Word/PDF rendering when content has validation issues or unknown placeholders.
+    Sections with placeholder, language or technical leakage errors are replaced by clean draft pending notices,
+    preventing renderer crashes while preserving all verified tables and charts in the draft document.
+    """
+    from .validation import resolve
+
+    ref_src = ["vira"] if "vira" in snapshot.sources else (list(snapshot.sources.keys())[:1] if snapshot.sources else ["manual"])
+    cloned = content.model_copy(deep=True)
+    issue_messages = [i.message for i in (content_issues or [])]
+
+    def is_safe_text(t: str) -> bool:
+        try:
+            res = resolve(t, snapshot, safe=False)
+            return bool(res)
+        except Exception:
+            return False
+
+    for sec_name in ["interbank", "usd_vnd", "eur_usd", "japan", "china", "coffee", "energy_metals"]:
+        sec = getattr(cloned, sec_name)
+        has_issue = any(msg.startswith(sec_name) for msg in issue_messages)
+        if not has_issue:
+            for p in sec.paragraphs:
+                if not is_safe_text(p):
+                    has_issue = True
+                    break
+        if has_issue:
+            label = sec_name.replace("_", "-").upper()
+            if sec_name == "coffee":
+                sec.paragraphs = [
+                    "Cập nhật giá cà phê thế giới, [Phần nhận xét thị trường cà phê chưa hoàn tất do lỗi kiểm định nội dung. Bảng số liệu đã được đối soát đầy đủ.]"
+                ]
+            elif sec_name == "eur_usd":
+                sec.paragraphs = [
+                    "[Phần nhận xét ngoại hối EUR-USD chưa hoàn tất do lỗi kiểm định nội dung.]",
+                    "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
+                ]
+            elif sec_name == "energy_metals":
+                sec.paragraphs = [
+                    "[Phần nhận xét năng lượng dầu Brent chưa hoàn tất do lỗi kiểm định nội dung.]",
+                    "[Phần nhận định thị trường vàng đang chờ cập nhật. Vui lòng tham khảo bảng giá kim loại quý.]",
+                ]
+            else:
+                sec.paragraphs = [
+                    f"[Phần nhận xét {label} chưa hoàn tất do lỗi kiểm định nội dung. Vui lòng tham khảo bảng số liệu đã được đối soát chuẩn xác.]"
+                ]
+
+    # Highlights
+    new_highlights = []
+    for idx, h in enumerate(cloned.highlights):
+        has_issue = any(msg.startswith(f"highlight_{idx}") for msg in issue_messages)
+        if not has_issue:
+            for p in h.paragraphs:
+                if not is_safe_text(p):
+                    has_issue = True
+                    break
+        if has_issue:
+            new_highlights.append(
+                Section(
+                    paragraphs=["[Bản nháp: Tiêu điểm thị trường đang chờ hoàn tất biên tập.]"],
+                    source_ids=ref_src,
+                )
+            )
+        else:
+            new_highlights.append(h)
+    cloned.highlights = new_highlights
+    return cloned
+

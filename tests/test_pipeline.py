@@ -11,8 +11,8 @@ from bttn import analysis, delivery
 from bttn.calculations import derive_swaps, percentage
 from bttn.models import ReportContent, Snapshot, business_days_between, parse_as_of
 from bttn.rendering import render
-from bttn.summary import generate_markdown_summary, write_step_summary
 from bttn.sources import parse_mb, parse_sbv, parse_vnd, yahoo_observation
+from bttn.summary import generate_markdown_summary, write_step_summary
 from bttn.validation import expected_session_date, resolve, validate_content, validate_snapshot
 from bttn.vira import editions, number, parse_tokens
 
@@ -272,6 +272,7 @@ def test_step_summary_markdown(snapshot, tmp_path, monkeypatch):
 
 def test_dry_run_with_stale_data_creates_draft_with_issues(snapshot, content, tmp_path, monkeypatch):
     from datetime import date
+
     from bttn.pipeline import main
     snapshot.purpose = 'live'
     snapshot.observations['VND_ON'].trading_date = date(2026, 9, 10)
@@ -298,6 +299,7 @@ def test_dry_run_with_stale_data_creates_draft_with_issues(snapshot, content, tm
 
 def test_send_blocked_when_data_has_issues(snapshot, content, tmp_path, monkeypatch):
     from datetime import date
+
     from bttn.pipeline import main
     snapshot.purpose = 'live'
     snapshot.observations['VND_ON'].trading_date = date(2026, 9, 10)
@@ -518,6 +520,7 @@ def test_summary_shows_both_validation_rejection_and_service_error(snapshot, tmp
 def test_pipeline_draft_fallback_when_ai_fails(snapshot, monkeypatch, tmp_path):
     """When AI fails completely, pipeline produces draft Word/PDF with verified data and blocks --send."""
     from types import SimpleNamespace
+
     from bttn import delivery, pipeline, rendering
 
     snapshot.purpose = "live"
@@ -574,6 +577,115 @@ def test_pipeline_draft_fallback_when_ai_fails(snapshot, monkeypatch, tmp_path):
     out_dir_dry = [d for d in (tmp_path / "out_dry").iterdir() if d.is_dir()][0]
     manifest_dry = json.loads((out_dir_dry / "manifest.json").read_text(encoding="utf-8"))
     assert manifest_dry["status"] == "draft_with_issues"
+
+
+def test_observation_placeholder_percentages(snapshot):
+    snapshot.observations["BRENT"].daily_pct = Decimal("-1.25")
+    snapshot.observations["BRENT"].annual_pct = Decimal("14.50")
+
+    text = "Giá dầu Brent đạt {{BRENT}} USD/thùng, biến động ngày {{BRENT_daily_pct}}% và năm {{BRENT_annual_pct}}%."
+    resolved = resolve(text, snapshot)
+    assert "-1,25" in resolved
+    assert "14,50" in resolved
+
+    safe_resolved = resolve("Giá dầu {{UNKNOWN_TOKEN}}", snapshot, safe=True)
+    assert safe_resolved == "Giá dầu [số liệu đang cập nhật]"
+
+
+def test_validation_catches_technical_leakage_and_english(snapshot, content):
+    content.energy_metals.paragraphs[0] = 'Dầu thô ổn định "source_ids": ["reuters"] và tiếp tục.'
+    issues = validate_content(content, snapshot)
+    assert any(i.code == "TECHNICAL_LEAKAGE" for i in issues)
+
+    content.energy_metals.paragraphs[0] = "The crude oil closed in trading according to market reports."
+    issues = validate_content(content, snapshot)
+    assert any(i.code == "LANGUAGE_NOT_VIETNAMESE" for i in issues)
+
+    content.interbank.paragraphs = ["Swap ON ghi nhận ở {{SWAP_ON}} điểm."]
+    content.interbank.source_ids = ["vira"]
+    issues = validate_content(content, snapshot)
+    assert not any(i.code == "NUMBER_SOURCE" for i in issues)
+
+
+def test_pipeline_draft_fallback_with_invalid_ai_content_does_not_crash(snapshot, content, monkeypatch, tmp_path):
+    """When AI returns content with broken placeholders or technical leakage, pipeline sanitizes it for draft and blocks --send."""
+    from types import SimpleNamespace
+
+    from bttn import delivery, pipeline, rendering
+
+    snapshot.purpose = "live"
+    snap_path = tmp_path / "snapshot.json"
+    snap_path.write_text(snapshot.model_dump_json(), encoding="utf-8")
+
+    def mock_convert(docx):
+        pdf = docx.with_suffix(".pdf")
+        pdf.write_bytes(b"%PDF-1.4 mock")
+        return pdf
+
+    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
+
+    bad_content = content.model_copy(deep=True)
+    bad_content.energy_metals.paragraphs = ['Dầu brent {{NONEXISTENT_KEY}} và "source_ids": [123]']
+    monkeypatch.setattr(analysis, "generate", MagicMock(return_value=bad_content))
+
+    send_mock = MagicMock()
+    monkeypatch.setattr(delivery, "send_report", send_mock)
+
+    args_send = SimpleNamespace(
+        type="midday",
+        send=True,
+        dry_run=False,
+        as_of=str(snapshot.as_of),
+        snapshot=str(snap_path),
+        content=None,
+        collect_only=False,
+        output_dir=str(tmp_path / "out_send_invalid"),
+        state_dir=str(tmp_path / ".state"),
+    )
+    code = pipeline.run(args_send)
+    assert code == 1
+    assert send_mock.call_count == 0
+
+    out_dir = [d for d in (tmp_path / "out_send_invalid").iterdir() if d.is_dir()][0]
+    docx_file = out_dir / f"BTTN-{snapshot.as_of:%Y%m%d}.docx"
+    assert docx_file.is_file()
+    manifest_send = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest_send["status"] == "blocked_content"
+
+    args_dry = SimpleNamespace(
+        type="midday",
+        send=False,
+        dry_run=True,
+        as_of=str(snapshot.as_of),
+        snapshot=str(snap_path),
+        content=None,
+        collect_only=False,
+        output_dir=str(tmp_path / "out_dry_invalid"),
+        state_dir=str(tmp_path / ".state"),
+    )
+    code_dry = pipeline.run(args_dry)
+    assert code_dry == 0
+    out_dir_dry = [d for d in (tmp_path / "out_dry_invalid").iterdir() if d.is_dir()][0]
+    manifest_dry = json.loads((out_dir_dry / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest_dry["status"] == "draft_with_issues"
+
+
+def test_call_with_network_retry_preserves_error_details():
+    from bttn.analysis import call_with_network_retry
+
+    def fail_call(prompt, schema, model, key):
+        raise ValueError("Incomplete OpenRouter final content (finish_reason: length)")
+
+    text, usage, exc, err_info, elapsed = call_with_network_retry(
+        fail_call, "test prompt", {}, "test-model", "key", provider_name="test", max_net_retries=1
+    )
+    assert text is None
+    assert exc is not None
+    err_type, status_code, err_msg, error_desc = err_info
+    assert err_type == "ValueError"
+    assert status_code is None
+    assert "Incomplete OpenRouter final content" in error_desc
+
 
 
 

@@ -33,24 +33,77 @@ ALLOWED_INDEX_NAMES = re.compile(
 )
 
 
+TECHNICAL_LEAKAGE_RE = re.compile(
+    r"(?:"
+    r"\"?source_ids\"?\s*[:=]|"
+    r"\"?paragraphs\"?\s*[:=]|"
+    r"\"?highlights\"?\s*[:=]|"
+    r"```|"
+    r"BEGIN_UNTRUSTED|END_UNTRUSTED"
+    r")",
+    re.I,
+)
+
+ENGLISH_BOILERPLATE_RE = re.compile(
+    r"\b(?:"
+    r"the|and|in|of|to|is|was|were|reported|closed|trading|market|overall|however|meanwhile|against|according"
+    r")\b",
+    re.I,
+)
+
+
 def rules():
     return json.loads((ROOT / "config/editorial_rules.json").read_text(encoding="utf-8"))
 
 
-def format_value(obs):
-    places = 4 if obs.id in {"EURUSD", "USDCNY"} else 0 if obs.unit == "VND/USD" else 2
-    return f"{obs.value:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
+def parse_placeholder_key(key: str, snapshot: Snapshot):
+    """Parses a placeholder key into (Observation, field_name).
+    Supports base observation (e.g. BRENT) and percentage change fields (e.g. BRENT_daily_pct, BRENT_annual_pct).
+    """
+    key = key.strip()
+    if key in snapshot.observations:
+        return snapshot.observations[key], "value"
+    for suffix, field in [
+        ("_daily_pct", "daily_pct"),
+        ("_annual_pct", "annual_pct"),
+        ("_pct", "daily_pct"),
+    ]:
+        if key.endswith(suffix):
+            base_id = key[:-len(suffix)]
+            if base_id in snapshot.observations:
+                return snapshot.observations[base_id], field
+    return None, None
 
 
-def resolve(text: str, snapshot: Snapshot) -> str:
+def format_value(obs, field: str = "value"):
+    if field == "daily_pct":
+        if obs.daily_pct is None:
+            return "—"
+        return f"{obs.daily_pct:.2f}".translate(str.maketrans({",": ".", ".": ","}))
+    elif field == "annual_pct":
+        if obs.annual_pct is None:
+            return "—"
+        return f"{obs.annual_pct:.2f}".translate(str.maketrans({",": ".", ".": ","}))
+    else:
+        places = 4 if obs.id in {"EURUSD", "USDCNY"} else 0 if obs.unit == "VND/USD" else 2
+        return f"{obs.value:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
+
+
+def resolve(text: str, snapshot: Snapshot, safe: bool = False) -> str:
     def replacement(match):
-        key = match.group(1)
-        if key not in snapshot.observations:
+        key = match.group(1).strip()
+        obs, field = parse_placeholder_key(key, snapshot)
+        if obs is None:
+            if safe:
+                return "[số liệu đang cập nhật]"
             raise ValueError(f"Unknown observation placeholder: {key}")
-        return format_value(snapshot.observations[key])
+        return format_value(obs, field=field)
+
     result = TOKEN.sub(replacement, text)
-    if "{{" in result or "}}" in result:
+    if not safe and ("{{" in result or "}}" in result):
         raise ValueError("Malformed unresolved placeholder")
+    elif safe:
+        result = re.sub(r"\{\{[^}]*\}\}", "[số liệu đang cập nhật]", result)
     return result
 
 
@@ -146,10 +199,22 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
         without_indices = ALLOWED_INDEX_NAMES.sub("", without_tokens)
         if re.search(r"\d", without_indices):
             error("UNBOUND_NUMBER", "Số liệu phải dùng {{OBSERVATION_ID}}")
+        if TECHNICAL_LEAKAGE_RE.search(raw):
+            error("TECHNICAL_LEAKAGE", "Phát hiện chuỗi kỹ thuật rò rỉ vào văn bản (ví dụ: source_ids)")
+        eng_matches = ENGLISH_BOILERPLATE_RE.findall(raw)
+        if len(eng_matches) >= 4:
+            error("LANGUAGE_NOT_VIETNAMESE", f"Văn bản chứa nhiều từ tiếng Anh ({', '.join(eng_matches[:4])}...); yêu cầu 100% tiếng Việt")
+
         for key in TOKEN.findall(raw):
-            obs = snapshot.observations.get(key)
-            if obs and obs.source_id not in section.source_ids:
-                error("NUMBER_SOURCE", f"Thiếu nguồn cho {key}")
+            obs, field = parse_placeholder_key(key, snapshot)
+            if obs is None:
+                error("UNKNOWN_PLACEHOLDER", f"Placeholder không xác định: {key}")
+                continue
+            valid_sources = {obs.source_id}
+            if obs.id.startswith("SWAP_") or obs.source_id.startswith("derived_swap_"):
+                valid_sources.add("vira")
+            if not any(sid in section.source_ids for sid in valid_sources):
+                error("NUMBER_SOURCE", f"Thiếu nguồn cho {key} (cần trích dẫn {obs.source_id} hoặc vira)")
         try:
             rendered = resolve(raw, snapshot)
         except ValueError as exc:

@@ -92,7 +92,7 @@ def value(snapshot, key):
 def narrative(cell, title, section, snapshot):
     heading(cell, title)
     for p in section.paragraphs:
-        paragraph(cell, resolve(p, snapshot))
+        paragraph(cell, resolve(p, snapshot, safe=True))
     sources = sorted({snapshot.sources[s].published_at.strftime("%d/%m") for s in section.source_ids if s in snapshot.sources})
     paragraph(cell, "Nguồn: " + ", ".join(section.source_ids) + " · " + ", ".join(sources), size=7, color="666666")
     paragraph(cell, "Dự kiến:", bold=True, color="C00000")
@@ -205,7 +205,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     r3, r4, r5, r7, r8, r9, r11, r12 = [cells(table.rows[i]) for i in [3, 4, 5, 7, 8, 9, 11, 12]]
     heading(r3[0], "Tin tức nổi bật")
     for section in content.highlights:
-        paragraph(r3[0], resolve(" ".join(section.paragraphs), snapshot))
+        paragraph(r3[0], resolve(" ".join(section.paragraphs), snapshot, safe=True))
     narrative(r3[1], "Thị trường tiền tệ liên ngân hàng", content.interbank, snapshot)
     plot_cell(r3[2], "Lãi suất VNIBOR theo kỳ hạn", snapshot, [("VND_", "VND"), ("USD_", "USD")], output.parent, "vnibor", category=True, height=1.35)
     heading(r4[0], "Tỷ giá USD-VND của NHNN")
@@ -241,7 +241,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     heading(r7[2], "Thị trường ngoại hối Châu Á")
     for section in [content.japan, content.china]:
         for p in section.paragraphs:
-            paragraph(r7[2], resolve(p, snapshot))
+            paragraph(r7[2], resolve(p, snapshot, safe=True))
     paragraph(r7[2], "Dự kiến:", bold=True, color="C00000")
     heading(r8[0], "Thị trường chứng khoán thế giới")
     rows = []
