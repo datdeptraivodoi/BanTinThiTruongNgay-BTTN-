@@ -5,7 +5,6 @@ import logging
 import os
 import subprocess
 import time
-from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -107,24 +106,6 @@ def run(args):
     timing_issue = None
 
     try:
-        # Early delivery window check: avoids costly generation if schedule delay already missed midday window
-        test_recipient = getattr(args, "test_recipient", None)
-        if args.send and not args.snapshot and not test_recipient:
-            now = parse_as_of(None)
-            if (now.date() != as_of.date() or now.weekday() >= 5
-                    or not 12 <= now.hour < 15 or not timedelta(0) <= now - as_of <= timedelta(hours=3)):
-                timing_issue = (
-                    f"Lịch chạy ngoài khung giờ phát hành 12:00–15:00 VN hôm nay "
-                    f"(hiện tại: {now.strftime('%H:%M %d/%m/%Y')}). "
-                    f"Dừng sớm để tránh gửi bản tin trưa vào buổi tối."
-                )
-                LOG.warning(timing_issue)
-                manifest["status"] = "blocked_timing"
-                manifest["timing_issue"] = timing_issue
-                return 1
-        elif test_recipient:
-            LOG.info("Bypassing release window check for test delivery to %s", test_recipient)
-
         if args.snapshot:
             snapshot = Snapshot.model_validate_json(Path(args.snapshot).read_text(encoding="utf-8"))
             if args.as_of and snapshot.as_of != as_of:
@@ -204,17 +185,12 @@ def run(args):
         if args.send:
             test_recipient = getattr(args, "test_recipient", None)
             if not test_recipient:
-                now = parse_as_of(None)
-                if (now.date() != snapshot.as_of.date() or now.weekday() >= 5
-                        or not 12 <= now.hour < 15 or not timedelta(0) <= now - snapshot.as_of <= timedelta(hours=3)):
-                    manifest["status"] = "blocked_timing"
-                    raise ValueError("Only today's weekday midday edition may be sent between 12:00 and 15:00 VN")
                 recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn").split(",") if r.strip()]
                 send_report(snapshot, [output, pdf], Path(args.state_dir), recipients, is_test=False)
                 manifest["status"] = "sent"
             else:
                 recipients = [test_recipient.strip()]
-                LOG.info("Sending test report to %s (bypassing release window)", recipients)
+                LOG.info("Sending test report to %s", recipients)
                 send_report(snapshot, [output, pdf], Path(args.state_dir), recipients, is_test=True)
                 manifest["status"] = "sent_test"
 
@@ -254,7 +230,7 @@ def main(argv=None):
     parser.add_argument("--output-dir", default=str(ROOT / "output"))
     parser.add_argument("--state-dir", default=str(ROOT / ".state"))
     args = parser.parse_args(argv)
-    if args.test_smtp or args.test_recipient:
+    if args.test_smtp or (args.test_recipient and not args.dry_run):
         args.send = True
         args.dry_run = False
     if args.send and args.collect_only:

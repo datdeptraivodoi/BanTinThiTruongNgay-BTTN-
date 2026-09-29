@@ -325,19 +325,43 @@ def test_send_blocked_when_data_has_issues(snapshot, content, tmp_path, monkeypa
     assert any(p.suffix == '.docx' for p in tmp_path.glob('*/*.docx'))
 
 
-def test_early_delivery_window_block(tmp_path, monkeypatch):
+def test_unrestricted_delivery_timing(snapshot, content, tmp_path, monkeypatch):
     from bttn.pipeline import main
-    late_time = parse_as_of('2026-09-28T18:17:00+07:00')
-    orig_parse = parse_as_of
-    monkeypatch.setattr('bttn.pipeline.parse_as_of', lambda val: late_time if val is None else orig_parse(val))
 
-    result = main(['--send', '--as-of', '2026-09-28T12:00:00+07:00', '--output-dir', str(tmp_path)])
-    assert result == 1
-    manifests = list(tmp_path.glob('*/manifest.json'))
+    late_time = parse_as_of("2026-09-28T18:17:00+07:00")
+    orig_parse = parse_as_of
+    monkeypatch.setattr("bttn.pipeline.parse_as_of", lambda val: late_time if val is None else orig_parse(val))
+
+    snapshot.purpose = "live"
+    snap_path = tmp_path / "snap.json"
+    snap_path.write_text(snapshot.model_dump_json(), encoding="utf-8")
+    content_path = tmp_path / "content.json"
+    content_path.write_text(content.model_dump_json(), encoding="utf-8")
+
+    send_mock = MagicMock()
+    monkeypatch.setattr("bttn.delivery.send_report", send_mock)
+
+    def fake_convert(docx):
+        pdf = docx.with_suffix(".pdf")
+        pdf.write_bytes(b"%PDF-1.4")
+        return pdf
+
+    monkeypatch.setattr("bttn.rendering.convert_and_validate", fake_convert)
+
+    # Running outside 12:00-15:00 should NOT be blocked by timing
+    result = main([
+        "--send",
+        "--as-of", str(snapshot.as_of),
+        "--snapshot", str(snap_path),
+        "--content", str(content_path),
+        "--output-dir", str(tmp_path),
+    ])
+    assert result == 0
+    manifests = list(tmp_path.glob("*/manifest.json"))
     assert len(manifests) == 1
-    m = json.loads(manifests[0].read_text(encoding='utf-8'))
-    assert m['status'] == 'blocked_timing'
-    assert '12:00–15:00 VN' in m['timing_issue']
+    m = json.loads(manifests[0].read_text(encoding="utf-8"))
+    assert m["status"] == "sent"
+    assert "timing_issue" not in m
 
 
 def test_expected_session_date():
@@ -832,6 +856,40 @@ def test_run_test_smtp_directly_sends_without_ai(tmp_path, monkeypatch):
     manifest = json.loads((out_dirs[0] / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "sent_test"
     assert manifest["test_smtp"] is True
+
+
+def test_parse_vietnambiz_coffee():
+    from datetime import date
+    from decimal import Decimal
+
+    from bttn.sources import parse_vietnambiz_coffee
+
+    html_sample = """
+    <div id="abody">
+      <p>Cập nhật giá cà phê thế giới</p>
+      <p>Kết thúc phiên giao dịch ngày 28/9, giá cà phê robusta hợp đồng giao kỳ hạn tháng 11/2026 trên sàn London tiếp tục tăng 1,45% (45 USD/tấn) so với phiên giao dịch trước, lên mức 3.412 USD/tấn.</p>
+      <p>Tương tự, giá cà phê arabica giao kỳ hạn tháng 12/2026 tăng với biên độ mạnh hơn, lên tới 3,64% (10,5 US cent/pound), lên mức 288,75 US cent/pound.</p>
+      <p>Cập nhật giá cà phê trong nước: tại Tây Nguyên, giá cà phê hôm nay dao động trong khoảng 94.000 - 95.000 đồng/kg.</p>
+    </div>
+    """
+    pub_at = parse_as_of("2026-09-29T08:00:00+07:00")
+    rates, trading_date = parse_vietnambiz_coffee(html_sample, pub_at)
+
+    assert trading_date == date(2026, 9, 28)
+    assert "ROBUSTA" in rates
+    assert rates["ROBUSTA"]["tenor"] == "tháng 11/2026"
+    assert rates["ROBUSTA"]["value"] == Decimal("3412")
+    assert rates["ROBUSTA"]["daily_pct"] == Decimal("1.45")
+    assert rates["ROBUSTA"]["unit"] == "USD/tấn"
+    assert rates["ROBUSTA"]["trading_date"] == date(2026, 9, 28)
+
+    assert "ARABICA" in rates
+    assert rates["ARABICA"]["tenor"] == "tháng 12/2026"
+    assert rates["ARABICA"]["value"] == Decimal("288.75")
+    assert rates["ARABICA"]["daily_pct"] == Decimal("3.64")
+    assert rates["ARABICA"]["unit"] == "USc/lb"
+    assert rates["ARABICA"]["trading_date"] == date(2026, 9, 28)
+
 
 
 

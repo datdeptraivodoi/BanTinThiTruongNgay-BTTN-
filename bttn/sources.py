@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import math
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,6 +14,8 @@ from bs4 import BeautifulSoup
 from .calculations import percentage
 from .http import Http
 from .models import Observation, Point, Snapshot, Source, previous_weekday
+
+LOG = logging.getLogger("bttn.sources")
 
 # Identity and units are explicit. Unsupported legacy rows remain unavailable.
 INSTRUMENTS = {
@@ -254,13 +257,144 @@ def collect_news(http, snapshot):
             retrieved_at=datetime.now(timezone.utc), text=text, kind="news")
 
 
+def parse_vietnambiz_coffee(html: str, published_at: datetime):
+    soup = BeautifulSoup(html, "html.parser")
+    body = soup.select_one("#abody, .vnbcbc-body, .detail-content")
+    if not body:
+        raise ValueError("Article body not found in VietnamBiz coffee page")
+    text = body.get_text(" ", strip=True)
+
+    # 1. Trading date
+    date_m = re.search(r"phiên giao dịch ngày\s*(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?", text, re.I)
+    if date_m:
+        d, m, y = date_m.group(1), date_m.group(2), date_m.group(3)
+        year = int(y) if y else published_at.year
+        trading_date = datetime(year, int(m), int(d)).date()
+    else:
+        trading_date = previous_weekday(published_at.date())
+
+    # 2. Robusta London
+    rob_m = re.search(
+        r"robusta[^\n.]*?kỳ\s+hạn\s+(tháng\s+\d+(?:/\d{4})?)[^\n.]*?(tăng|giảm)[^\n.]*?([\d,.]+)\s*%[^\n.]*?(?:lên|xuống|đạt|về)[^\n.]*?([\d.,]+)\s*USD/tấn",
+        text,
+        re.I,
+    )
+    if not rob_m:
+        rob_m = re.search(
+            r"robusta[^.]*?London[^.]*?(tăng|giảm)[^.]*?([\d,.]+)\s*%[^.]*?(?:lên|xuống|đạt|về)[^.]*?([\d.,]+)\s*USD/tấn",
+            text,
+            re.I,
+        )
+
+    # 3. Arabica New York
+    ara_m = re.search(
+        r"arabica[^\n.]*?kỳ\s+hạn\s+(tháng\s+\d+(?:/\d{4})?)[^\n.]*?(tăng|giảm)[^\n.]*?([\d,.]+)\s*%[^\n.]*?(?:lên|xuống|đạt|về)[^\n.]*?([\d.,]+)\s*(?:US\s+cent/pound|USc/lb|cent/pound)",
+        text,
+        re.I,
+    )
+    if not ara_m:
+        ara_m = re.search(
+            r"arabica[^.]*?New York[^.]*?(tăng|giảm)[^.]*?([\d,.]+)\s*%[^.]*?(?:lên|xuống|đạt|về)[^.]*?([\d.,]+)\s*(?:US\s+cent/pound|USc/lb|cent/pound)",
+            text,
+            re.I,
+        )
+
+    results = {}
+    if rob_m:
+        groups = rob_m.groups()
+        tenor = groups[0] if len(groups) == 4 else None
+        direction = groups[-3].lower()
+        pct = Decimal(groups[-2].replace(",", "."))
+        if "giảm" in direction:
+            pct = -pct
+        price = Decimal(groups[-1].replace(".", "").replace(",", "."))
+        results["ROBUSTA"] = {
+            "tenor": tenor,
+            "value": price,
+            "daily_pct": pct,
+            "unit": "USD/tấn",
+            "trading_date": trading_date,
+        }
+
+    if ara_m:
+        groups = ara_m.groups()
+        tenor = groups[0] if len(groups) == 4 else None
+        direction = groups[-3].lower()
+        pct = Decimal(groups[-2].replace(",", "."))
+        if "giảm" in direction:
+            pct = -pct
+        price = Decimal(groups[-1].replace(",", "."))
+        results["ARABICA"] = {
+            "tenor": tenor,
+            "value": price,
+            "daily_pct": pct,
+            "unit": "USc/lb",
+            "trading_date": trading_date,
+        }
+
+    return results, trading_date
+
+
+def collect_vietnambiz_coffee(http, snapshot):
+    listing_url = "https://vietnambiz.vn/chu-de/ca-phe-34.htm"
+    try:
+        html = http.get(listing_url).text
+        soup = BeautifulSoup(html, "html.parser")
+        first_article_url = None
+        for a in soup.select("a[href]"):
+            href = a.get("href", "")
+            title = a.get("title", "") or a.get_text(" ", strip=True)
+            if "/chu-de/" not in href and href.endswith(".htm") and len(title) > 20 and ("ca-phe" in href or "gia-ca-phe" in href):
+                first_article_url = urljoin(listing_url, href)
+                break
+
+        if not first_article_url:
+            snapshot.add_issue("VIETNAMBIZ_COFFEE", "No coffee article link found on VietnamBiz listing")
+            return
+
+        detail_resp = http.get(first_article_url)
+        detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
+        meta = detail_soup.find("meta", property="article:published_time")
+        published_at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00")) if meta else snapshot.as_of
+
+        if published_at > snapshot.as_of:
+            return
+
+        rates, trading_date = parse_vietnambiz_coffee(detail_resp.text, published_at)
+        sid = "news_" + hashlib.sha256(first_article_url.encode()).hexdigest()[:12]
+        snapshot.sources[sid] = Source(
+            id=sid,
+            url=first_article_url,
+            published_at=published_at,
+            retrieved_at=datetime.now(timezone.utc),
+            text=detail_soup.get_text(" ", strip=True)[:18000],
+            kind="news",
+        )
+
+        for key, info in rates.items():
+            snapshot.observations[key] = Observation(
+                id=key,
+                label=f"{key.capitalize()} futures",
+                value=info["value"],
+                unit=info["unit"],
+                source_id=sid,
+                trading_date=info["trading_date"],
+                basis=f"VietnamBiz bài giá cà phê; giao kỳ hạn {info.get('tenor') or 'chuẩn'}",
+                daily_pct=info["daily_pct"],
+                tenor=info.get("tenor"),
+            )
+        LOG.info("Collected VietnamBiz coffee data: %s", list(rates.keys()))
+    except Exception as exc:
+        snapshot.add_issue("VIETNAMBIZ_COFFEE", f"Failed to collect VietnamBiz coffee: {type(exc).__name__}: {exc}")
+
+
 def collect_snapshot(http, as_of):
     from .calculations import derive_swaps
     from .vira import collect_vira
 
     snapshot = Snapshot(as_of=as_of)
     for name, collector in [("VIRA", collect_vira), ("SBV", collect_sbv), ("MB", collect_mb),
-                            ("YAHOO", collect_yahoo), ("NEWS", collect_news)]:
+                            ("YAHOO", collect_yahoo), ("COFFEE", collect_vietnambiz_coffee), ("NEWS", collect_news)]:
         try:
             collector(http, snapshot)
         except Exception as exc:

@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       send_email:
-        description: 'Tích chọn để phát hành CHÍNH THỨC (chỉ gửi trong 12:00-15:00 tới danh sách RECIPIENTS)'
+        description: 'Tích chọn để gửi email phát hành (không giới hạn giờ; gửi tới email thử nếu có, hoặc danh sách chính thức nếu để trống)'
         type: boolean
         default: false
       test_recipient:
-        description: 'Email nhận thử nghiệm (gửi thử ngoài giờ, chỉ gửi riêng tới email này; để trống nếu chỉ tạo bản nháp)'
+        description: 'Email nhận thử nghiệm (chỉ gửi riêng tới email này khi tích gửi email; để trống để phát hành tới danh sách chính thức)'
         type: string
         default: 'dat.nguyen296286@gmail.com'
       test_smtp:
@@ -66,10 +66,10 @@ jobs:
         run: |
           if [ "$TEST_SMTP" = "true" ]; then
             python market_report.py --type midday --test-smtp --test-recipient "$TEST_RECIPIENT"
+          elif [ "$SEND_EMAIL" = "true" ] && [ -n "$TEST_RECIPIENT" ]; then
+            python market_report.py --type midday --send --test-recipient "$TEST_RECIPIENT"
           elif [ "$SEND_EMAIL" = "true" ]; then
             python market_report.py --type midday --send
-          elif [ -n "$TEST_RECIPIENT" ]; then
-            python market_report.py --type midday --test-recipient "$TEST_RECIPIENT"
           else
             python market_report.py --type midday --dry-run
           fi
