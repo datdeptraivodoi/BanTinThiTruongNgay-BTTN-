@@ -9,6 +9,30 @@ ROOT = Path(__file__).resolve().parents[1]
 TOKEN = re.compile(r"\{\{([A-Za-z0-9_ ]+)\}\}")
 
 
+ALLOWED_INDEX_NAMES = re.compile(
+    r"\b(?:"
+    r"Nikkei\s*225|"
+    r"S&P\s*(?:500|100|400|600)|"
+    r"CSI\s*300|"
+    r"FTSE\s*(?:100|250)|"
+    r"CAC\s*40|"
+    r"DAX\s*(?:40|30)|"
+    r"(?:Euro\s*)?Stoxx\s*(?:50|600)|"
+    r"Russell\s*(?:2000|1000|3000)|"
+    r"Topix\s*(?:100)?|"
+    r"Nifty\s*50|"
+    r"Kospi\s*200|"
+    r"ASX\s*200|"
+    r"VN-?Index(?:\s*(?:30|100))?|"
+    r"VN\s*(?:30|100)|"
+    r"HNX\s*30|"
+    r"G7|G20|"
+    r"T\+[0-3]"
+    r")\b",
+    re.I,
+)
+
+
 def rules():
     return json.loads((ROOT / "config/editorial_rules.json").read_text(encoding="utf-8"))
 
@@ -116,7 +140,11 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
             error("MARKDOWN", "Không dùng markup trong văn bản")
         # Numeric market assertions must be inserted deterministically from the
         # snapshot; this also prevents literal unsupported prices/dates.
-        if re.search(r"\d", TOKEN.sub("", raw)):
+        # Index names (e.g. Nikkei 225, S&P 500) are recognized and excluded
+        # so their digits are not falsely flagged as unbound market data.
+        without_tokens = TOKEN.sub("", raw)
+        without_indices = ALLOWED_INDEX_NAMES.sub("", without_tokens)
+        if re.search(r"\d", without_indices):
             error("UNBOUND_NUMBER", "Số liệu phải dùng {{OBSERVATION_ID}}")
         for key in TOKEN.findall(raw):
             obs = snapshot.observations.get(key)

@@ -9,7 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from .models import Issue, ReportContent, Snapshot, parse_as_of
+from .models import Issue, ReportContent, Snapshot, create_draft_placeholder_content, parse_as_of
 from .summary import write_step_summary
 from .validation import ROOT, validate_content, validate_snapshot
 
@@ -84,17 +84,31 @@ def run(args):
         if data_issues and args.send:
             LOG.warning("Data validation has issues (%d issues) for --send; producing draft for inspection without sending", len(data_issues))
 
+        ai_error = None
+        content = None
         if args.content:
             content = ReportContent.model_validate_json(Path(args.content).read_text(encoding="utf-8"))
         else:
-            content = generate(snapshot, directory)
+            try:
+                content = generate(snapshot, directory)
+            except Exception as exc:
+                ai_error = str(exc)
+                LOG.warning("AI generation did not produce validated content: %s", exc)
 
-        content_issues = validate_content(content, snapshot)
+        if content is None:
+            # Produce draft placeholder content so verified tables/charts are preserved in draft
+            content = create_draft_placeholder_content(snapshot, reason=ai_error or "AI generation incomplete")
+            content_issues = [
+                Issue(severity="error", code="AI_INCOMPLETE", message=f"Phần nhận xét chưa hoàn tất ({ai_error or 'Lỗi tạo nội dung'})")
+            ]
+        else:
+            content_issues = validate_content(content, snapshot)
+
         write_json(directory / "validation-content.json", [i.model_dump() for i in content_issues])
         (directory / "content.json").write_text(content.model_dump_json(indent=2), encoding="utf-8")
 
         # Distinct draft vs official publication watermark / label
-        is_draft = not args.send or bool(data_issues or content_issues)
+        is_draft = not args.send or bool(data_issues or content_issues or ai_error)
         output = directory / f"BTTN-{snapshot.as_of:%Y%m%d}.docx"
         render(snapshot, content, ROOT / "template.docx", output, is_draft=is_draft)
         pdf = convert_and_validate(output)
@@ -110,10 +124,13 @@ def run(args):
                 return 1
             return 0
 
-        if content_issues:
+        if content_issues or ai_error:
             manifest["status"] = "blocked_content" if args.send else "draft_with_issues"
+            if ai_error and not manifest.get("error_message"):
+                manifest["error_message"] = ai_error
+                manifest["error_type"] = "RuntimeError"
             if args.send:
-                LOG.error("Sending blocked due to content issues; draft saved to %s", output)
+                LOG.error("Sending blocked due to content/AI issues; draft saved to %s", output)
                 return 1
             return 0
 

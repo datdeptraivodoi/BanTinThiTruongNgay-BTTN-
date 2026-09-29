@@ -107,3 +107,53 @@ def parse_as_of(value: str | None) -> datetime:
     if result.tzinfo is None:
         raise ValueError("--as-of requires a UTC offset, e.g. 2026-09-24T12:00:00+07:00")
     return result.astimezone(vn)
+
+
+def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> ReportContent:
+    """Creates a draft placeholder content when AI generation is incomplete or encounters service errors.
+    
+    Preserves all verified market data, tables, and charts while clearly marking commentary as pending.
+    """
+    ref_src = ["vira"] if "vira" in snapshot.sources else (list(snapshot.sources.keys())[:1] if snapshot.sources else ["manual"])
+    return ReportContent(
+        highlights=[
+            Section(paragraphs=["[Bản nháp kỹ thuật: Nhận định thị trường nổi bật đang chờ cập nhật.]"], source_ids=ref_src),
+            Section(paragraphs=["[Dữ liệu vĩ mô và lãi suất thị trường được đối soát tự động từ nguồn VIRA và các sở giao dịch.]"], source_ids=ref_src),
+            Section(paragraphs=["[Bản tin đang ở chế độ bản nháp; phần nhận xét phân tích sẽ được hoàn thiện trong phiên tiếp theo.]"], source_ids=ref_src),
+        ],
+        interbank=Section(
+            paragraphs=["[Phần nhận xét thị trường tiền tệ liên ngân hàng chưa hoàn tất. Vui lòng tham khảo bảng lãi suất VNIBOR và tỷ giá đã được cập nhật đầy đủ.]"],
+            source_ids=ref_src,
+        ),
+        usd_vnd=Section(
+            paragraphs=["[Phần nhận xét tỷ giá USD-VND chưa hoàn tất. Vui lòng tham khảo bảng tỷ giá trung tâm SBV và giá niêm yết MBBank.]"],
+            source_ids=ref_src,
+        ),
+        eur_usd=Section(
+            paragraphs=[
+                "[Phần nhận xét thị trường ngoại hối EUR-USD chưa hoàn tất.]",
+                "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
+            ],
+            source_ids=ref_src,
+        ),
+        japan=Section(
+            paragraphs=["[Phần nhận xét thị trường Nhật Bản chưa hoàn tất. Vui lòng tham khảo diễn biến tỷ giá USD-JPY và chỉ số Nikkei 225 trên bảng số liệu.]"],
+            source_ids=ref_src,
+        ),
+        china=Section(
+            paragraphs=["[Phần nhận xét thị trường Trung Quốc chưa hoàn tất. Vui lòng tham khảo tỷ giá USD-CNY trên bảng số liệu.]"],
+            source_ids=ref_src,
+        ),
+        coffee=Section(
+            paragraphs=["Cập nhật giá cà phê thế giới, [Phần nhận xét thị trường cà phê chưa hoàn tất. Vui lòng tham khảo bảng giá hàng hóa nông sản.]"],
+            source_ids=ref_src,
+        ),
+        energy_metals=Section(
+            paragraphs=[
+                "[Phần nhận xét thị trường năng lượng dầu Brent chưa hoàn tất.]",
+                "[Phần nhận định thị trường vàng chưa hoàn tất. Vui lòng tham khảo bảng giá kim loại quý.]",
+            ],
+            source_ids=ref_src,
+        ),
+    )
+

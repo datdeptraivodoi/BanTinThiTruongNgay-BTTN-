@@ -426,4 +426,155 @@ def test_gemini_503_without_openrouter_key_informative_error(snapshot, monkeypat
     assert 'OPENROUTER_API_KEY' in md
 
 
+def test_index_names_allowed_without_unbound_number_error(snapshot, content):
+    """Indices such as Nikkei 225, S&P 500, CSI 300, VN-Index should be allowed,
+    while literal market figures without {{OBSERVATION_ID}} should still be rejected."""
+    # Allowed index names should NOT trigger UNBOUND_NUMBER
+    content.japan.paragraphs = [
+        "Thị trường Nhật Bản diễn biến giằng co, chỉ số Nikkei 225 và Topix biến động trái chiều "
+        "khi đồng yên dao động quanh mức {{USDJPY}}."
+    ]
+    issues = validate_content(content, snapshot)
+    unbound = [i for i in issues if i.code == "UNBOUND_NUMBER"]
+    assert not unbound, f"Expected no UNBOUND_NUMBER for Nikkei 225, got: {unbound}"
+
+    # Literal numbers NOT part of index names MUST still trigger UNBOUND_NUMBER
+    content.japan.paragraphs = [
+        "Thị trường Nhật Bản diễn biến giằng co, chỉ số Nikkei 225 đóng cửa tại mức 38900 điểm."
+    ]
+    issues = validate_content(content, snapshot)
+    unbound = [i for i in issues if i.code == "UNBOUND_NUMBER"]
+    assert unbound, "Expected UNBOUND_NUMBER for literal figure '38900'"
+
+
+def test_summary_shows_both_validation_rejection_and_service_error(snapshot, tmp_path):
+    """When attempt 1 fails validation and repair attempts get HTTP 503, both must be visible in summary."""
+    attempts = [
+        {
+            "provider": "gemini",
+            "model": "gemini-3.8-flash",
+            "attempt": 1,
+            "content_round": 1,
+            "status": "validation_error",
+            "issues": [
+                {"severity": "error", "code": "LENGTH_EUR_USD", "message": "EUR/USD chỉ có 82 từ, yêu cầu 150-200 từ"},
+                {"severity": "error", "code": "EU_STRUCTURE", "message": "Cần hai đoạn; đoạn hai bắt đầu Về phía Châu Âu,"},
+            ],
+            "error_message": "Validator từ chối (2 lỗi)",
+            "elapsed_seconds": 3.2,
+        },
+        {
+            "provider": "gemini",
+            "model": "gemini-3.8-flash",
+            "attempt": 2,
+            "content_round": 2,
+            "status": "service_error",
+            "http_status": 503,
+            "error": "HTTPError",
+            "error_message": "HTTP 503 Service Unavailable",
+            "elapsed_seconds": 6.5,
+        },
+        {
+            "provider": "openrouter",
+            "model": "inclusionai/ling-3.0-flash-fin:free",
+            "attempt": 3,
+            "content_round": 0,
+            "status": "skipped",
+            "error": "MISSING_API_KEY",
+            "error_message": "Bỏ qua vì chưa cấu hình OPENROUTER_API_KEY trong GitHub Secrets",
+            "elapsed_seconds": 0,
+        },
+    ]
+    (tmp_path / "model-attempts.json").write_text(json.dumps(attempts), encoding="utf-8")
+
+    manifest = {
+        "status": "blocked_content",
+        "send_requested": True,
+        "error_type": "RuntimeError",
+        "error_message": "Gemini HTTP 503; chưa có fallback khả dụng (thiếu OPENROUTER_API_KEY).",
+        "artifacts": {"BTTN-20260929.docx": "abc", "BTTN-20260929.pdf": "def"},
+    }
+
+    summary_md = generate_markdown_summary(manifest, snapshot=snapshot, directory=tmp_path)
+
+    # 1. Header reflects both validation rejection and service error
+    assert "NỘI DUNG BỊ TỪ CHỐI & GẶP LỖI DỊCH VỤ TRONG QUÁ TRÌNH SỬA" in summary_md
+
+    # 2. Section 3 lists both validation errors and service error
+    assert "LENGTH_EUR_USD" in summary_md
+    assert "EU_STRUCTURE" in summary_md
+    assert "GEMINI_503" in summary_md
+    assert "FALLBACK_KEY_MISSING" in summary_md
+
+    # 3. Section 4 displays all attempts
+    assert "⚠️ Bị từ chối KĐ" in summary_md
+    assert "🔴 Lỗi dịch vụ (503)" in summary_md
+    assert "⚪ Bỏ qua" in summary_md
+
+    # 4. Artifacts section shows draft notice
+    assert "Bản nháp" in summary_md
+
+
+def test_pipeline_draft_fallback_when_ai_fails(snapshot, monkeypatch, tmp_path):
+    """When AI fails completely, pipeline produces draft Word/PDF with verified data and blocks --send."""
+    from types import SimpleNamespace
+    from bttn import delivery, pipeline, rendering
+
+    snapshot.purpose = "live"
+    snap_path = tmp_path / "snapshot.json"
+    snap_path.write_text(snapshot.model_dump_json(), encoding="utf-8")
+
+    def mock_convert(docx):
+        pdf = docx.with_suffix(".pdf")
+        pdf.write_bytes(b"%PDF-1.4 mock")
+        return pdf
+
+    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
+    monkeypatch.setattr(analysis, "generate", MagicMock(side_effect=RuntimeError("Gemini 503 Service Unavailable")))
+
+    send_mock = MagicMock()
+    monkeypatch.setattr(delivery, "send_report", send_mock)
+
+    # In --send mode: should block sending, save draft, and return exit code 1
+    args_send = SimpleNamespace(
+        type="midday",
+        send=True,
+        dry_run=False,
+        as_of=str(snapshot.as_of),
+        snapshot=str(snap_path),
+        content=None,
+        collect_only=False,
+        output_dir=str(tmp_path / "out_send"),
+        state_dir=str(tmp_path / ".state"),
+    )
+    code = pipeline.run(args_send)
+    assert code == 1
+    assert send_mock.call_count == 0
+
+    out_dir = [d for d in (tmp_path / "out_send").iterdir() if d.is_dir()][0]
+    assert (out_dir / f"BTTN-{snapshot.as_of:%Y%m%d}.docx").is_file()
+    assert (out_dir / "manifest.json").is_file()
+    manifest_send = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest_send["status"] == "blocked_content"
+
+    # In --dry-run mode: should succeed with draft_with_issues and return 0
+    args_dry = SimpleNamespace(
+        type="midday",
+        send=False,
+        dry_run=True,
+        as_of=str(snapshot.as_of),
+        snapshot=str(snap_path),
+        content=None,
+        collect_only=False,
+        output_dir=str(tmp_path / "out_dry"),
+        state_dir=str(tmp_path / ".state"),
+    )
+    code_dry = pipeline.run(args_dry)
+    assert code_dry == 0
+    out_dir_dry = [d for d in (tmp_path / "out_dry").iterdir() if d.is_dir()][0]
+    manifest_dry = json.loads((out_dir_dry / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest_dry["status"] == "draft_with_issues"
+
+
+
 

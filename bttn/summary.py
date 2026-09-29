@@ -20,7 +20,37 @@ def generate_markdown_summary(
     error_type = manifest.get("error_type", "")
     send_requested = manifest.get("send_requested", False)
 
-    is_gemini_503 = "503" in error_message or "503" in error_type
+    # Load attempts data if available
+    attempts_data = []
+    if directory and (directory / "model-attempts.json").is_file():
+        try:
+            attempts_data = json.loads((directory / "model-attempts.json").read_text(encoding="utf-8"))
+        except Exception:
+            attempts_data = []
+
+    validation_attempts = [
+        att for att in attempts_data
+        if att.get("status") == "validation_error" or att.get("issues")
+    ]
+    service_attempts = [
+        att for att in attempts_data
+        if att.get("status") == "service_error"
+        or att.get("http_status") in (500, 502, 503, 504)
+        or "503" in str(att.get("error_message", ""))
+    ]
+    skipped_attempts = [att for att in attempts_data if att.get("status") == "skipped"]
+
+    has_validation_rejection = bool(validation_attempts) or bool(
+        content_issues and any(i.code != "AI_INCOMPLETE" for i in content_issues)
+    )
+    has_503_in_attempts = any(
+        a.get("http_status") == 503
+        or "503" in str(a.get("error_message", ""))
+        or "503" in str(a.get("error", ""))
+        for a in attempts_data
+    )
+    is_gemini_503 = "503" in error_message or "503" in error_type or has_503_in_attempts
+    has_service_error = bool(service_attempts) or is_gemini_503
 
     # 1. Header & Status Badge
     status_badges = {
@@ -34,7 +64,22 @@ def generate_markdown_summary(
         "failed": ("❌ THẤT BẠI (FAILED)", "Quá trình thực thi gặp lỗi hệ thống hoặc ngoại lệ chưa xử lý."),
     }
 
-    if status == "failed" and is_gemini_503:
+    if status in ("failed", "blocked_content", "draft_with_issues") and has_validation_rejection and has_service_error:
+        if send_requested or status == "blocked_content":
+            title = "⚠️ CHẶN PHÁT HÀNH - NỘI DUNG BỊ TỪ CHỐI & GẶP LỖI DỊCH VỤ TRONG QUÁ TRÌNH SỬA"
+            desc = (
+                "Mô hình AI đã phản hồi ở lần gọi đầu nhưng bị Validator từ chối do vi phạm quy tắc biên tập. "
+                "Trong các lần gọi tiếp theo để sửa lỗi, dịch vụ AI gặp lỗi kết nối/quá tải (Gemini HTTP 503). "
+                "Bản nháp tài liệu (Word/PDF) bảo lưu số liệu đã được tạo để kiểm tra; việc gửi email bị chặn."
+            )
+        else:
+            title = "📝 BẢN NHÁP CÓ CẢNH BÁO - NỘI DUNG BỊ TỪ CHỐI & GẶP LỖI DỊCH VỤ TRONG QUÁ TRÌNH SỬA"
+            desc = (
+                "Mô hình AI phản hồi bị Validator từ chối do vi phạm quy tắc biên tập. "
+                "Các lần gọi tiếp theo để sửa gặp lỗi dịch vụ AI (HTTP 503). "
+                "Bản nháp Word/PDF đã được tạo thành công với bảng số liệu đầy đủ."
+            )
+    elif status == "failed" and is_gemini_503:
         title = "❌ THẤT BẠI (FAILED) - Gemini HTTP 503; chưa có fallback khả dụng"
         desc = "Dịch vụ Gemini gặp lỗi HTTP 503 Service Unavailable (tạm thời quá tải). OpenRouter chưa hoạt động dự phòng (thiếu OPENROUTER_API_KEY hoặc chưa cấu hình trong GitHub Secrets)."
     else:
@@ -61,56 +106,102 @@ def generate_markdown_summary(
 
     # 3. Issues / Blocking Reasons
     all_issues = []
+    seen = set()
+
+    def add_issue(sev, code, msg):
+        key = (code, msg)
+        if key not in seen:
+            seen.add(key)
+            all_issues.append((sev, code, msg))
+
     if timing_issue:
-        all_issues.append(("CẢNH BÁO", "TIMING_WINDOW", timing_issue))
+        add_issue("CẢNH BÁO", "TIMING_WINDOW", timing_issue)
     if data_issues:
         for iss in data_issues:
-            all_issues.append((iss.severity.upper(), iss.code, iss.message))
+            add_issue(iss.severity.upper(), iss.code, iss.message)
     if content_issues:
         for iss in content_issues:
-            all_issues.append((iss.severity.upper(), iss.code, iss.message))
+            add_issue(iss.severity.upper(), iss.code, iss.message)
 
-    if error_message:
+    # Include specific validation errors from earlier AI attempts if not already present
+    for val_att in validation_attempts:
+        r_num = val_att.get("content_round", val_att.get("attempt", 1))
+        for iss in val_att.get("issues", []):
+            code = iss.get("code", "VALIDATION")
+            msg = iss.get("message", "")
+            add_issue("LỖI NỘI DUNG", code, f"[Lần {r_num}] {msg}")
+
+    # Include service errors from attempts
+    for s_att in service_attempts:
+        p_name = s_att.get("provider", "AI").title()
+        r_num = s_att.get("content_round", s_att.get("attempt", 1))
+        h_code = s_att.get("http_status")
+        err_code = f"{p_name.upper()}_{h_code}" if h_code else f"{p_name.upper()}_NET_ERROR"
+        err_msg = s_att.get("error_message") or s_att.get("error") or "Lỗi kết nối dịch vụ"
+        add_issue("LỖI DỊCH VỤ", err_code, f"[Lần {r_num} {p_name}] {err_msg}")
+
+    # Include skipped fallback notices
+    for sk_att in skipped_attempts:
+        p_name = sk_att.get("provider", "AI").title()
+        err_msg = sk_att.get("error_message") or f"Chưa cấu hình API Key cho {p_name}"
+        add_issue("CẢNH BÁO", "FALLBACK_KEY_MISSING", err_msg)
+
+    if error_message and not any(iss[1] == "GEMINI_503" for iss in all_issues if is_gemini_503):
         code = "GEMINI_503" if is_gemini_503 else (error_type or "SYSTEM_ERROR")
-        all_issues.append(("LỖI", code, error_message))
-    elif error_type:
-        all_issues.append(("LỖI", error_type, "Hệ thống gặp ngoại lệ trong quá trình chạy"))
+        add_issue("LỖI", code, error_message)
+    elif error_type and not all_issues:
+        add_issue("LỖI", error_type, "Hệ thống gặp ngoại lệ trong quá trình chạy")
 
     if all_issues:
         lines.append("### ⚠️ Vấn đề phát hiện & Lý do chặn\n")
         lines.append("| Mức độ | Mã kiểm tra | Chi tiết vấn đề |")
         lines.append("| :---: | :--- | :--- |")
         for sev, code, msg in all_issues:
-            sev_icon = "🔴" if sev in ("ERROR", "LỖI") else "🟡"
+            sev_icon = "🔴" if sev in ("ERROR", "LỖI", "LỖI NỘI DUNG", "LỖI DỊCH VỤ") else "🟡"
             lines.append(f"| {sev_icon} {sev} | `{code}` | {msg} |")
         lines.append("")
 
     # 4. Model attempts table (if available)
-    if directory and (directory / "model-attempts.json").is_file():
-        try:
-            attempts_data = json.loads((directory / "model-attempts.json").read_text(encoding="utf-8"))
-            if attempts_data:
-                lines.append("### 🤖 Nhật ký gọi mô hình AI (Model Attempts)\n")
-                lines.append("| Lần thử | Nhà cung cấp | Model | Trạng thái | Chi tiết lỗi / Ghi chú |")
-                lines.append("| :---: | :--- | :--- | :---: | :--- |")
-                for att in attempts_data:
-                    p = att.get("provider", "—")
-                    m = att.get("model", "—")
-                    num = att.get("attempt", 1)
-                    st = att.get("status")
-                    if st == "valid":
-                        st_icon = "✅ Thành công"
-                        detail = "Nội dung hợp lệ"
-                    else:
-                        st_icon = "🔴 Thất bại"
-                        code = att.get("http_status")
-                        detail = att.get("error_message") or att.get("error") or (f"HTTP {code}" if code else "Lỗi cấu trúc")
-                    lines.append(f"| {num} | **{p.title()}** | `{m}` | {st_icon} | {detail} |")
-                lines.append("")
-        except Exception:
-            pass
+    if directory and attempts_data:
+        lines.append("### 🤖 Nhật ký gọi mô hình AI (Model Attempts)\n")
+        lines.append("| Lần thử | Vòng sửa | Nhà cung cấp | Mô hình | Kết quả | Chi tiết kết quả & Kiểm định | Thời gian |")
+        lines.append("| :---: | :---: | :--- | :--- | :---: | :--- | :---: |")
+        for att in attempts_data:
+            p = att.get("provider", "—").title()
+            m = att.get("model", "—")
+            num = att.get("attempt", 1)
+            round_idx = att.get("content_round", "—")
+            st = att.get("status")
+            elapsed_sec = att.get("elapsed_seconds")
+            elapsed_str = f"{elapsed_sec:.2f}s" if isinstance(elapsed_sec, (int, float)) else "—"
 
-    if is_gemini_503:
+            if st == "valid":
+                st_icon = "✅ Đạt chuẩn"
+                detail = "Đạt 100% quy tắc kiểm định biên tập"
+            elif st == "validation_error":
+                st_icon = "⚠️ Bị từ chối KĐ"
+                issues = att.get("issues", [])
+                codes_list = list(dict.fromkeys(i.get("code") for i in issues if i.get("code")))
+                code_summary = f" ({', '.join(codes_list[:4])}{'...' if len(codes_list) > 4 else ''})" if codes_list else ""
+                detail = f"Validator từ chối ({len(issues)} lỗi){code_summary}"
+            elif st == "service_error":
+                code = att.get("http_status")
+                st_icon = f"🔴 Lỗi dịch vụ ({code or 'Net'})"
+                detail = att.get("error_message") or att.get("error") or "Lỗi kết nối / quá tải"
+            elif st == "json_error":
+                st_icon = "🔴 Lỗi JSON"
+                detail = att.get("error_message") or "Phản hồi không phải JSON hợp lệ"
+            elif st == "skipped":
+                st_icon = "⚪ Bỏ qua"
+                detail = att.get("error_message") or "Chưa cấu hình API Key"
+            else:
+                st_icon = "🔴 Thất bại"
+                detail = att.get("error_message") or att.get("error") or "Lỗi không xác định"
+
+            lines.append(f"| {num} | {round_idx} | **{p}** | `{m}` | {st_icon} | {detail} | {elapsed_str} |")
+        lines.append("")
+
+    if is_gemini_503 or any(a.get("http_status") == 503 or "503" in str(a.get("error_message", "")) for a in attempts_data):
         lines.append("> [!TIP]\n"
                      "> **Khắc phục sự cố khi Gemini quá tải (HTTP 503):** Hệ thống đã có cơ chế tự động chuyển sang mô hình dự phòng (OpenRouter). "
                      "Để kích hoạt, vui lòng kiểm tra **GitHub Repository -> Settings -> Secrets and variables -> Actions** và đảm bảo secret "
@@ -178,12 +269,16 @@ def generate_markdown_summary(
     # 6. Artifacts
     artifacts = manifest.get("artifacts", {})
     if artifacts:
+        is_draft_doc = manifest.get("status") not in ("sent", "validated_draft")
+        doc_badge = "📝 Bản nháp (Draft)" if is_draft_doc else "✅ Chính thức (Official)"
         lines.append("### 📁 Tài liệu xuất xưởng (Artifacts)\n")
-        lines.append("| Tên tệp | Định dạng | SHA-256 Checksum |")
-        lines.append("| :--- | :---: | :--- |")
+        lines.append(f"> Phân loại tài liệu: **{doc_badge}**\n")
+        lines.append("| Tên tệp | Định dạng | Trạng thái & Ghi chú | SHA-256 Checksum |")
+        lines.append("| :--- | :---: | :--- | :--- |")
         for fname, sha in artifacts.items():
             ext = Path(fname).suffix.upper().replace(".", "")
-            lines.append(f"| `{fname}` | **{ext}** | `{sha[:16]}...` |")
+            note = "Bản nháp bảo lưu bảng số liệu & biểu đồ đã đối soát" if is_draft_doc else "Bản tin chính thức đã kiểm duyệt toàn diện"
+            lines.append(f"| `{fname}` | **{ext}** | {note} | `{sha[:16]}...` |")
         lines.append("\n> 💡 *Bạn có thể tải các tệp tài liệu này tại phần **Artifacts** của lượt chạy trên GitHub Actions.*")
 
     lines.append("")
