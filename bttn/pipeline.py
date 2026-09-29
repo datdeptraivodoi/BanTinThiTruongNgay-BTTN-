@@ -38,9 +38,14 @@ def run(args):
     as_of = parse_as_of(args.as_of)
     directory = Path(args.output_dir) / (as_of.strftime("%Y%m%d-%H%M%S") + "-" + uuid4().hex[:8])
     directory.mkdir(parents=True, exist_ok=False)
-    manifest = {"status": "started", "as_of": as_of.isoformat(), "send_requested": args.send,
-                "rules_sha256": hashlib.sha256((ROOT / "config/editorial_rules.json").read_bytes()).hexdigest(),
-                "skill_sha256": hashlib.sha256((ROOT / "SKILL.md").read_bytes()).hexdigest()}
+    manifest = {
+        "status": "started",
+        "as_of": as_of.isoformat(),
+        "send_requested": args.send,
+        "test_recipient": getattr(args, "test_recipient", None),
+        "rules_sha256": hashlib.sha256((ROOT / "config/editorial_rules.json").read_bytes()).hexdigest(),
+        "skill_sha256": hashlib.sha256((ROOT / "SKILL.md").read_bytes()).hexdigest(),
+    }
     try:
         manifest["commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     except (OSError, subprocess.SubprocessError):
@@ -54,7 +59,8 @@ def run(args):
 
     try:
         # Early delivery window check: avoids costly generation if schedule delay already missed midday window
-        if args.send and not args.snapshot:
+        test_recipient = getattr(args, "test_recipient", None)
+        if args.send and not args.snapshot and not test_recipient:
             now = parse_as_of(None)
             if (now.date() != as_of.date() or now.weekday() >= 5
                     or not 12 <= now.hour < 15 or not timedelta(0) <= now - as_of <= timedelta(hours=3)):
@@ -67,6 +73,8 @@ def run(args):
                 manifest["status"] = "blocked_timing"
                 manifest["timing_issue"] = timing_issue
                 return 1
+        elif test_recipient:
+            LOG.info("Bypassing release window check for test delivery to %s", test_recipient)
 
         if args.snapshot:
             snapshot = Snapshot.model_validate_json(Path(args.snapshot).read_text(encoding="utf-8"))
@@ -145,14 +153,21 @@ def run(args):
         manifest["status"] = "validated_draft"
 
         if args.send:
-            now = parse_as_of(None)
-            if (now.date() != snapshot.as_of.date() or now.weekday() >= 5
-                    or not 12 <= now.hour < 15 or not timedelta(0) <= now - snapshot.as_of <= timedelta(hours=3)):
-                manifest["status"] = "blocked_timing"
-                raise ValueError("Only today's weekday midday edition may be sent between 12:00 and 15:00 VN")
-            recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn").split(",") if r.strip()]
-            send_report(snapshot, [output, pdf], Path(args.state_dir), recipients)
-            manifest["status"] = "sent"
+            test_recipient = getattr(args, "test_recipient", None)
+            if not test_recipient:
+                now = parse_as_of(None)
+                if (now.date() != snapshot.as_of.date() or now.weekday() >= 5
+                        or not 12 <= now.hour < 15 or not timedelta(0) <= now - snapshot.as_of <= timedelta(hours=3)):
+                    manifest["status"] = "blocked_timing"
+                    raise ValueError("Only today's weekday midday edition may be sent between 12:00 and 15:00 VN")
+                recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn").split(",") if r.strip()]
+                send_report(snapshot, [output, pdf], Path(args.state_dir), recipients, is_test=False)
+                manifest["status"] = "sent"
+            else:
+                recipients = [test_recipient.strip()]
+                LOG.info("Sending test report to %s (bypassing release window)", recipients)
+                send_report(snapshot, [output, pdf], Path(args.state_dir), recipients, is_test=True)
+                manifest["status"] = "sent_test"
 
         LOG.info("Completed: %s", manifest["status"])
         return 0
@@ -181,6 +196,7 @@ def main(argv=None):
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--send", action="store_true", help="Send only after all validation gates pass")
     modes.add_argument("--dry-run", action="store_true", help="Generate and validate without sending (default)")
+    parser.add_argument("--test-recipient", help="Recipient email for test delivery outside the midday window")
     parser.add_argument("--as-of", help="ISO timestamp including UTC offset")
     parser.add_argument("--snapshot", help="Replay stored snapshot JSON, without fetching sources")
     parser.add_argument("--content", help="Use existing structured content JSON, without calling AI")
@@ -188,6 +204,9 @@ def main(argv=None):
     parser.add_argument("--output-dir", default=str(ROOT / "output"))
     parser.add_argument("--state-dir", default=str(ROOT / ".state"))
     args = parser.parse_args(argv)
+    if args.test_recipient:
+        args.send = True
+        args.dry_run = False
     if args.send and args.collect_only:
         parser.error("--send cannot be combined with --collect-only")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")

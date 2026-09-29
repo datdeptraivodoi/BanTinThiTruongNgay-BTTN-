@@ -55,6 +55,7 @@ def generate_markdown_summary(
     # 1. Header & Status Badge
     status_badges = {
         "sent": ("🚀 ĐÃ PHÁT HÀNH (SENT)", "Bản tin đã được kiểm chứng và gửi thành công qua email tới các bên liên quan."),
+        "sent_test": ("🧪 ĐÃ GỬI THỬ NGHIỆM (TEST SENT)", "Bản tin đã được kiểm chứng và gửi thử nghiệm thành công tới email riêng chỉ định."),
         "validated_draft": ("📝 BẢN NHÁP ĐÃ KIỂM CHỨNG (VALIDATED DRAFT)", "Bản nháp đã tạo thành công; toàn bộ kiểm tra dữ liệu và nội dung đều đạt chuẩn."),
         "draft_with_issues": ("📝 BẢN NHÁP CÓ CẢNH BÁO (DRAFT WITH WARNINGS)", "Bản nháp đã tạo thành công; có một số lưu ý/cảnh báo về số liệu hoặc nội dung."),
         "blocked_timing": ("⚠️ CHẶN PHÁT HÀNH (BLOCKED - LỊCH CHẠY MUỘN)", "Lượt chạy ngoài khung giờ phát hành 12:00–15:00 VN. Đã dừng để tránh gửi bản tin trưa vào buổi tối."),
@@ -93,13 +94,21 @@ def generate_markdown_summary(
     as_of_str = manifest.get("as_of", "—")
     elapsed = manifest.get("elapsed_seconds", "—")
     commit = manifest.get("commit", "unknown")
-    mode_str = "Phát hành chính thức (`--send`)" if send_requested else "Xem trước / Bản nháp (`--dry-run`)"
+    test_recipient = manifest.get("test_recipient")
+    if test_recipient:
+        mode_str = f"Gửi thử nghiệm (`--test-recipient {test_recipient}`)"
+    elif send_requested:
+        mode_str = "Phát hành chính thức (`--send`)"
+    else:
+        mode_str = "Xem trước / Bản nháp (`--dry-run`)"
 
     lines.append("### 📌 Thông tin lượt chạy\n")
     lines.append("| Thông tin | Giá trị |")
     lines.append("| :--- | :--- |")
     lines.append(f"| **Thời điểm chốt dữ liệu (as-of)** | `{as_of_str}` |")
     lines.append(f"| **Chế độ thực thi** | {mode_str} |")
+    if test_recipient:
+        lines.append(f"| **Email nhận thử nghiệm** | `{test_recipient}` |")
     lines.append(f"| **Trạng thái manifest** | `{status}` |")
     lines.append(f"| **Thời gian xử lý** | `{elapsed}s` |")
     lines.append(f"| **Commit Git** | `{commit[:8] if len(commit) >= 8 else commit}` |\n")

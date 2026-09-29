@@ -687,6 +687,73 @@ def test_call_with_network_retry_preserves_error_details():
     assert "Incomplete OpenRouter final content" in error_desc
 
 
+def test_send_report_with_is_test(snapshot, tmp_path, monkeypatch):
+    monkeypatch.setenv("SENDER_EMAIL", "sender@test.com")
+    monkeypatch.setenv("SENDER_PASSWORD", "secret")
+    server = MagicMock()
+    server.send_message.return_value = {}
+    monkeypatch.setattr("smtplib.SMTP_SSL", MagicMock(return_value=MagicMock(__enter__=MagicMock(return_value=server))))
+
+    attachments = [tmp_path / "x.docx", tmp_path / "x.pdf"]
+    for path in attachments:
+        path.write_bytes(b"data")
+    state = tmp_path / "state"
+
+    ledger = delivery.send_report(snapshot, attachments, state, ["dat.nguyen296286@gmail.com"], is_test=True)
+    assert "-test-" in ledger.name
+    record = json.loads(ledger.read_text(encoding="utf-8"))
+    assert record["is_test"] is True
+    assert record["recipients"] == ["dat.nguyen296286@gmail.com"]
+
+    call_args = server.send_message.call_args[0][0]
+    assert "[TEST / GỬI THỬ]" in call_args["Subject"]
+    assert call_args["To"] == "dat.nguyen296286@gmail.com"
+
+
+def test_pipeline_run_test_recipient_bypasses_timing(snapshot, content, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from bttn import delivery, pipeline, rendering
+
+    snapshot.purpose = "live"
+    snap_path = tmp_path / "snapshot.json"
+    snap_path.write_text(snapshot.model_dump_json(), encoding="utf-8")
+
+    def mock_convert(docx):
+        pdf = docx.with_suffix(".pdf")
+        pdf.write_bytes(b"%PDF-1.4 mock")
+        return pdf
+
+    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
+    monkeypatch.setattr(analysis, "generate", MagicMock(return_value=content))
+    send_mock = MagicMock()
+    monkeypatch.setattr(delivery, "send_report", send_mock)
+
+    args = SimpleNamespace(
+        type="midday",
+        send=True,
+        dry_run=False,
+        test_recipient="dat.nguyen296286@gmail.com",
+        as_of=str(snapshot.as_of),
+        snapshot=str(snap_path),
+        content=None,
+        collect_only=False,
+        output_dir=str(tmp_path / "out_test_send"),
+        state_dir=str(tmp_path / ".state"),
+    )
+    code = pipeline.run(args)
+    assert code == 0
+    assert send_mock.call_count == 1
+    assert send_mock.call_args[0][3] == ["dat.nguyen296286@gmail.com"]
+    assert send_mock.call_args[1].get("is_test") is True
+
+    out_dir = [d for d in (tmp_path / "out_test_send").iterdir() if d.is_dir()][0]
+    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "sent_test"
+    assert manifest["test_recipient"] == "dat.nguyen296286@gmail.com"
+
+
+
 
 
 
