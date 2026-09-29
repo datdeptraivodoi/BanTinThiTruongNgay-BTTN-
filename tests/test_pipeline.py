@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -751,6 +752,87 @@ def test_pipeline_run_test_recipient_bypasses_timing(snapshot, content, tmp_path
     manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "sent_test"
     assert manifest["test_recipient"] == "dat.nguyen296286@gmail.com"
+
+
+def test_normalization_replaces_forecast_and_tenor_digits(snapshot):
+    from bttn.normalization import normalize_text_prose
+
+    text = "Lãi suất kỳ hạn 1 tháng và 3 tháng dự kiến duy trì ổn định trong tháng 11 năm 2026."
+    normalized = normalize_text_prose(text, snapshot)
+    assert "một tháng" in normalized
+    assert "ba tháng" in normalized
+    assert "ước tính" in normalized
+    assert "dự kiến" not in normalized
+    assert "tháng mười một" in normalized
+    assert "năm nay" in normalized
+
+
+def test_normalization_handles_missing_robusta(snapshot, content):
+    from bttn.normalization import ROBUSTA_MISSING_NOTICE, normalize_coffee_section
+
+    # Ensure ROBUSTA is missing
+    snapshot.observations.pop("ROBUSTA", None)
+    content.coffee.paragraphs = [
+        "Giá Arabica {{ARABICA}} biến động nhẹ. Giá Robusta giảm 0,5% xuống 1.950 USD/tấn do sản lượng dự kiến tăng."
+    ]
+    normalize_coffee_section(content.coffee, snapshot)
+    result = content.coffee.paragraphs[0]
+    assert result.startswith("Cập nhật giá cà phê thế giới,")
+    assert "1.950" not in result
+    assert ROBUSTA_MISSING_NOTICE in result
+
+
+def test_normalization_ensures_gold_two_sentences():
+    from bttn.normalization import normalize_gold_sentences
+
+    three_sentences = "Giá vàng thế giới đạt {{GOLD}} USD/oz. Nhà đầu tư theo dõi chính sách tiền tệ. Lực mua duy trì ổn định."
+    normalized = normalize_gold_sentences(three_sentences)
+    assert len(re.findall(r"[.!?](?:\s|$)", normalized)) == 2
+
+
+def test_run_test_smtp_directly_sends_without_ai(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from bttn import delivery, pipeline, rendering
+
+    send_mock = MagicMock()
+    monkeypatch.setattr(delivery, "send_report", send_mock)
+
+    def mock_convert(docx):
+        pdf = docx.with_suffix(".pdf")
+        pdf.write_bytes(b"%PDF-1.4 mock")
+        return pdf
+
+    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
+    generate_mock = MagicMock()
+    monkeypatch.setattr(analysis, "generate", generate_mock)
+
+    args = SimpleNamespace(
+        type="midday",
+        send=True,
+        dry_run=False,
+        test_smtp=True,
+        test_recipient="dat.nguyen296286@gmail.com",
+        as_of=None,
+        snapshot=None,
+        content=None,
+        collect_only=False,
+        output_dir=str(tmp_path / "out_test_smtp"),
+        state_dir=str(tmp_path / ".state"),
+    )
+    code = pipeline.run(args)
+    assert code == 0
+    assert generate_mock.call_count == 0  # AI was never called!
+    assert send_mock.call_count == 1
+    assert send_mock.call_args[0][3] == ["dat.nguyen296286@gmail.com"]
+    assert send_mock.call_args[1].get("is_test") is True
+
+    out_dirs = list((tmp_path / "out_test_smtp").iterdir())
+    assert len(out_dirs) == 1
+    manifest = json.loads((out_dirs[0] / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "sent_test"
+    assert manifest["test_smtp"] is True
+
 
 
 

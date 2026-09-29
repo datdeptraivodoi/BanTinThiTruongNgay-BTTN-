@@ -14,6 +14,10 @@ on:
         description: 'Email nhận thử nghiệm (gửi thử ngoài giờ, chỉ gửi riêng tới email này; để trống nếu chỉ tạo bản nháp)'
         type: string
         default: 'dat.nguyen296286@gmail.com'
+      test_smtp:
+        description: 'Kiểm tra gửi SMTP ngay (bỏ qua AI; gửi ngay báo cáo mẫu tới email test để xác minh Gmail/App Password)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -50,7 +54,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPEN_ROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY || secrets.OPENROUTER_TOKEN || secrets.OPEN_ROUTER_KEY || secrets.OPEN_ROUTER_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPEN_ROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY || secrets.OPENROUTER_TOKEN || secrets.OPEN_ROUTER_KEY || secrets.OPENROUTER_TOKEN }}
           OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY || secrets.OPENROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY || secrets.OPENROUTER_TOKEN }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'inclusionai/ling-3.0-flash-fin' }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
@@ -58,8 +62,11 @@ jobs:
           RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn' }}
           SEND_EMAIL: ${{ github.event_name == 'schedule' || inputs.send_email }}
           TEST_RECIPIENT: ${{ github.event_name == 'workflow_dispatch' && inputs.test_recipient || '' }}
+          TEST_SMTP: ${{ github.event_name == 'workflow_dispatch' && inputs.test_smtp || false }}
         run: |
-          if [ "$SEND_EMAIL" = "true" ]; then
+          if [ "$TEST_SMTP" = "true" ]; then
+            python market_report.py --type midday --test-smtp --test-recipient "$TEST_RECIPIENT"
+          elif [ "$SEND_EMAIL" = "true" ]; then
             python market_report.py --type midday --send
           elif [ -n "$TEST_RECIPIENT" ]; then
             python market_report.py --type midday --test-recipient "$TEST_RECIPIENT"

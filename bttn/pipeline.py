@@ -27,7 +27,56 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def run_test_smtp(args):
+    """Bypasses AI and web scraping to immediately verify SMTP authentication and email delivery."""
+    from .delivery import send_report
+    from .rendering import convert_and_validate, render
+    from .summary import write_step_summary
+
+    started = time.monotonic()
+    now = parse_as_of(None)
+    directory = Path(args.output_dir) / (now.strftime("%Y%m%d-%H%M%S") + "-test-smtp-" + uuid4().hex[:8])
+    directory.mkdir(parents=True, exist_ok=True)
+    test_recipient = getattr(args, "test_recipient", None) or "dat.nguyen296286@gmail.com"
+
+    manifest = {
+        "status": "started",
+        "as_of": now.isoformat(),
+        "send_requested": True,
+        "test_recipient": test_recipient,
+        "test_smtp": True,
+        "artifacts": {},
+    }
+    LOG.info("Running SMTP verification test directly to %s", test_recipient)
+
+    fixtures = ROOT / "tests" / "fixtures"
+    snap_file = fixtures / "snapshot.json"
+    content_file = fixtures / "content.json"
+    if not snap_file.is_file() or not content_file.is_file():
+        raise FileNotFoundError("Fixtures required for SMTP test not found")
+
+    snapshot = Snapshot.model_validate_json(snap_file.read_text(encoding="utf-8"))
+    content = ReportContent.model_validate_json(content_file.read_text(encoding="utf-8"))
+    snapshot.as_of = now
+
+    output = directory / f"BTTN-TEST-{now:%Y%m%d}.docx"
+    render(snapshot, content, ROOT / "template.docx", output, is_draft=False)
+    pdf = convert_and_validate(output)
+    manifest["artifacts"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [output, pdf]}
+
+    send_report(snapshot, [output, pdf], Path(args.state_dir), [test_recipient], is_test=True)
+    manifest["status"] = "sent_test"
+    manifest["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    write_json(directory / "manifest.json", manifest)
+    write_step_summary(manifest, snapshot=snapshot, directory=directory)
+    LOG.info("SMTP test completed successfully; email delivered to %s", test_recipient)
+    return 0
+
+
 def run(args):
+    if getattr(args, "test_smtp", False):
+        return run_test_smtp(args)
+
     from .analysis import generate
     from .delivery import send_report
     from .http import Http
@@ -197,6 +246,7 @@ def main(argv=None):
     modes.add_argument("--send", action="store_true", help="Send only after all validation gates pass")
     modes.add_argument("--dry-run", action="store_true", help="Generate and validate without sending (default)")
     parser.add_argument("--test-recipient", help="Recipient email for test delivery outside the midday window")
+    parser.add_argument("--test-smtp", action="store_true", help="Bypass AI to immediately test SMTP delivery to test-recipient")
     parser.add_argument("--as-of", help="ISO timestamp including UTC offset")
     parser.add_argument("--snapshot", help="Replay stored snapshot JSON, without fetching sources")
     parser.add_argument("--content", help="Use existing structured content JSON, without calling AI")
@@ -204,7 +254,7 @@ def main(argv=None):
     parser.add_argument("--output-dir", default=str(ROOT / "output"))
     parser.add_argument("--state-dir", default=str(ROOT / ".state"))
     args = parser.parse_args(argv)
-    if args.test_recipient:
+    if args.test_smtp or args.test_recipient:
         args.send = True
         args.dry_run = False
     if args.send and args.collect_only:

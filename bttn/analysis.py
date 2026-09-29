@@ -8,7 +8,8 @@ from pathlib import Path
 
 import requests
 
-from .models import ReportContent
+from .models import ReportContent, Section
+from .normalization import normalize_report_content
 from .validation import ROOT, rules, validate_content
 
 LOG = logging.getLogger("bttn.analysis")
@@ -25,6 +26,18 @@ def make_prompt(snapshot):
     rules_cfg = rules()
     word_limits = rules_cfg.get("word_limits", {})
 
+    robusta_obs = snapshot.observations.get("ROBUSTA")
+    has_robusta = robusta_obs is not None and robusta_obs.value is not None and not robusta_obs.value.is_nan()
+    robusta_guidance = ""
+    if not has_robusta:
+        robusta_guidance = (
+            "\nLƯU Ý ĐẶC BIỆT VỀ CÀ PHÊ ROBUSTA:\n"
+            "- Hiện tại KHÔNG CÓ số liệu giá cà phê Robusta từ sở giao dịch.\n"
+            "- TUYỆT ĐỐI KHÔNG tự tạo hoặc bịa giá hoặc % biến động của Robusta.\n"
+            "- Chỉ trích dẫn giá Arabica (dùng {{ARABICA}}), và thêm câu bắt buộc: "
+            "'Dữ liệu giá cà phê Robusta kỳ hạn hiện chưa có cập nhật từ sở giao dịch.'\n"
+        )
+
     limits_guidance = (
         "\n\nBẮT BUỘC TUÂN THỦ NGHIÊM NGẶT ĐỘ DÀI VÀ CẤU TRÚC (tính bằng số từ sau khi thay thế {{OBSERVATION_ID}}):\n"
         f"- highlights: đúng 3 mục, mỗi mục từ 12 đến 45 từ.\n"
@@ -35,6 +48,7 @@ def make_prompt(snapshot):
         f"- china: đúng 1 đoạn, từ {word_limits.get('china', [50, 70])[0]} đến {word_limits.get('china', [50, 70])[1]} từ.\n"
         f"- coffee: đúng 1 đoạn, từ {word_limits.get('coffee', [130, 135])[0]} đến {word_limits.get('coffee', [130, 135])[1]} từ. BẮT BUỘC bắt đầu bằng: 'Cập nhật giá cà phê thế giới,'.\n"
         f"- energy_metals: đúng 2 đoạn, tổng từ {word_limits.get('energy_metals', [125, 135])[0]} đến {word_limits.get('energy_metals', [125, 135])[1]} từ. Đoạn 1 về dầu Brent. Đoạn 2 về vàng (BẮT BUỘC có đúng 2 câu kết thúc bằng dấu chấm).\n"
+        + robusta_guidance
     )
 
     valid_tokens_sample = [f"{{{{{k}}}}}" for k in list(snapshot.observations.keys())[:12]]
@@ -42,10 +56,13 @@ def make_prompt(snapshot):
         "\n\nQUY TẮC BẮT BUỘC VỀ SỐ LIỆU, PLACEHOLDER VÀ NGÔN NGỮ:\n"
         "1. TOÀN BỘ VĂN BẢN PHẢI VIẾT 100% BẰNG TIẾNG VIỆT CHUẨN. Tuyệt đối không viết bằng tiếng Anh.\n"
         "2. TUYỆT ĐỐI KHÔNG để lọt chuỗi kỹ thuật (như 'source_ids', 'paragraphs', dấu ngoặc JSON) vào nội dung câu văn.\n"
-        "3. Mọi số liệu trong văn bản BẮT BUỘC dùng đúng các thẻ placeholder sau (không tự viết chữ số tự do, ngoại trừ tên chỉ số Nikkei 225, S&P 500):\n"
-        f"   - Thẻ giá / lãi suất / tỷ giá: {', '.join(valid_tokens_sample)}...\n"
-        "   - Thẻ biến động % ngày (nếu cần): {{BRENT_daily_pct}}, {{GOLD_daily_pct}}, {{EURUSD_daily_pct}}, {{ROBUSTA_daily_pct}}, v.v. (ví dụ: 'giảm {{BRENT_daily_pct}}%').\n"
-        "   - Khi sử dụng số liệu chênh lệch lãi suất {{SWAP_ON}} (hoặc các kỳ hạn SWAP), section source_ids điền là 'vira'.\n"
+        "3. TUYỆT ĐỐI KHÔNG VIẾT CHỮ SỐ (0-9) TỰ DO TRONG VĂN BẢN (ngoại trừ tên chỉ số Nikkei 225, S&P 500):\n"
+        "   - Các kỳ hạn hay mốc thời gian BẮT BUỘC VIẾT BẰNG CHỮ: 'một tháng', 'ba tháng', 'sáu tháng', 'tháng mười một', 'năm nay'.\n"
+        "   - Mọi số liệu giá, lãi suất, tỷ giá phải dùng đúng các thẻ placeholder sau:\n"
+        f"     * Giá / lãi suất / tỷ giá: {', '.join(valid_tokens_sample)}...\n"
+        "     * Biến động % ngày (nếu cần): {{BRENT_daily_pct}}, {{GOLD_daily_pct}}, {{EURUSD_daily_pct}}, v.v.\n"
+        "     * Khi sử dụng số liệu chênh lệch lãi suất {{SWAP_ON}} (hoặc các kỳ hạn SWAP), section source_ids điền là 'vira'.\n"
+        "4. TUYỆT ĐỐI KHÔNG DÙNG CÁC TỪ DỰ BÁO: 'dự kiến', 'dự báo', 'khuyến nghị', 'mục tiêu giá'.\n"
     )
 
     return (
@@ -263,6 +280,68 @@ def call_with_network_retry(call, prompt, schema, model, key, provider_name="ai"
             return None, None, exc, (err_type, status_code, err_msg, error_desc), elapsed
 
 
+def repair_invalid_sections(content: ReportContent, issues: list, snapshot, call, model, key, provider_name="ai"):
+    """Repairs only the specific sections with validation issues, keeping valid sections untouched."""
+    section_schema = Section.model_json_schema()
+    rules_cfg = rules()
+    word_limits = rules_cfg.get("word_limits", {})
+
+    # Group issues by section name
+    issues_by_sec: dict[str, list[str]] = {}
+    for iss in issues:
+        parts = iss.message.split(":", 1)
+        sec_name = parts[0].strip()
+        issues_by_sec.setdefault(sec_name, []).append(parts[1].strip() if len(parts) > 1 else iss.message)
+
+    for sec_name, sec_issues in issues_by_sec.items():
+        idx = None
+        if sec_name.startswith("highlight_"):
+            try:
+                idx = int(sec_name.split("_")[1])
+                curr_sec = content.highlights[idx]
+                limits = (12, 45)
+            except (IndexError, ValueError):
+                continue
+        elif hasattr(content, sec_name):
+            curr_sec = getattr(content, sec_name)
+            limits = word_limits.get(sec_name, (50, 100))
+        else:
+            continue
+
+        raw = " ".join(curr_sec.paragraphs)
+        low, high = limits
+        section_prompt = (
+            f"Bạn là biên tập viên tài chính. Hãy viết lại DUY NHẤT mục '{sec_name}' sau đây để đạt chuẩn biên tập:\n\n"
+            f"- ĐỘ DÀI BẮT BUỘC: từ {low} đến {high} từ (tính sau khi thay thế các thẻ {{TOKEN}}).\n"
+            f"- CÁC LỖI CẦN KHẮC PHỤC Ở MỤC NÀY:\n"
+            + "\n".join(f"  * {m}" for m in sec_issues)
+            + "\n\nQUY TẮC QUAN TRỌNG:\n"
+            "1. Tuyệt đối KHÔNG viết chữ số (0-9) tự do; các số liệu phải dùng thẻ {{KEY}} hoặc viết chữ ('một tháng', 'ba tháng', 'tháng mười một', 'năm nay').\n"
+            "2. Không dùng từ dự báo ('dự kiến', 'dự báo', 'khuyến nghị', 'mục tiêu giá').\n"
+            "3. Viết 100% bằng tiếng Việt chuẩn.\n\n"
+            f"BẢN NHÁP HIỆN TẠI CỦA MỤC NÀY:\n"
+            f"{raw}\n\n"
+            f"Trả về duy nhất JSON hợp lệ cho mục này theo schema sau (không trả về toàn bộ bài):\n"
+            f'{{"paragraphs": ["..."], "source_ids": {json.dumps(curr_sec.source_ids)}}}'
+        )
+
+        try:
+            sec_text, _, _, _, _ = call_with_network_retry(
+                call, section_prompt, section_schema, model, key, provider_name=f"{provider_name}-{sec_name}", max_net_retries=1
+            )
+            if sec_text:
+                cleaned_sec = clean_json_response(sec_text)
+                repaired_sec = Section.model_validate_json(cleaned_sec)
+                if idx is not None:
+                    content.highlights[idx] = repaired_sec
+                else:
+                    setattr(content, sec_name, repaired_sec)
+        except Exception as exc:
+            LOG.warning("Failed targeted repair for section %s: %s", sec_name, exc)
+
+    return normalize_report_content(content, snapshot)
+
+
 def generate(snapshot, directory: Path):
     prompt = make_prompt(snapshot)
     (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
@@ -368,8 +447,18 @@ def generate(snapshot, directory: Path):
                     )
                 continue
 
+            # Deterministic Python normalization of numbers, forecast words, structure, Robusta notice, word counts
+            content = normalize_report_content(content, snapshot)
             last_parsed_content = content
             issues = validate_content(content, snapshot)
+
+            # If minor section issues remain, repair sections individually
+            if issues and round_idx < max_content_rounds:
+                LOG.info("Attempting targeted repair on %d section issues...", len(issues))
+                content = repair_invalid_sections(content, issues, snapshot, call, model, key, provider_name=provider)
+                last_parsed_content = content
+                issues = validate_content(content, snapshot)
+
             if not issues:
                 record["status"] = "valid"
                 attempts.append(record)
