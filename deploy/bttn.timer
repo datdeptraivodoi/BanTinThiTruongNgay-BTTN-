@@ -1,0 +1,9 @@
+[Unit]
+Description=BTTN weekdays at noon Vietnam time
+[Timer]
+OnCalendar=Mon..Fri *-*-* 12:00:00 Asia/Ho_Chi_Minh
+AccuracySec=1s
+Persistent=false
+Unit=bttn.service
+[Install]
+WantedBy=timers.target
