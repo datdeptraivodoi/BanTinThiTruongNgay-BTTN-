@@ -2,14 +2,11 @@ import hashlib
 import logging
 import math
 import re
-import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time, timedelta, timezone
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
-from email.utils import parsedate_to_datetime
-from urllib.parse import quote, quote_plus, urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
-import feedparser
 from bs4 import BeautifulSoup
 
 from .calculations import percentage
@@ -200,62 +197,8 @@ def collect_mb(http, snapshot):
 
 
 def collect_news(http, snapshot):
-    query = 'site:tradingeconomics.com ("Euro Area" OR "United States" OR Japan OR China) when:1d'
-    feeds = [f"https://news.google.com/rss/search?q={quote_plus(query)}&hl=en-US&gl=US&ceid=US:en",
-             "https://vietnambiz.vn/rss/tai-chinh.rss"]
-    candidates = []
-    for url in feeds:
-        try:
-            feed = feedparser.parse(http.get(url).content)
-            for entry in feed.entries[:15]:
-                try:
-                    at = parsedate_to_datetime(entry.get("published", ""))
-                    if at.tzinfo is None:
-                        continue
-                    text = BeautifulSoup(entry.get("summary", ""), "html.parser").get_text(" ", strip=True)
-                    candidates.append((entry.get("link", ""), at, entry.get("title", "") + "\n" + text))
-                except (ValueError, TypeError):
-                    continue
-        except Exception as exc:
-            snapshot.add_issue("NEWS_FEED", f"{urlparse(url).hostname}: {type(exc).__name__}")
-    # Full articles for coffee/oil and VIRA domestic market commentary.
-    listings = [("https://vietnambiz.vn/chu-de/ca-phe-34.htm", "a[href]"),
-                ("https://vietnambiz.vn/chu-de/dau-mo-60.htm", "a[href]"),
-                ("https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html", ".story__title a")]
-    for url, selector in listings:
-        try:
-            soup = BeautifulSoup(http.get(url).text, "html.parser")
-            links = []
-            for a in soup.select(selector):
-                href = urljoin(url, a.get("href", ""))
-                title = a.get("title", "") or a.get_text(" ", strip=True)
-                is_article = (len(title) > 20 and "/chu-de/" not in href and href.endswith(".htm"))
-                is_vira = (urlparse(href).hostname == "vira.org.vn"
-                           and "/Ban-tin-Kinh-te-Tai-chinh-ngay/Ban-tin" in href)
-                if (urlparse(href).hostname == urlparse(url).hostname and href not in links
-                        and (is_article or is_vira)):
-                    links.append(href)
-                if len(links) >= 4:
-                    break
-            for link in links:
-                detail = BeautifulSoup(http.get(link).text, "html.parser")
-                meta = detail.find("meta", property="article:published_time")
-                if not meta:
-                    continue
-                at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
-                if at.tzinfo is None:
-                    continue
-                body = detail.select_one("#abody, .vnbcbc-body, .detail-content")
-                if body:
-                    candidates.append((link, at, body.get_text(" ", strip=True)[:18000]))
-        except Exception as exc:
-            snapshot.add_issue("NEWS_ARTICLE", f"{urlparse(url).hostname}: {type(exc).__name__}")
-    for url, at, text in candidates:
-        if not url.startswith("https://") or not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=36):
-            continue
-        sid = "news_" + hashlib.sha256(url.encode()).hexdigest()[:12]
-        snapshot.sources[sid] = Source(id=sid, url=url, published_at=at,
-            retrieved_at=datetime.now(timezone.utc), text=text, kind="news")
+    from .news import collect_news as collect_articles
+    collect_articles(http, snapshot)
 
 
 def parse_vietnambiz_coffee(html: str, published_at: datetime):
@@ -337,78 +280,49 @@ def parse_vietnambiz_coffee(html: str, published_at: datetime):
 
 
 def collect_vietnambiz_coffee(http, snapshot):
+    from .news import append_decision, canonical_url, contains, fetch_article, fresh
     listing_url = "https://vietnambiz.vn/chu-de/ca-phe-34.htm"
     try:
-        html = http.get(listing_url).text
-        soup = BeautifulSoup(html, "html.parser")
-        first_article_url = None
+        soup = BeautifulSoup(http.get(listing_url).text, "html.parser")
+        links = {}
         for a in soup.select("a[href]"):
-            href = a.get("href", "")
-            title = a.get("title", "") or a.get_text(" ", strip=True)
-            if "/chu-de/" not in href and href.endswith(".htm") and len(title) > 20 and ("ca-phe" in href or "gia-ca-phe" in href):
-                first_article_url = urljoin(listing_url, href)
-                break
-
-        if not first_article_url:
-            snapshot.add_issue("VIETNAMBIZ_COFFEE", "No coffee article link found on VietnamBiz listing")
-            return
-
-        detail_resp = http.get(first_article_url)
-        detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
-        meta = detail_soup.find("meta", property="article:published_time")
-        if meta and meta.get("content"):
+            href = urljoin(listing_url, a.get("href", ""))
+            title = a.get("title") or a.get_text(" ", strip=True)
+            if (urlparse(href).hostname == "vietnambiz.vn" and "/chu-de/" not in href
+                    and href.endswith(".htm") and contains(title, "giá cà phê hôm nay")):
+                links[canonical_url(href)] = title
+        candidates = []
+        for link, title in list(links.items())[:8]:
             try:
-                published_at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
-                if published_at.tzinfo is None:
-                    published_at = published_at.replace(tzinfo=snapshot.as_of.tzinfo)
-            except Exception:
-                published_at = snapshot.as_of
-        else:
-            published_at = snapshot.as_of
-
-        if published_at > snapshot.as_of:
+                article = fetch_article(http, link, title)
+                if not fresh(article.published_at, snapshot.as_of):
+                    raise ValueError("FUTURE_OR_STALE_ARTICLE")
+                # Reuse the already archived HTML; no second network read.
+                html = http.article_html_cache[canonical_url(link)]
+                rates, _ = parse_vietnambiz_coffee(html, article.published_at)
+                if not rates:
+                    raise ValueError("COFFEE_PRICE_PARSE")
+                candidates.append((article, rates))
+            except Exception as error:
+                append_decision(http, {"url": link, "topic": "coffee", "status": "rejected",
+                                       "reason": str(error) if isinstance(error, ValueError) else type(error).__name__})
+        if not candidates:
+            snapshot.add_issue("VIETNAMBIZ_COFFEE", "No recent, dated daily coffee-price article could be parsed")
             return
-
-        rates, trading_date = parse_vietnambiz_coffee(detail_resp.text, published_at)
-        sid = "news_" + hashlib.sha256(first_article_url.encode()).hexdigest()[:12]
-
-        body = detail_soup.select_one("#abody, .vnbcbc-body, .detail-content")
-        clean_text = ""
-        if body:
-            for rel in body.select(".relate-container, .box-tin-lien-quan, .VnbArticleContentEmbed, script, style"):
-                rel.decompose()
-            paras = [unicodedata.normalize("NFC", p.get_text(" ", strip=True)) for p in body.find_all(["p", "h2", "h3"])]
-            clean_paras = [p for p in paras if p and len(p) > 15 and not p.startswith("TIN LIÊN QUAN") and not p.startswith("Xem thêm:")]
-            full_body = "\n\n".join(clean_paras)
-            m = re.search(r"(Cập nhật giá cà phê thế giới|Trên sàn giao dịch London|thị trường cà phê thế giới)", full_body, re.I)
-            clean_text = full_body[m.start():] if m else full_body
-        else:
-            clean_text = unicodedata.normalize("NFC", detail_soup.get_text(" ", strip=True))
-
-        snapshot.sources[sid] = Source(
-            id=sid,
-            url=first_article_url,
-            published_at=published_at,
-            retrieved_at=datetime.now(timezone.utc),
-            text=f"[VIETNAMBIZ CẬP NHẬT GIÁ CÀ PHÊ THẾ GIỚI]\n{clean_text[:18000]}",
-            kind="news",
-        )
-
+        article, rates = max(candidates, key=lambda item: item[0].published_at)
+        snapshot.sources[article.id] = article
+        append_decision(http, {"url": article.url, "source_id": article.id, "topic": "coffee",
+                               "status": "selected", "reason": "LATEST_DATED_COFFEE_PRICES"})
         for key, info in rates.items():
             snapshot.observations[key] = Observation(
-                id=key,
-                label=f"{key.capitalize()} futures",
-                value=info["value"],
-                unit=info["unit"],
-                source_id=sid,
-                trading_date=info["trading_date"],
+                id=key, label=f"{key.capitalize()} futures", value=info["value"], unit=info["unit"],
+                source_id=article.id, trading_date=info["trading_date"],
                 basis=f"VietnamBiz bài giá cà phê; giao kỳ hạn {info.get('tenor') or 'chuẩn'}",
-                daily_pct=info["daily_pct"],
-                tenor=info.get("tenor"),
+                daily_pct=info["daily_pct"], tenor=info.get("tenor"),
             )
-        LOG.info("Collected VietnamBiz coffee data: %s", list(rates.keys()))
-    except Exception as exc:
-        snapshot.add_issue("VIETNAMBIZ_COFFEE", f"Failed to collect VietnamBiz coffee: {type(exc).__name__}: {exc}")
+        LOG.info("Collected dated VietnamBiz coffee prices: %s", list(rates))
+    except Exception as error:
+        snapshot.add_issue("VIETNAMBIZ_COFFEE", f"Coffee collection: {type(error).__name__}")
 
 
 def collect_snapshot(http, as_of):

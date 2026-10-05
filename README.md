@@ -22,11 +22,57 @@ Pipeline Python tạo bản tin từ dữ liệu có nguồn, nội dung AI dạ
 | Tỷ giá trung tâm | [NHNN](https://sbv.gov.vn/vi/tỷ-giá) | Chặn; trang có thể trả Request Rejected |
 | Tỷ giá chuyển khoản USD | [MBBank](https://www.mbbank.com.vn/ExchangeRate) | Chặn nếu thiếu ngày hiện tại; ngày trước thiếu thì để — |
 | FX, chỉ số, một số hợp đồng hàng hóa | Yahoo Finance chart API | FX bắt buộc thiếu thì chặn; chỉ tiêu tùy chọn để — |
-| Tin tức | RSS và bài VietnamBiz, VIRA; Google News RSS tìm Trading Economics | Cần ít nhất ba nguồn trong cửa sổ 36 giờ; RSS có thể chỉ cung cấp tóm tắt |
+| Tin tức | RSS theo chủ đề, trang chuyên mục VietnamBiz/VIRA và toàn văn tại nhà xuất bản được cho phép | Cần ít nhất ba bài khác nhau đủ nội dung; thiếu tin từng chủ đề được ghi rõ |
 
 CRB Spot, LME Index, cao su, RON92 và kim loại LME chưa có adapter được xác minh nên để `—`. Không thay bằng chỉ số/hợp đồng khác chỉ vì tên gần giống. Dữ liệu futures Yahoo không phải báo giá spot và có thể có hiệu ứng đổi hợp đồng. Mỗi lần chạy lưu ngày/nguồn cụ thể trong `snapshot.json`; không coi tất cả là giá realtime.
 
 Lịch ngày làm việc hiện bỏ thứ Bảy/Chủ nhật, chưa tích hợp lịch nghỉ lễ từng thị trường. Yêu cầu VIRA, NHNN và MB đúng ngày sẽ chặn phát hành khi chưa có số mới, kể cả ngày nghỉ. Không phát hành bản tin nếu nguồn bị lỗi; đây là hành vi chủ ý. Kiểm tra JSON/nguồn/số không chứng minh hoàn toàn mọi quan hệ nhân quả trong văn xuôi; vẫn cần review biên tập trước khi đổi model chính.
+
+## Thu thập và lọc tin bằng Python
+
+Quy tắc nằm trong `config/news_rules.json`, xử lý tại `bttn/news.py`. Có tám nhóm:
+liên ngân hàng, USD/VND, EUR/USD, Nhật Bản, Trung Quốc, cà phê, Brent và vàng.
+Brent và vàng có trạng thái nguồn riêng dù cùng một mục trong bản tin.
+
+1. Khám phá link từ RSS theo từng nhóm, RSS tài chính/hàng hóa và các trang chuyên mục.
+   RSS chỉ cung cấp link, tiêu đề và ngày đăng để khám phá; không dùng phần mô tả RSS làm toàn văn.
+   Ưu tiên link trực tiếp, sự kiện kinh tế trong tiêu đề rồi thời gian đăng, tối đa sáu ứng viên/nhóm.
+2. Tải bài từ Trading Economics, VietnamBiz hoặc VIRA. Google News chỉ được dùng nếu redirect/link
+   công khai dẫn tới nhà xuất bản; không giải được link thì ghi `PUBLISHER_LINK_UNRESOLVED`.
+   Tối đa 36 URL ứng viên tin trong một lượt; bộ đọc giá cà phê kiểm tra riêng tối đa tám bài.
+3. Lấy tiêu đề, toàn văn và ngày đăng từ HTML/JSON-LD; loại khối tin liên quan/quảng cáo.
+   Bài cần ít nhất 80 đơn vị tách bằng khoảng trắng và 400 ký tự, tối đa 80.000 ký tự.
+   Không lấy ngày chạy thay ngày đăng. Chỉ dùng ngày RSS nếu trang thiếu ngày; ngày địa phương
+   không có offset chỉ được gắn múi giờ khi nhà xuất bản có cấu hình rõ ràng.
+4. Chốt tin trong cửa sổ 36 giờ, mở rộng tới đầu ngày làm việc liền trước nếu cần.
+   Ví dụ thứ Hai trưa vẫn nhận tin thứ Sáu; không nhận tin sau cutoff. Chưa có lịch nghỉ lễ.
+5. Phân loại bằng từ/cụm có ranh giới trong tiêu đề và nội dung; URL không tham gia phân loại.
+   USD/VND cần cả dấu hiệu thị trường Việt Nam và đồng USD; bảng euro trong nước không thay cho EUR/USD.
+   Một lần nhắc Nhật Bản trong thân bài không đủ để coi là tin Nhật Bản. Đếm từ khóa khác nhau, không thưởng lặp từ.
+   Xếp hạng theo mức liên quan, sự kiện kinh tế/chính sách, ngày đăng và độ đầy đủ.
+6. Chuẩn hóa URL bỏ tracking, lọc bản sao theo URL/nội dung và ưu tiên bài đầy đủ hơn.
+   Nhóm sự kiện bằng tiêu đề gần giống, cùng ngày và cùng bộ số liệu; tối đa hai bài/sự kiện,
+   sáu bài/nhóm. Bài cập nhật số liệu mới vẫn được giữ. Đây là heuristic, cần review các trường hợp biên.
+7. Lưu `news-decisions.json` (lý do chọn/loại), `news-coverage.json`, bản gốc HTTP và `snapshot.json`.
+   Không có bài đủ dùng cho một nhóm thì ghi `price_data_only_or_missing`; bước biên tập chỉ mô tả
+   số liệu và giới hạn nguồn, không tự viết nguyên nhân. Điều kiện phát hành về số liệu và độ dài vẫn giữ.
+
+Bộ đọc giá cà phê chọn bài **giá cà phê hôm nay có ngày đăng mới nhất và đọc được giá**,
+không chọn theo bài đầu trang. Lưu riêng ngày đăng bài và ngày giao dịch của giá Arabica/Robusta.
+Một bài mới không làm giá của phiên cũ thành giá ngày hiện tại.
+
+Kiểm tra riêng khâu thu thập, không gọi model và không gửi thư:
+
+```bash
+python -m bttn.news
+# Giảm số URL tin để kiểm tra nhanh; bài giá cà phê có giới hạn riêng như trên.
+python -m bttn.news --max-fetches 16
+python -m bttn.news --as-of 2026-10-06T12:00:00+07:00 --output-dir output
+```
+
+Mỗi lượt tạo thư mục `news-review-*`. `reviewed_with_gaps` nghĩa là kiểm tra thu thập đã hoàn tất
+nhưng còn nhóm thiếu bài; mã thoát 0 của lệnh review không xác nhận bản tin đủ điều kiện phát hành.
+Muốn tái hiện nội dung tại cutoff cũ phải dùng snapshot/raw đã lưu, vì trang nguồn có thể được cập nhật.
 
 ## Cài đặt và chạy
 
@@ -58,7 +104,7 @@ python market_report.py --snapshot path/to/snapshot.json --content path/to/conte
 
 ## Model và GitHub Actions
 
-Cấu hình ít nhất một key: `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`), `OPENROUTER_API_KEY` (tương thích secret cũ `Open_Router_API_Key`). Các tên model cấu hình qua `GEMINI_MODEL`, `ZENMUX_MODEL`, `OPENROUTER_MODEL`; giá trị mặc định giữ baseline Gemini và Ling Fin fallback trong `.env.example`. Tên model phải tồn tại và tài khoản phải có quyền gọi. Chưa tự động nâng Ling Fin thành model chính khi chưa có đánh giá trên bản tin thực tế.
+Cấu hình ít nhất một key: `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`), `ZENMUX_API_KEY`; OpenRouter là tùy chọn (`OPENROUTER_API_KEY`, tương thích secret cũ `Open_Router_API_Key`). Các tên model cấu hình qua `GEMINI_MODEL`, `ZENMUX_MODEL`, `OPENROUTER_MODEL`. Tên model phải tồn tại và tài khoản phải có quyền gọi. Chưa tự động nâng Ling Fin thành model chính khi chưa có đánh giá trên bản tin thực tế.
 
 Pipeline dịch và biên tập theo từng mục: Python chọn nguồn còn hạn, lọc trùng và giới hạn tối đa sáu bài bổ sung/mục; giữ observation và provenance. Mỗi mục gọi AI riêng theo schema Section. Python đếm độ dài sau thay placeholder, bỏ câu trùng và chỉ rút gọn bằng câu hoàn chỉnh khi không mất câu chứa số liệu. Không cắt giữa câu, không chèn văn bản mẫu hay số liệu cố định. Nếu chưa đạt, chỉ mục đó được viết lại (Gemini tối đa ba vòng, ZenMux/OpenRouter hai vòng). Các mục đã đạt được giữ nguyên. Giới hạn từ và kiểm tra nguồn/số liệu vẫn là điều kiện phát hành.
 

@@ -122,6 +122,7 @@ def expected_session_date(as_of: datetime, snapshot: Snapshot | None = None) -> 
 
 
 def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
+    from .news import article_quality, duplicates, fresh
     result = [i for i in snapshot.issues if i.severity == "error"]
     cfg = rules()
     def error(code, message):
@@ -166,13 +167,18 @@ def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
         if obs and obs.trading_date != expected:
             error("LOCAL_FIXING_DATE", f"{key}: chưa có số liệu ngày {expected}")
     news = [s for s in snapshot.sources.values() if s.kind == "news" and
-            timedelta(0) <= snapshot.as_of - s.published_at <= timedelta(hours=cfg["news_max_age_hours"])]
-    if len(news) < 3:
-        error("NEWS_COVERAGE", "Cần ít nhất ba bài có nguồn và ngày xuất bản hợp lệ")
+            not article_quality(s) and fresh(s.published_at, snapshot.as_of)]
+    unique = []
+    for source in sorted(news, key=lambda s: len(s.text), reverse=True):
+        if not any(duplicates(source, old) for old in unique):
+            unique.append(source)
+    if len(unique) < 3:
+        error("NEWS_COVERAGE", "Cần ít nhất ba bài có nội dung đủ dùng, nguồn và ngày xuất bản hợp lệ")
     return result
 
 
 def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
+    from .news import article_quality, fresh
     result = []
     sections = [(name, getattr(content, name)) for name in rules()["word_limits"]]
     sections += [(f"highlight_{i}", s) for i, s in enumerate(content.highlights)]
@@ -184,8 +190,10 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
         for sid in section.source_ids:
             source = snapshot.sources.get(sid)
             if source and (source.published_at > snapshot.as_of or
-                           source.kind == "news" and snapshot.as_of - source.published_at > timedelta(hours=rules()["news_max_age_hours"])):
+                           source.kind == "news" and not fresh(source.published_at, snapshot.as_of)):
                 error("CONTENT_SOURCE_DATE", "Nguồn trích dẫn nằm ngoài thời gian hợp lệ")
+            if source and source.kind == "news" and article_quality(source):
+                error("CONTENT_SOURCE_QUALITY", "Bài nguồn chỉ có tiêu đề hoặc không đủ nội dung")
         raw = " ".join(section.paragraphs)
         if "[" in raw or "]" in raw:
             error("INCOMPLETE_SECTION", "Mục còn chứa dấu chờ biên tập; không được phát hành")

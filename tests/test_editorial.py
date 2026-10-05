@@ -21,7 +21,8 @@ def test_preparation_filters_old_future_duplicate_and_unrelated_news():
                              ("duplicate", "Japan yen strengthens after BOJ statement.", 3),
                              ("old", "Japan old report", 50), ("future", "Japan future report", -1),
                              ("irrelevant", "Coffee harvest in Brazil", 1)]:
-        snapshot.sources[sid] = base.model_copy(update={"id": sid, "text": text,
+        snapshot.sources[sid] = base.model_copy(update={"id": sid, "text": " ".join([text] * 20), "title": text,
+                                                        "url": "https://example.com/" + sid,
                                                         "published_at": snapshot.as_of-timedelta(hours=hours)})
     evidence = prepare_evidence(snapshot, "japan")
     assert "fresh" in evidence["sources"]

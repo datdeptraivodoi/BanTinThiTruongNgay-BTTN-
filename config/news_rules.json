@@ -1,0 +1,28 @@
+{
+  "minimum_words": 80,
+  "minimum_characters": 400,
+  "maximum_article_characters": 80000,
+  "maximum_discovery_per_topic": 6,
+  "maximum_fetches": 36,
+  "maximum_articles_per_topic": 6,
+  "allowed_publishers": ["tradingeconomics.com", "vietnambiz.vn", "vira.org.vn"],
+  "publisher_timezones": {"vietnambiz.vn": "Asia/Ho_Chi_Minh", "vira.org.vn": "Asia/Ho_Chi_Minh"},
+  "direct_feeds": ["https://vietnambiz.vn/tai-chinh.rss", "https://vietnambiz.vn/hang-hoa.rss"],
+  "direct_listings": [
+    {"url": "https://vietnambiz.vn/chu-de/ca-phe-34.htm", "topics": ["coffee"]},
+    {"url": "https://vietnambiz.vn/chu-de/dau-mo-60.htm", "topics": ["brent"]},
+    {"url": "https://vietnambiz.vn/quoc-te.htm", "topics": ["eur_usd", "japan", "china"]},
+    {"url": "https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html", "topics": ["interbank", "usd_vnd"]}
+  ],
+  "topics": {
+    "interbank": {"query": "VNIBOR OR interbank OR \"liên ngân hàng\"", "terms": ["vnibor", "interbank", "liên ngân hàng", "thị trường tiền tệ"]},
+    "usd_vnd": {"query": "\"USD VND\" OR \"tỷ giá trung tâm\" OR \"tỷ giá USD\"", "terms": ["usd vnd", "usd/vnd", "usd-vnd", "tỷ giá", "tỷ giá trung tâm"], "require_any": ["vnd", "usd/vnd", "usd-vnd", "usd vnd", "việt nam", "trong nước", "trung tâm", "vietcombank", "mbbank"], "currency_terms": ["usd", "đô la mỹ", "đôla mỹ", "đồng bạc xanh"]},
+    "eur_usd": {"query": "ECB OR Fed OR \"euro area\" OR \"US inflation\"", "terms": ["eur/usd", "eur-usd", "euro", "ecb", "fed", "federal reserve", "euro area", "châu âu", "lạm phát mỹ", "united states"], "require_any": ["eur/usd", "eur-usd", "eurusd", "ecb", "fed", "federal reserve", "euro area", "châu âu", "lạm phát mỹ", "united states"]},
+    "japan": {"query": "Japan BOJ yen OR \"Nhật Bản\"", "terms": ["japan", "japanese", "jpy", "yen", "boj", "bank of japan", "nhật bản", "đồng yên"], "minimum_score": 2},
+    "china": {"query": "China PBOC yuan OR \"Trung Quốc\"", "terms": ["china", "chinese", "yuan", "pboc", "trung quốc", "nhân dân tệ"]},
+    "coffee": {"query": "arabica robusta OR \"giá cà phê\"", "terms": ["coffee", "arabica", "robusta", "cà phê"]},
+    "brent": {"query": "Brent crude oil OR \"giá dầu\"", "terms": ["brent", "crude oil", "oil prices", "giá dầu", "dầu thô", "opec"]},
+    "gold": {"query": "gold bullion OR \"giá vàng\"", "terms": ["gold", "bullion", "giá vàng", "vàng thế giới"]}
+  },
+  "events": ["interest rate", "policy rate", "rate decision", "inflation", "gdp", "pmi", "payrolls", "cpi", "exports", "inventories", "supply", "demand", "quyết định lãi suất", "lãi suất", "chính sách", "chính sách tiền tệ", "lạm phát", "tăng trưởng", "xuất khẩu", "tồn kho", "nguồn cung", "nhu cầu", "báo cáo việc làm"]
+}

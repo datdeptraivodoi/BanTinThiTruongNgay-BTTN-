@@ -33,6 +33,17 @@ A successful dry-run may still be `draft_with_issues`; inspect `manifest.json`
 and validation files. Never delete the ledger to retry an uncertain email.
 Keep the previous code revision for rollback; retain environment and state.
 
+Review only news discovery/extraction/filtering, with no model or mail credentials:
+
+```bash
+cd /opt/bttn
+runuser -u bttn -- .venv/bin/python -m bttn.news --max-fetches 16 --output-dir /var/lib/bttn/output
+```
+
+Inspect `snapshot.json`, `news-decisions.json`, and `news-coverage.json` in the
+printed `news-review-*` directory. `reviewed_with_gaps` records missing topics;
+the review command's successful exit does not mean publication is ready.
+
 Article translations are persisted in `/var/lib/bttn/state/translations`. Install
 `bttn-translation-cleanup.service` and `bttn-translation-cleanup.timer` alongside
 the publication units, verify them with systemd-analyze, then enable the cleanup

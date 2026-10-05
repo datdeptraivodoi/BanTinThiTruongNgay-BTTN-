@@ -116,13 +116,15 @@ def test_editorial_uses_one_stored_translation_across_topics_and_runs(tmp_path):
     fixtures = Path(__file__).parent / "fixtures"
     snapshot = Snapshot.model_validate_json((fixtures / "snapshot.json").read_text(encoding="utf-8"))
     content = ReportContent.model_validate_json((fixtures / "content.json").read_text(encoding="utf-8"))
-    article = source().model_copy(update={"published_at": snapshot.as_of-timedelta(hours=1)})
+    original = " ".join([ORIGINAL + " Japan yen and China yuan markets await the ECB policy decision."] * 10)
+    translated = " ".join([TRANSLATED + " Thị trường đồng yên Nhật Bản và nhân dân tệ Trung Quốc chờ quyết định chính sách của ECB."] * 10)
+    article = source(original).model_copy(update={"published_at": snapshot.as_of-timedelta(hours=1)})
     snapshot.sources[article.id] = article
     translation_calls, evidence_seen = [], []
     def model(prompt, schema, *args):
         if "segments" in schema["properties"]:
             translation_calls.append(prompt)
-            return json.dumps({"segments": [TRANSLATED]}), {}
+            return json.dumps({"segments": [translated]}), {}
         name = prompt.split("SECTION: ")[1].splitlines()[0]
         evidence = json.loads(prompt.split("BEGIN_UNTRUSTED_SOURCE_DATA\n")[1].split("\nEND_UNTRUSTED_SOURCE_DATA")[0])
         if "article" in evidence["sources"]:
@@ -139,14 +141,14 @@ def test_editorial_uses_one_stored_translation_across_topics_and_runs(tmp_path):
             assert TRANSLATED not in diagnostic.read_text(encoding="utf-8")
     assert len(translation_calls) == 1
     assert len(evidence_seen) >= 3
-    assert all(text == TRANSLATED for text in evidence_seen)
+    assert all(text == translated for text in evidence_seen)
 
 
 def test_failed_foreign_article_is_not_silently_sent_to_editor(tmp_path):
     fixtures = Path(__file__).parent / "fixtures"
     snapshot = Snapshot.model_validate_json((fixtures / "snapshot.json").read_text(encoding="utf-8"))
     content = ReportContent.model_validate_json((fixtures / "content.json").read_text(encoding="utf-8"))
-    snapshot.sources["article"] = source().model_copy(update={"published_at": snapshot.as_of-timedelta(hours=1)})
+    snapshot.sources["article"] = source(" ".join([ORIGINAL] * 10)).model_copy(update={"published_at": snapshot.as_of-timedelta(hours=1)})
     def model(prompt, schema, *args):
         if "segments" in schema["properties"]:
             return "{}", {}
