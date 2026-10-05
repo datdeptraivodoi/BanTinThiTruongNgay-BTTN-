@@ -75,3 +75,37 @@ def test_outage_is_not_repeated_for_each_section(tmp_path):
     with pytest.raises(RuntimeError, match="HTTP 402"):
         generate_sections(snapshot, tmp_path, [("test", "test", "fake", unavailable, 3)])
     assert len(calls) == 1
+
+
+def test_short_output_repaired_only_for_its_section(tmp_path):
+    snapshot, content = fixtures()
+    calls = []
+    def model(prompt, schema, model, key):
+        name = prompt.split("SECTION: ")[1].splitlines()[0]
+        calls.append(name)
+        evidence = json.loads(prompt.split("BEGIN_UNTRUSTED_SOURCE_DATA\n")[1].split("\nEND_UNTRUSTED_SOURCE_DATA")[0])
+        from bttn.editorial import get_section
+        section = get_section(content, name).model_copy(deep=True)
+        section.source_ids = list(evidence["sources"])[:1]
+        if name == "china" and calls.count(name) == 1:
+            section.paragraphs = ["Tin quá ngắn."]
+        return section.model_dump_json(), {}
+    result = generate_sections(snapshot, tmp_path, [("test", "test", "fake", model, 2)])
+    assert not validate_content(result, snapshot)
+    assert len(calls) == 11
+    assert calls.count("china") == 2
+    assert calls.count("eur_usd") == 1
+
+
+def test_forecast_and_unbound_numbers_cannot_be_normalized_away(tmp_path):
+    import pytest
+    snapshot, _ = fixtures()
+    def model(prompt, *args):
+        evidence = json.loads(prompt.split("BEGIN_UNTRUSTED_SOURCE_DATA\n")[1].split("\nEND_UNTRUSTED_SOURCE_DATA")[0])
+        section = Section(paragraphs=["Dự báo giá sẽ đạt 12345 trong phiên tới."],
+                          source_ids=list(evidence["sources"])[:1])
+        return section.model_dump_json(), {}
+    with pytest.raises(RuntimeError):
+        generate_sections(snapshot, tmp_path, [("test", "test", "fake", model, 1)])
+    records = json.loads((tmp_path / "model-attempts.json").read_text(encoding="utf-8"))
+    assert all({"FORECAST_DISABLED", "UNBOUND_NUMBER"} <= {i["code"] for i in r["issues"]} for r in records)

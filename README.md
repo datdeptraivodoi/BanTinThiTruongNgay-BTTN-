@@ -48,7 +48,7 @@ $env:LIBREOFFICE_PATH = 'C:\Program Files\LibreOffice\program\soffice.exe'
 python market_report.py --collect-only
 # Tạo bản xem trước (mặc định), có gọi model khi dữ liệu đạt
 python market_report.py --dry-run
-# Phát hành sau mọi kiểm tra; chỉ ngày làm việc 12:00–15:00 VN
+# Phát hành sau mọi kiểm tra
 python market_report.py --send
 # Tái hiện bản đã lưu, không gọi nguồn hoặc AI
 python market_report.py --snapshot path/to/snapshot.json --content path/to/content.json --dry-run
@@ -58,13 +58,13 @@ python market_report.py --snapshot path/to/snapshot.json --content path/to/conte
 
 ## Model và GitHub Actions
 
-Cấu hình ít nhất một key: `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`), `OPENROUTER_API_KEY` (tương thích secret cũ `Open_Router_API_Key`). Các tên model cấu hình qua `GEMINI_MODEL`, `OPENROUTER_MODEL`; giá trị mặc định giữ baseline Gemini và Ling Fin fallback trong `.env.example`. Tên model phải tồn tại và tài khoản phải có quyền gọi. Chưa tự động nâng Ling Fin thành model chính khi chưa có đánh giá trên bản tin thực tế.
+Cấu hình ít nhất một key: `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`), `OPENROUTER_API_KEY` (tương thích secret cũ `Open_Router_API_Key`). Các tên model cấu hình qua `GEMINI_MODEL`, `ZENMUX_MODEL`, `OPENROUTER_MODEL`; giá trị mặc định giữ baseline Gemini và Ling Fin fallback trong `.env.example`. Tên model phải tồn tại và tài khoản phải có quyền gọi. Chưa tự động nâng Ling Fin thành model chính khi chưa có đánh giá trên bản tin thực tế.
 
 Pipeline dịch và biên tập theo từng mục: Python chọn nguồn còn hạn, lọc trùng và giới hạn tối đa sáu bài bổ sung/mục; giữ observation và provenance. Mỗi mục gọi AI riêng theo schema Section. Python đếm độ dài sau thay placeholder, bỏ câu trùng và chỉ rút gọn bằng câu hoàn chỉnh khi không mất câu chứa số liệu. Không cắt giữa câu, không chèn văn bản mẫu hay số liệu cố định. Nếu chưa đạt, chỉ mục đó được viết lại (Gemini tối đa ba vòng, ZenMux/OpenRouter hai vòng). Các mục đã đạt được giữ nguyên. Giới hạn từ và kiểm tra nguồn/số liệu vẫn là điều kiện phát hành.
 
 Hỗ trợ `ZENMUX_API_KEY` và `ZENMUX_MODEL` trực tiếp tại endpoint ZenMux; không cần OpenRouter. Nếu provider hết số dư hoặc hết lượt thử mạng, các mục còn lại dùng provider dự phòng, không gọi lại provider lỗi trong cùng lượt chạy. Nhật ký `model-attempts.json` ghi từng mục, vòng biên tập, usage, thời gian và lỗi. `evidence-*.json`, `prompt-*.txt`, `response-*.txt` lưu bằng chứng và đầu ra; `content-progress.json` lưu các mục đã đạt để kiểm tra. Đây chưa phải cơ chế tự tiếp tục giữa hai lượt chạy. Mục chưa đạt còn dấu nháp và chặn gửi thư. Không lấy reasoning_content làm bản tin. Skills cải thiện chỉ dẫn, không tương đương fine-tuning trọng số.
 
-Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biến `RECIPIENTS` có thể cấu hình trong GitHub Repository Variables; mặc định giữ danh sách nhận cũ. Workflow schedule gọi `--send`. Chạy thủ công mặc định chỉ preview, bật `send_email` nếu muốn gửi; cùng giới hạn giờ và dữ liệu áp dụng. Workflow kiểm tra riêng chạy trên push/PR và không cần secrets.
+Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biến `RECIPIENTS` có thể cấu hình trong GitHub Repository Variables; mặc định giữ danh sách nhận cũ. Workflow schedule gọi `--send`. Chạy thủ công mặc định chỉ preview, bật `send_email` nếu muốn gửi; cùng kiểm tra dữ liệu và nội dung áp dụng. Workflow kiểm tra riêng chạy trên push/PR và không cần secrets.
 
 `.state/` lưu trạng thái gửi theo ngày. Workflow dùng concurrency và Actions cache để lưu qua các lần chạy. Cache có thể bị xóa/evict và ledger ở máy khác không được đồng bộ; đây không phải bảo đảm exactly-once toàn cục. Nếu trạng thái `unknown`/`partial_or_unknown`, kiểm tra hộp thư người gửi và danh sách nhận trước khi xử lý ledger. Không xóa ledger để retry mù. Chạy nhiều môi trường sản xuất cần kho ledger bền vững dùng chung.
 
