@@ -101,7 +101,10 @@ def gemini(prompt, schema, model, key):
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
                         response_json_schema=schema,
-                        max_output_tokens=8192,
+                        max_output_tokens=16384,
+                        thinking_config=(types.ThinkingConfig(thinking_budget=1024)
+                                         if m.startswith("gemini-2.5")
+                                         else types.ThinkingConfig(thinking_level="low")),
                     ),
                 )
                 reasons = [str(c.finish_reason).split(".")[-1] for c in (response.candidates or [])]
