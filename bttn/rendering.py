@@ -258,7 +258,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     grid(r9[1], ["Chỉ tiêu", "1 tháng", "6 tháng"], [[k, "", ""] for k in ["USD-VND", "EUR-USD", "USD-JPY", "SOFR USD"]], size=8)
     heading(r11[0], "Bảng giá hàng hóa · " + snapshot.as_of.strftime("%d.%m.%Y"))
     commodities = [("CRB", "CRB Spot"), ("DXY", "USD Index"), ("LME", "LME Index"),
-        ("ROBUSTA", "Robusta USD/tấn"), ("ARABICA", "Arabica USc/lb"), ("CORN", "Ngô USc/bsh"),
+        ("ROBUSTA", "Robusta USD/tấn"), ("ARABICA", "Arabica USc/lbs"), ("CORN", "Ngô USc/bsh"),
         ("SOY", "Đậu tương USc/bsh"), ("RUBBER", "Cao su JPY/kg"), ("COTTON", "Cotton USc/lb"),
         ("BRENT", "Brent USD/thùng"), ("GAS", "Khí USD/MMBtu"), ("RON92", "RON92 USD/thùng"),
         ("COPPER", "Đồng USD/tấn"), ("ALUMINUM", "Nhôm USD/tấn"), ("ZINC", "Kẽm USD/tấn"),
@@ -272,7 +272,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot)
     narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot)
     plot_cell(r12[1], "Dầu Brent futures · USD/thùng", snapshot, ["BRENT"], output.parent, "brent", height=1.7)
-    plot_cell(r12[2], "Arabica futures · USc/lb", snapshot, ["ARABICA"], output.parent, "arabica", height=1.7)
+    plot_cell(r12[2], "Arabica futures · USc/lbs", snapshot, ["ARABICA"], output.parent, "arabica", height=1.7)
     # Remove orphan chart/image relationships now that all source charts were replaced.
     used = {value for node in doc.element.iter() for key, value in node.attrib.items()
             if key in {qn("r:id"), qn("r:embed"), qn("r:link")}}

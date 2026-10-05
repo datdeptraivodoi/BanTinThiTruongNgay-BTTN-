@@ -69,6 +69,12 @@ FORECAST_REPLACEMENTS = [
     (re.compile(r"\bmục tiêu giá\b", re.I), "mức tham chiếu"),
 ]
 
+UNIT_REPLACEMENTS = [
+    (re.compile(r"\bUS\s*cents?/(?:pounds?|lbs?)\b", re.I), "USc/lbs"),
+    (re.compile(r"\bUSc/lb\b", re.I), "USc/lbs"),
+    (re.compile(r"\bcents?/(?:pounds?|lbs?)\b", re.I), "USc/lbs"),
+]
+
 ROBUSTA_MISSING_NOTICE = "Dữ liệu giá cà phê Robusta kỳ hạn hiện chưa có cập nhật từ sở giao dịch."
 
 
@@ -81,11 +87,15 @@ def normalize_text_prose(text: str, snapshot: Snapshot) -> str:
     for mark in ["**", "##", "__", "```"]:
         text = text.replace(mark, "")
 
-    # 2. Replace forbidden forecast words
+    # 2. Standardize coffee units (US cent/pound -> USc/lbs) without altering price digits
+    for pat, repl in UNIT_REPLACEMENTS:
+        text = pat.sub(repl, text)
+
+    # 3. Replace forbidden forecast words
     for pat, repl in FORECAST_REPLACEMENTS:
         text = pat.sub(repl, text)
 
-    # 3. Replace tenors and calendar numbers
+    # 4. Replace tenors and calendar numbers
     for pat, repl in TENOR_REPLACEMENTS:
         text = pat.sub(repl, text)
     for pat, repl in MONTH_REPLACEMENTS:

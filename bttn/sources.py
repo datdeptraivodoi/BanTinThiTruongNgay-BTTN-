@@ -2,6 +2,7 @@ import hashlib
 import logging
 import math
 import re
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time, timedelta, timezone
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
@@ -28,7 +29,7 @@ INSTRUMENTS = {
     "DAX": ("^GDAXI", "DAX", "điểm"),
     "DXY": ("DX-Y.NYB", "USD Index", "điểm"),
     "ROBUSTA": ("RC=F", "Robusta futures", "USD/tấn"),
-    "ARABICA": ("KC=F", "Arabica futures", "USc/lb"),
+    "ARABICA": ("KC=F", "Arabica futures", "USc/lbs"),
     "CORN": ("ZC=F", "Ngô futures", "USc/bushel"),
     "SOY": ("ZS=F", "Đậu tương futures", "USc/bushel"),
     "COTTON": ("CT=F", "Cotton futures", "USc/lb"),
@@ -328,7 +329,7 @@ def parse_vietnambiz_coffee(html: str, published_at: datetime):
             "tenor": tenor,
             "value": price,
             "daily_pct": pct,
-            "unit": "USc/lb",
+            "unit": "USc/lbs",
             "trading_date": trading_date,
         }
 
@@ -355,19 +356,41 @@ def collect_vietnambiz_coffee(http, snapshot):
         detail_resp = http.get(first_article_url)
         detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
         meta = detail_soup.find("meta", property="article:published_time")
-        published_at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00")) if meta else snapshot.as_of
+        if meta and meta.get("content"):
+            try:
+                published_at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
+                if published_at.tzinfo is None:
+                    published_at = published_at.replace(tzinfo=snapshot.as_of.tzinfo)
+            except Exception:
+                published_at = snapshot.as_of
+        else:
+            published_at = snapshot.as_of
 
         if published_at > snapshot.as_of:
             return
 
         rates, trading_date = parse_vietnambiz_coffee(detail_resp.text, published_at)
         sid = "news_" + hashlib.sha256(first_article_url.encode()).hexdigest()[:12]
+
+        body = detail_soup.select_one("#abody, .vnbcbc-body, .detail-content")
+        clean_text = ""
+        if body:
+            for rel in body.select(".relate-container, .box-tin-lien-quan, .VnbArticleContentEmbed, script, style"):
+                rel.decompose()
+            paras = [unicodedata.normalize("NFC", p.get_text(" ", strip=True)) for p in body.find_all(["p", "h2", "h3"])]
+            clean_paras = [p for p in paras if p and len(p) > 15 and not p.startswith("TIN LIÊN QUAN") and not p.startswith("Xem thêm:")]
+            full_body = "\n\n".join(clean_paras)
+            m = re.search(r"(Cập nhật giá cà phê thế giới|Trên sàn giao dịch London|thị trường cà phê thế giới)", full_body, re.I)
+            clean_text = full_body[m.start():] if m else full_body
+        else:
+            clean_text = unicodedata.normalize("NFC", detail_soup.get_text(" ", strip=True))
+
         snapshot.sources[sid] = Source(
             id=sid,
             url=first_article_url,
             published_at=published_at,
             retrieved_at=datetime.now(timezone.utc),
-            text=detail_soup.get_text(" ", strip=True)[:18000],
+            text=f"[VIETNAMBIZ CẬP NHẬT GIÁ CÀ PHÊ THẾ GIỚI]\n{clean_text[:18000]}",
             kind="news",
         )
 

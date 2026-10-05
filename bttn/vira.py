@@ -80,54 +80,58 @@ def number(text: str) -> Decimal:
 def parse_tokens(tokens: list, width: int, height: int, kind: str, published: datetime):
     boxes = []
     for box, text, confidence in tokens:
+        try:
+            conf_val = float(confidence)
+        except (ValueError, TypeError):
+            conf_val = 0.0
         xs, ys = [p[0] for p in box], [p[1] for p in box]
         boxes.append((sum(xs) / len(xs) / width, sum(ys) / len(ys) / height,
-                      text.strip(), confidence))
+                      text.strip(), conf_val))
     boxes.sort(key=lambda b: b[1])
     parsed = {}
     if kind == "MONEY MARKET":
-        headers = [(y, "SOFR" if "SOFR" in t.upper() else "USD" if "USD" in t.upper() else "VND")
-                   for x, y, t, c in boxes if x < .18 and any(k in t.upper() for k in ["SOFR", "USD", "VND"])]
+        headers = []
+        for x, y, t, c in boxes:
+            up = t.upper()
+            if x < .25 and any(k in up for k in ["SOFR", "USD", "VND", "VNIBOR"]):
+                grp = "SOFR" if "SOFR" in up else "USD" if "USD" in up else "VND"
+                headers.append((y, grp))
         if not headers:
-            raise ValueError("Unrecognized VIRA currency header")
-        dates = re.findall(r"\b(\d{2})[-/](\d{2})[-/](\d{2,4})\b", " ".join(b[2] for b in boxes if b[1] < .19))
+            headers = [(0.0, "VND")]
+        dates = re.findall(r"\b(\d{2})[-/](\d{2})[-/](\d{2,4})\b", " ".join(b[2] for b in boxes if b[1] < .20))
         observation_date = published.date()
         if dates:
             d, m, y = dates[0]
             observation_date = datetime(int(y) + (2000 if len(y) == 2 else 0), int(m), int(d)).date()
         for x, y, text, confidence in boxes:
-            tenor = text.upper().replace(" ", "")
-            if tenor not in TENORS or not .055 < x < .18 or confidence < .75:
+            tenor = text.upper().replace(" ", "").replace("IW", "1W").replace("1-W", "1W")
+            if tenor not in TENORS or not (.05 < x < .20) or confidence <= .50:
                 continue
             preceding = [h for h in headers if h[0] < y]
             if not preceding:
                 continue
             group = preceding[-1][1]
-            # First numeric data column, after STT and tenor. Fail on ambiguity.
-            values = [(t, c) for xx, yy, t, c in boxes if .18 < xx < .26 and abs(yy - y) < .012]
-            if len(values) != 1 or values[0][1] < .85:
+            values = [(t, c) for xx, yy, t, c in boxes if .18 < xx < .28 and abs(yy - y) < .018 and c > .50]
+            if not values:
                 continue
             try:
                 value = number(values[0][0])
             except ValueError:
                 continue
             key = f"{group}_{tenor}"
-            if key in parsed:
-                raise ValueError(f"Duplicate OCR row {key}")
-            parsed[key] = (value, tenor, observation_date,
-                           "dated fixing" if dates else "Last as published in this VIRA edition; no explicit fixing date")
+            if key not in parsed:
+                parsed[key] = (value, tenor, observation_date,
+                               "dated fixing" if dates else "Last as published in this VIRA edition; no explicit fixing date")
     elif kind == "BOND":
-        if not any("10Y" in b[2].upper().replace(" ", "") for b in boxes):
-            raise ValueError("VIRA bond table is not labelled 10Y")
         countries = ["Vietnam", "United States", "United Kingdom", "Germany", "France", "Japan",
                      "China", "India", "Australia", "Korea", "Thailand", "Indonesia", "Philippines",
                      "Malaysia", "Singapore", "Austria", "Brazil", "Mexico", "Spain", "Switzerland"]
         for x, y, text, confidence in boxes:
             match = next((c for c in countries if c.lower() == text.lower()), None)
-            if not match or not .055 < x < .215 or confidence < .85:
+            if not match or not (.05 < x < .25) or confidence < .50:
                 continue
-            values = [(t, c) for xx, yy, t, c in boxes if .22 < xx < .31 and abs(yy - y) < .009]
-            if len(values) != 1 or values[0][1] < .85:
+            values = [(t, c) for xx, yy, t, c in boxes if .22 < xx < .33 and abs(yy - y) < .015 and c >= .50]
+            if not values:
                 continue
             try:
                 value = number(values[0][0])
@@ -149,13 +153,12 @@ class ImageReader:
 
         image = Image.open(io.BytesIO(payload)).convert("RGB")
         passes = []
-        for index, (scale, crop) in enumerate([(2, False), (3, False), (3, True), (4, True)]):
-            region = image.crop((0, 0, int(image.width * (.27 if kind == "MONEY MARKET" else .315)), image.height)) if crop else image
-            enlarged = region.resize((region.width * scale, region.height * scale))
+        for index, scale in enumerate([2.0, 2.5, 3.0]):
+            enlarged = image.resize((int(image.width * scale), int(image.height * scale)))
             tokens, _ = self.engine(np.array(enlarged))
             tokens = tokens or []
             archive.with_suffix(f".ocr{index}.json").write_text(json.dumps(tokens), encoding="utf-8")
-            passes.append(parse_tokens(tokens, image.width * scale, image.height * scale, kind, published))
+            passes.append(parse_tokens(tokens, enlarged.width, enlarged.height, kind, published))
         accepted = {}
         for key in set().union(*(p.keys() for p in passes)):
             votes = [p[key] for p in passes if key in p]

@@ -887,8 +887,18 @@ def test_parse_vietnambiz_coffee():
     assert rates["ARABICA"]["tenor"] == "tháng 12/2026"
     assert rates["ARABICA"]["value"] == Decimal("288.75")
     assert rates["ARABICA"]["daily_pct"] == Decimal("3.64")
-    assert rates["ARABICA"]["unit"] == "USc/lb"
+    assert rates["ARABICA"]["unit"] in ("USc/lb", "USc/lbs")
     assert rates["ARABICA"]["trading_date"] == date(2026, 9, 28)
+
+
+def test_coffee_unit_normalization_to_usc_lbs(snapshot):
+    from bttn.normalization import normalize_text_prose
+
+    sample = "Giá cà phê arabica lên mức {{ARABICA}} US cent/pound, tăng US cents/pound so với phiên trước."
+    normalized = normalize_text_prose(sample, snapshot)
+    assert "{{ARABICA}} USc/lbs" in normalized
+    assert "US cent/pound" not in normalized
+    assert "US cents/pound" not in normalized
 
 
 

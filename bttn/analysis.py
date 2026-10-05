@@ -46,7 +46,7 @@ def make_prompt(snapshot):
         f"- eur_usd: đúng 2 đoạn, tổng từ {word_limits.get('eur_usd', [150, 200])[0]} đến {word_limits.get('eur_usd', [150, 200])[1]} từ. Đoạn 2 BẮT BUỘC bắt đầu bằng: 'Về phía Châu Âu,'.\n"
         f"- japan: đúng 1 đoạn, từ {word_limits.get('japan', [100, 130])[0]} đến {word_limits.get('japan', [100, 130])[1]} từ.\n"
         f"- china: đúng 1 đoạn, từ {word_limits.get('china', [50, 70])[0]} đến {word_limits.get('china', [50, 70])[1]} từ.\n"
-        f"- coffee: đúng 1 đoạn, từ {word_limits.get('coffee', [130, 135])[0]} đến {word_limits.get('coffee', [130, 135])[1]} từ. BẮT BUỘC bắt đầu bằng: 'Cập nhật giá cà phê thế giới,'.\n"
+        f"- coffee: đúng 1 đoạn, từ {word_limits.get('coffee', [130, 135])[0]} đến {word_limits.get('coffee', [130, 135])[1]} từ (chuẩn 135 từ). BẮT BUỘC bắt đầu bằng: 'Cập nhật giá cà phê thế giới,'. Tóm tắt diễn biến giá Arabica và Robusta kèm các nguyên nhân cốt lõi dẫn dắt giá từ bài viết VietnamBiz (hoạt động mua bù vị thế bán khống của giới đầu cơ, mức tồn kho chứng nhận suy giảm, lo ngại thời tiết và El Niño tại Brazil, tình hình xuất khẩu tại Indonesia).\n"
         f"- energy_metals: đúng 2 đoạn, tổng từ {word_limits.get('energy_metals', [125, 135])[0]} đến {word_limits.get('energy_metals', [125, 135])[1]} từ. Đoạn 1 về dầu Brent. Đoạn 2 về vàng (BẮT BUỘC có đúng 2 câu kết thúc bằng dấu chấm).\n"
         + robusta_guidance
     )
