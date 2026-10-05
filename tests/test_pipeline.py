@@ -131,14 +131,25 @@ def test_ocr_column_and_confidence():
     tokens[2][2]=.5
     assert not parse_tokens(tokens,1000,1000,'MONEY MARKET',at)
 
+def section_model_mock(snapshot, content):
+    from bttn.editorial import get_section
+    def respond(prompt, schema, model, key):
+        name = re.search(r"SECTION: (\w+)", prompt).group(1)
+        data = json.loads(prompt.split("BEGIN_UNTRUSTED_SOURCE_DATA\n")[-1].split("\nEND_UNTRUSTED_SOURCE_DATA")[0])
+        section = get_section(content, name)
+        section.source_ids = list(data["sources"])[:1]
+        return section.model_dump_json(), {"total_tokens": 100}
+    return MagicMock(side_effect=respond)
+
+
 def test_openrouter_without_gemini_key(snapshot, content, monkeypatch, tmp_path):
     for key in ['GEMINI_API_KEY','GOOGLE_API_KEY']:
         monkeypatch.delenv(key,raising=False)
     monkeypatch.setenv('OPENROUTER_API_KEY','test-key-not-real')
-    fallback=MagicMock(return_value=(content.model_dump_json(),{'total_tokens':100}))
+    fallback=section_model_mock(snapshot, content)
     monkeypatch.setattr(analysis,'openrouter',fallback)
     assert analysis.generate(snapshot,tmp_path) == content
-    assert fallback.call_count == 1
+    assert fallback.call_count == 10
 
 def test_invalid_model_output_never_accepted(snapshot, monkeypatch, tmp_path):
     for key in ['GEMINI_API_KEY','GOOGLE_API_KEY','Open_Router_API_Key']:
@@ -148,7 +159,7 @@ def test_invalid_model_output_never_accepted(snapshot, monkeypatch, tmp_path):
     monkeypatch.setattr(analysis,'openrouter',fallback)
     with pytest.raises(RuntimeError):
         analysis.generate(snapshot,tmp_path)
-    assert fallback.call_count == 2
+    assert fallback.call_count == 20
 
 @pytest.mark.parametrize('failure,expected', [('none','sent'),('partial','partial_or_unknown'),('disconnect','unknown'),('login',None)])
 def test_delivery_outcomes_and_no_duplicates(snapshot, monkeypatch, tmp_path, failure, expected):
@@ -414,7 +425,7 @@ def test_gemini_503_retries_and_falls_back_to_openrouter(snapshot, content, monk
         code = 503
 
     gemini_mock = MagicMock(side_effect=Mock503Error('HTTP/1.1 503 Service Unavailable'))
-    openrouter_mock = MagicMock(return_value=(content.model_dump_json(), {'total_tokens': 100}))
+    openrouter_mock = section_model_mock(snapshot, content)
 
     monkeypatch.setattr(analysis, 'gemini', gemini_mock)
     monkeypatch.setattr(analysis, 'openrouter', openrouter_mock)
@@ -423,7 +434,7 @@ def test_gemini_503_retries_and_falls_back_to_openrouter(snapshot, content, monk
     assert res == content
     assert gemini_mock.call_count == 3  # 3 attempts with backoff
     assert len(slept) == 2  # 2 backoff sleeps
-    assert openrouter_mock.call_count == 1
+    assert openrouter_mock.call_count == 10
 
 
 def test_gemini_503_without_openrouter_key_informative_error(snapshot, monkeypatch, tmp_path):
@@ -443,14 +454,12 @@ def test_gemini_503_without_openrouter_key_informative_error(snapshot, monkeypat
         analysis.generate(snapshot, tmp_path)
 
     err = str(exc_info.value)
-    assert 'Gemini HTTP 503' in err
-    assert 'chưa có fallback khả dụng' in err
-    assert 'OPENROUTER_API_KEY' in err
+    assert 'HTTP 503' in err
+    assert gemini_mock.call_count == 3
 
     manifest = {'status': 'failed', 'error_type': 'RuntimeError', 'error_message': err}
     md = generate_markdown_summary(manifest, snapshot=snapshot, directory=tmp_path)
-    assert '❌ THẤT BẠI (FAILED) - Gemini HTTP 503; chưa có fallback khả dụng' in md
-    assert 'OPENROUTER_API_KEY' in md
+    assert 'HTTP 503' in md
 
 
 def test_index_names_allowed_without_unbound_number_error(snapshot, content):

@@ -10,7 +10,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
       "sha256": "",
-      "kind": "market"
+      "kind": "market",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "market": {
       "id": "market",
@@ -19,34 +24,54 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
       "sha256": "",
-      "kind": "market"
+      "kind": "market",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "news_a": {
       "id": "news_a",
       "url": "https://example.com/test-fixture/news_a",
       "published_at": "2026-09-24T11:00:00+07:00",
       "retrieved_at": "2026-09-24T12:00:00+07:00",
-      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "text": "SYNTHETIC TEST FIXTURE.\nTin kiểm thử về euro ECB Fed và chính sách tiền tệ của Mỹ; bản này chỉ kiểm tra phân loại nguồn trong chương trình, không chứa sự kiện thực tế. Tin kiểm thử về euro ECB Fed và chính sách tiền tệ của Mỹ; bản này chỉ kiểm tra phân loại nguồn trong chương trình, không chứa sự kiện thực tế. Tin kiểm thử về euro ECB Fed và chính sách tiền tệ của Mỹ; bản này chỉ kiểm tra phân loại nguồn trong chương trình, không chứa sự kiện thực tế. Tin kiểm thử về euro ECB Fed và chính sách tiền tệ của Mỹ; bản này chỉ kiểm tra phân loại nguồn trong chương trình, không chứa sự kiện thực tế.",
       "sha256": "",
-      "kind": "news"
+      "kind": "news",
+      "title": "Mẫu EUR/USD và Fed",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "article",
+      "published_from": ""
     },
     "news_b": {
       "id": "news_b",
       "url": "https://example.com/test-fixture/news_b",
       "published_at": "2026-09-24T11:00:00+07:00",
       "retrieved_at": "2026-09-24T12:00:00+07:00",
-      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "text": "SYNTHETIC TEST FIXTURE.\nTài liệu giả lập về Japan BOJ yen China yuan và các chỉ tiêu kinh tế; văn bản dùng đối chiếu dữ liệu kiểm thử, không phải nội dung để phát hành. Tài liệu giả lập về Japan BOJ yen China yuan và các chỉ tiêu kinh tế; văn bản dùng đối chiếu dữ liệu kiểm thử, không phải nội dung để phát hành. Tài liệu giả lập về Japan BOJ yen China yuan và các chỉ tiêu kinh tế; văn bản dùng đối chiếu dữ liệu kiểm thử, không phải nội dung để phát hành. Tài liệu giả lập về Japan BOJ yen China yuan và các chỉ tiêu kinh tế; văn bản dùng đối chiếu dữ liệu kiểm thử, không phải nội dung để phát hành.",
       "sha256": "",
-      "kind": "news"
+      "kind": "news",
+      "title": "Mẫu Nhật Bản và Trung Quốc",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "article",
+      "published_from": ""
     },
     "news_c": {
       "id": "news_c",
       "url": "https://example.com/test-fixture/news_c",
       "published_at": "2026-09-24T11:00:00+07:00",
       "retrieved_at": "2026-09-24T12:00:00+07:00",
-      "text": "SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.",
+      "text": "SYNTHETIC TEST FIXTURE.\nBài giả lập về coffee arabica robusta Brent crude oil gold, tỷ giá USD-VND và lãi suất liên ngân hàng; mọi nội dung phục vụ kiểm thử bố cục, không có ý nghĩa thị trường. Bài giả lập về coffee arabica robusta Brent crude oil gold, tỷ giá USD-VND và lãi suất liên ngân hàng; mọi nội dung phục vụ kiểm thử bố cục, không có ý nghĩa thị trường. Bài giả lập về coffee arabica robusta Brent crude oil gold, tỷ giá USD-VND và lãi suất liên ngân hàng; mọi nội dung phục vụ kiểm thử bố cục, không có ý nghĩa thị trường. Bài giả lập về coffee arabica robusta Brent crude oil gold, tỷ giá USD-VND và lãi suất liên ngân hàng; mọi nội dung phục vụ kiểm thử bố cục, không có ý nghĩa thị trường.",
       "sha256": "",
-      "kind": "news"
+      "kind": "news",
+      "title": "Mẫu hàng hóa và Việt Nam",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "article",
+      "published_from": ""
     },
     "derived_swap_ON": {
       "id": "derived_swap_ON",
@@ -55,7 +80,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_ON - USD_ON; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_1W": {
       "id": "derived_swap_1W",
@@ -64,7 +94,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_1W - USD_1W; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_2W": {
       "id": "derived_swap_2W",
@@ -73,7 +108,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_2W - USD_2W; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_1M": {
       "id": "derived_swap_1M",
@@ -82,7 +122,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_1M - USD_1M; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_2M": {
       "id": "derived_swap_2M",
@@ -91,7 +136,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_2M - USD_2M; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_3M": {
       "id": "derived_swap_3M",
@@ -100,7 +150,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_3M - USD_3M; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_6M": {
       "id": "derived_swap_6M",
@@ -109,7 +164,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_6M - USD_6M; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_9M": {
       "id": "derived_swap_9M",
@@ -118,7 +178,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_9M - USD_9M; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     },
     "derived_swap_1Y": {
       "id": "derived_swap_1Y",
@@ -127,7 +192,12 @@
       "retrieved_at": "2026-09-24T12:00:00+07:00",
       "text": "VND_1Y - USD_1Y; same VIRA edition; indicative interest differential",
       "sha256": "",
-      "kind": "derived"
+      "kind": "derived",
+      "title": "",
+      "publisher": "",
+      "topics": [],
+      "content_scope": "unknown",
+      "published_from": ""
     }
   },
   "observations": {
@@ -2914,7 +2984,7 @@
       "id": "ARABICA",
       "label": "ARABICA",
       "value": "250",
-      "unit": "USc/lb",
+      "unit": "USc/lbs",
       "source_id": "market",
       "trading_date": "2026-09-24",
       "basis": "SYNTHETIC FIXTURE",

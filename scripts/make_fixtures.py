@@ -17,6 +17,16 @@ for sid in ['vira', 'market', 'news_a', 'news_b', 'news_c']:
         kind='news' if sid.startswith('news') else 'market',
         text='SYNTHETIC TEST FIXTURE. Không dùng phát hành hoặc đưa ra quyết định tài chính.')
 
+news_texts = {
+    'news_a': ('Mẫu EUR/USD và Fed', 'Tin kiểm thử về euro ECB Fed và chính sách tiền tệ của Mỹ; bản này chỉ kiểm tra phân loại nguồn trong chương trình, không chứa sự kiện thực tế.'),
+    'news_b': ('Mẫu Nhật Bản và Trung Quốc', 'Tài liệu giả lập về Japan BOJ yen China yuan và các chỉ tiêu kinh tế; văn bản dùng đối chiếu dữ liệu kiểm thử, không phải nội dung để phát hành.'),
+    'news_c': ('Mẫu hàng hóa và Việt Nam', 'Bài giả lập về coffee arabica robusta Brent crude oil gold, tỷ giá USD-VND và lãi suất liên ngân hàng; mọi nội dung phục vụ kiểm thử bố cục, không có ý nghĩa thị trường.'),
+}
+for sid, (title, text) in news_texts.items():
+    snapshot.sources[sid].title = title
+    snapshot.sources[sid].text = 'SYNTHETIC TEST FIXTURE.\n' + ' '.join([text] * 4)
+    snapshot.sources[sid].content_scope = 'article'
+
 def add(key, val, unit, tenor=None, series=False):
     snapshot.observations[key] = Observation(id=key, label=key, value=Decimal(str(val)),
         unit=unit, source_id='market', trading_date=at.date(), basis='SYNTHETIC FIXTURE', tenor=tenor,

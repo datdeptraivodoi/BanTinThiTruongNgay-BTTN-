@@ -1,0 +1,20 @@
+[Unit]
+Description=BTTN midday publication
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+User=bttn
+Group=bttn
+WorkingDirectory=/opt/bttn
+EnvironmentFile=/etc/bttn/bttn.env
+Environment=HOME=/var/lib/bttn
+Environment=MPLCONFIGDIR=/var/lib/bttn/matplotlib
+Environment=OMP_NUM_THREADS=2
+UMask=0077
+ExecStart=/usr/bin/flock -n /var/lib/bttn/run.lock /opt/bttn/.venv/bin/python /opt/bttn/market_report.py --send --output-dir /var/lib/bttn/output --state-dir /var/lib/bttn/state
+TimeoutStartSec=1800
+NoNewPrivileges=true
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target

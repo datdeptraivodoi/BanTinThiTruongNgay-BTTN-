@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily BTTN translation retention cleanup
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Ho_Chi_Minh
+Persistent=true
+AccuracySec=1min
+Unit=bttn-translation-cleanup.service
+[Install]
+WantedBy=timers.target

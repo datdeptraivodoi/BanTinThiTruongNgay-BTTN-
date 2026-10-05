@@ -17,6 +17,11 @@ class Source(StrictModel):
     text: str = ""
     sha256: str = ""
     kind: Literal["news", "market", "derived"] = "market"
+    title: str = ""
+    publisher: str = ""
+    topics: list[str] = Field(default_factory=list)
+    content_scope: Literal["article", "headline", "unknown"] = "unknown"
+    published_from: str = ""
 
 
 class Point(StrictModel):
