@@ -187,6 +187,8 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
                            source.kind == "news" and snapshot.as_of - source.published_at > timedelta(hours=rules()["news_max_age_hours"])):
                 error("CONTENT_SOURCE_DATE", "Nguồn trích dẫn nằm ngoài thời gian hợp lệ")
         raw = " ".join(section.paragraphs)
+        if "[" in raw or "]" in raw:
+            error("INCOMPLETE_SECTION", "Mục còn chứa dấu chờ biên tập; không được phát hành")
         if re.search(r"dự kiến|dự báo|khuyến nghị|mục tiêu giá", raw, re.I):
             error("FORECAST_DISABLED", "Phần dự báo đang tạm để trống")
         if any(mark in raw for mark in ["**", "##", "__"]):
