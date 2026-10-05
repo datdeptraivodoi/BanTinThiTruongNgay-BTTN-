@@ -106,6 +106,8 @@ def run(args):
     timing_issue = None
 
     try:
+        from .translation_service import TranslationStore
+        TranslationStore(Path(args.state_dir) / "translations").cleanup()
         if args.snapshot:
             snapshot = Snapshot.model_validate_json(Path(args.snapshot).read_text(encoding="utf-8"))
             if args.as_of and snapshot.as_of != as_of:
@@ -135,7 +137,7 @@ def run(args):
             content = ReportContent.model_validate_json(Path(args.content).read_text(encoding="utf-8"))
         else:
             try:
-                content = generate(snapshot, directory)
+                content = generate(snapshot, directory, translation_dir=Path(args.state_dir) / "translations")
             except Exception as exc:
                 ai_error = str(exc)
                 LOG.warning("AI generation did not produce validated content: %s", exc)

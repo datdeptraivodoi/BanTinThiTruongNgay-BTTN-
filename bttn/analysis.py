@@ -237,7 +237,7 @@ def call_with_network_retry(call, prompt, schema, model, key, provider_name="ai"
             return None, None, exc, (err_type, status_code, err_msg, error_desc), elapsed
 
 
-def generate(snapshot, directory: Path):
+def generate(snapshot, directory: Path, translation_dir=None):
 
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     openrouter_key = (
@@ -267,4 +267,4 @@ def generate(snapshot, directory: Path):
             providers = [item for item in providers if item[0] != "openrouter"]
         providers.insert(1, ("zenmux", os.getenv("ZENMUX_MODEL", "google/gemini-3.8-flash"), zenmux_key, zenmux, 2))
     from .editorial import generate_sections
-    return generate_sections(snapshot, directory, providers)
+    return generate_sections(snapshot, directory, providers, translation_dir=translation_dir)

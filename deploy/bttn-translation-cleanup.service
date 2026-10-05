@@ -1,0 +1,12 @@
+[Unit]
+Description=Remove BTTN translations unmodified for seven days
+[Service]
+Type=oneshot
+User=bttn
+Group=bttn
+WorkingDirectory=/opt/bttn
+UMask=0077
+ExecStart=/usr/bin/flock /var/lib/bttn/run.lock /opt/bttn/.venv/bin/python -m bttn.translation_service cleanup --cache-dir /var/lib/bttn/state/translations
+TimeoutStartSec=1800
+NoNewPrivileges=true
+PrivateTmp=true

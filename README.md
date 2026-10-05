@@ -69,3 +69,31 @@ Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biế
 `.state/` lưu trạng thái gửi theo ngày. Workflow dùng concurrency và Actions cache để lưu qua các lần chạy. Cache có thể bị xóa/evict và ledger ở máy khác không được đồng bộ; đây không phải bảo đảm exactly-once toàn cục. Nếu trạng thái `unknown`/`partial_or_unknown`, kiểm tra hộp thư người gửi và danh sách nhận trước khi xử lý ledger. Không xóa ledger để retry mù. Chạy nhiều môi trường sản xuất cần kho ledger bền vững dùng chung.
 
 Không chạy workflow gửi thư chỉ để kiểm thử code. Xem `validation-data.json`, `validation-content.json` và `manifest.json` trong artifact khi workflow bị chặn.
+
+## Bản dịch bài nguồn và thời hạn lưu
+
+`bttn/translation_service.py` dịch riêng từng bài được chọn trước khi biên tập bản tin.
+Mỗi bài lưu nội dung gốc đầy đủ theo phần đã thu thập, bản dịch theo đoạn, link, ngày xuất bản,
+provider/model được yêu cầu và thời gian tạo/sửa. Không áp dụng giới hạn từ của bản tin lên bản dịch.
+Bài tiếng Việt được giữ nguyên. Một link có cùng nội dung chỉ dịch một lần, dùng cho nhiều mục
+và nhiều lượt chạy; sửa nội dung nguồn sẽ tạo bản dịch mới. Bài chưa dịch đạt kiểm tra không được
+đưa nguyên văn tiếng nước ngoài vào bước tổng hợp. Các bài khác vẫn được xử lý.
+
+Kho nằm tại `<state-dir>/translations/` (VPS: `/var/lib/bttn/state/translations`). Kiểm tra tự động
+đối chiếu chữ số, ngày, ký hiệu và một số đơn vị theo từng đoạn, kiểm tra số đoạn và ngôn ngữ.
+Kiểm tra này không chứng minh bản dịch đúng hoàn toàn về ngữ nghĩa hay chiều tăng/giảm;
+vẫn cần đối chiếu nguồn khi duyệt. Có thể đọc/sửa bản dịch đã lưu, nhưng bản sửa thay đổi số liệu
+sẽ không được tái sử dụng nếu không qua kiểm tra.
+
+Bản dịch không sửa trong **bảy ngày** được xóa tại lần dọn tiếp theo. Thời hạn tính bằng thời gian
+sửa file, gồm cả sửa thủ công; đọc/tái sử dụng không gia hạn. Mỗi lượt chạy dọn kho trước khi xử lý.
+VPS có timer dọn hằng ngày lúc 03:00 giờ Việt Nam, độc lập lịch gửi bản tin. Chỉ xóa file bản dịch
+trong kho; giữ nguyên báo cáo đã tạo, snapshot nguồn và sổ theo dõi gửi email. Diagnostics chỉ lưu
+`translation_key`, trạng thái và lỗi; không tạo thêm bản sao toàn văn bản dịch ngoài kho có thời hạn.
+
+```bash
+python -m bttn.translation_service cleanup --cache-dir .state/translations
+# segments.json có dạng {"segments": ["bản dịch đoạn một", "bản dịch đoạn hai"]},
+# số đoạn tương ứng original_segments trong bản ghi. Sửa đạt kiểm tra sẽ bắt đầu lại hạn bảy ngày.
+python -m bttn.translation_service edit --cache-dir .state/translations --key <translation_key> --text-file segments.json
+```

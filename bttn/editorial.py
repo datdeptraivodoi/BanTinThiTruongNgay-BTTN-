@@ -133,11 +133,47 @@ def section_prompt(name, evidence, low, high, previous=None, issues=()):
     )
 
 
-def generate_sections(snapshot, directory, providers):
+def generate_sections(snapshot, directory, providers, translation_dir=None):
     from .analysis import call_with_network_retry, clean_json_response
+    from .translation_service import TranslationStore, cache_key, translate_article
 
     content = create_draft_placeholder_content(snapshot)
     attempts, unavailable, completed = [], set(), set()
+    store = TranslationStore(translation_dir or directory / "translations")
+    removed = store.cleanup()
+    prepared = {name: prepare_evidence(snapshot, name) for name in TOPICS}
+    selected_news = {sid for evidence in prepared.values() for sid, source in evidence["sources"].items()
+                     if source["kind"] == "news" and source["text"]}
+    translations, translation_index, translation_attempts = {}, {}, []
+    for sid in sorted(selected_news):
+        source = snapshot.sources[sid]
+        try:
+            translated, status = translate_article(source, store, providers, unavailable, translation_attempts)
+            translations[sid] = translated.text
+            translation_index[sid] = {"status": status, "cache_key": cache_key(source), "url": source.url,
+                                      "validation_status": translated.validation_status}
+        except RuntimeError:
+            translation_index[sid] = {"status": "unavailable", "cache_key": cache_key(source), "url": source.url}
+        (directory / "translation-index.json").write_text(
+            json.dumps({"removed_expired": removed, "articles": translation_index}, ensure_ascii=False, indent=2), encoding="utf-8")
+        (directory / "translation-attempts.json").write_text(
+            json.dumps(translation_attempts, ensure_ascii=False, indent=2), encoding="utf-8")
+    for evidence in prepared.values():
+        for sid in list(evidence["sources"]):
+            source = evidence["sources"][sid]
+            if sid in selected_news:
+                if sid not in translations:
+                    del evidence["sources"][sid]
+                    continue
+                text = translations[sid]
+                excerpt = text[:6000]
+                if len(text) > 6000:
+                    boundaries = list(re.finditer(r"[.!?](?:\s|$)", excerpt))
+                    excerpt = excerpt[:boundaries[-1].end()] if boundaries else ""
+                source.update(text=excerpt, translation_key=cache_key(snapshot.sources[sid]),
+                              excerpt_truncated=len(excerpt) < len(text))
+        evidence["observations"] = {key: value for key, value in evidence["observations"].items()
+                                    if value["source_id"] in evidence["sources"]}
     names = list(TOPICS) + [f"highlight_{i}" for i in range(3)]
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     policy = "\n".join(line for line in instructions.splitlines() if line.startswith("- ")
@@ -146,12 +182,17 @@ def generate_sections(snapshot, directory, providers):
         low, high = (12, 45) if name.startswith("highlight_") else rules()["word_limits"][name]
         if name.startswith("highlight_"):
             topic = ("interbank", "eur_usd", "coffee")[int(name[-1])]
-            evidence = prepare_evidence(snapshot, topic)
+            evidence = prepared[topic].copy()
             if topic in completed:
                 evidence["validated_section"] = get_section(content, topic).model_dump()
         else:
-            evidence = prepare_evidence(snapshot, name)
-        (directory / f"evidence-{name}.json").write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
+            evidence = prepared[name]
+        # Translation bodies live only in the expiring store; diagnostics hold references.
+        archived = json.loads(json.dumps(evidence))
+        for source in archived["sources"].values():
+            if source.get("translation_key"):
+                source["text"] = "[Bản dịch lưu trong kho theo translation_key]"
+        (directory / f"evidence-{name}.json").write_text(json.dumps(archived, ensure_ascii=False, indent=2), encoding="utf-8")
         previous, errors = None, []
         for provider, model, key, call, rounds in providers:
             if not key or provider in unavailable:
@@ -159,7 +200,8 @@ def generate_sections(snapshot, directory, providers):
             for round_index in range(1, rounds + 1):
                 prompt = policy + "\n" + section_prompt(name, evidence, low, high, previous, errors)
                 stem = f"{name}-{provider}-{round_index}"
-                (directory / f"prompt-{stem}.txt").write_text(prompt, encoding="utf-8")
+                archived_prompt = policy + "\n" + section_prompt(name, archived, low, high, previous, errors)
+                (directory / f"prompt-{stem}.txt").write_text(archived_prompt, encoding="utf-8")
                 record = {"section": name, "provider": provider, "model": model, "attempt": len(attempts)+1,
                           "content_round": round_index, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest()}
                 text, usage, exc, info, elapsed = call_with_network_retry(call, prompt, Section.model_json_schema(), model, key, provider)
