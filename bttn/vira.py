@@ -152,8 +152,10 @@ class ImageReader:
         from PIL import Image
 
         image = Image.open(io.BytesIO(payload)).convert("RGB")
+        from collections import Counter
+
         passes = []
-        for index, scale in enumerate([2.0, 2.5, 3.0]):
+        for index, scale in enumerate([1.3, 1.4, 1.8, 2.2]):
             enlarged = image.resize((int(image.width * scale), int(image.height * scale)))
             tokens, _ = self.engine(np.array(enlarged))
             tokens = tokens or []
@@ -162,8 +164,10 @@ class ImageReader:
         accepted = {}
         for key in set().union(*(p.keys() for p in passes)):
             votes = [p[key] for p in passes if key in p]
-            if len(votes) >= 2 and all(value == votes[0] for value in votes):
-                accepted[key] = votes[0]
+            counts = Counter(votes)
+            most_common_val, count = counts.most_common(1)[0]
+            if count >= 2:
+                accepted[key] = most_common_val
         return accepted
 
 

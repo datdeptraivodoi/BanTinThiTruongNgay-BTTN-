@@ -218,10 +218,11 @@ def collect_news(http, snapshot):
                     continue
         except Exception as exc:
             snapshot.add_issue("NEWS_FEED", f"{urlparse(url).hostname}: {type(exc).__name__}")
-    # Full articles for coffee/oil and VIRA domestic market commentary.
+    # Full articles for coffee/oil, VIRA domestic market commentary, and Tin Nhanh Chung Khoan macro.
     listings = [("https://vietnambiz.vn/chu-de/ca-phe-34.htm", "a[href]"),
                 ("https://vietnambiz.vn/chu-de/dau-mo-60.htm", "a[href]"),
-                ("https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html", ".story__title a")]
+                ("https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html", ".story__title a"),
+                ("https://www.tinnhanhchungkhoan.vn/vi-mo/", "a[href]")]
     for url, selector in listings:
         try:
             soup = BeautifulSoup(http.get(url).text, "html.parser")
@@ -232,20 +233,25 @@ def collect_news(http, snapshot):
                 is_article = (len(title) > 20 and "/chu-de/" not in href and href.endswith(".htm"))
                 is_vira = (urlparse(href).hostname == "vira.org.vn"
                            and "/Ban-tin-Kinh-te-Tai-chinh-ngay/Ban-tin" in href)
+                is_tnck = (urlparse(href).hostname == "www.tinnhanhchungkhoan.vn"
+                           and "-post" in href and href.endswith(".html") and len(title) > 20)
                 if (urlparse(href).hostname == urlparse(url).hostname and href not in links
-                        and (is_article or is_vira)):
+                        and (is_article or is_vira or is_tnck)):
                     links.append(href)
-                if len(links) >= 4:
+                if len(links) >= 6:
                     break
             for link in links:
                 detail = BeautifulSoup(http.get(link).text, "html.parser")
                 meta = detail.find("meta", property="article:published_time")
-                if not meta:
+                if not meta or not meta.get("content"):
                     continue
-                at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
+                try:
+                    at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
+                except (ValueError, TypeError):
+                    continue
                 if at.tzinfo is None:
                     continue
-                body = detail.select_one("#abody, .vnbcbc-body, .detail-content")
+                body = detail.select_one("#abody, .vnbcbc-body, .detail-content, .article__body, .cms-body")
                 if body:
                     candidates.append((link, at, body.get_text(" ", strip=True)[:18000]))
         except Exception as exc:

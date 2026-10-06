@@ -8,7 +8,7 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Cm, Inches, Pt, RGBColor
 
 from .validation import format_value, resolve
 
@@ -151,10 +151,48 @@ def plot_cell(cell, title, snapshot, keys, directory, name, height=1.55, categor
     paragraph(cell, "Nguồn: VIRA Market Watch" if category else "Nguồn: Yahoo Finance · các phiên có dữ liệu", size=7, color="666666")
 
 
+def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_type="currency", tv_cache=None):
+    from .candlestick import (
+        get_symbol_dataframe,
+        render_commodity_chart,
+        render_currency_chart,
+    )
+
+    heading(cell, title)
+    path = directory / f"{name}.png"
+    df, source_label = get_symbol_dataframe(key, snapshot, tv_cache)
+
+    success = False
+    if chart_type == "currency":
+        success = render_currency_chart(df, path, title, source_label)
+        width_cm, height_cm = 9.0, 6.89
+    else:
+        success = render_commodity_chart(df, path, title, source_label)
+        width_cm, height_cm = 9.0, 6.5
+
+    if not success or not path.is_file():
+        # Fallback to standard line chart if candlestick rendering failed
+        plot_cell(cell, title, snapshot, [key], directory, name, height=1.7)
+        return
+
+    p = cell.add_paragraph()
+    p.paragraph_format.space_after = Pt(0)
+    p.add_run().add_picture(str(path), width=Cm(width_cm), height=Cm(height_cm))
+    paragraph(cell, f"Nguồn: {source_label} · Khung Daily 3 tháng", size=7, color="666666")
+
+
 def render(snapshot, content, template: Path, output: Path, is_draft: bool = False):
     if not template.is_file():
         raise ValueError("Required template.docx is missing")
     doc = Document(template)
+
+    tv_cache = {}
+    if getattr(snapshot, "purpose", None) == "live":
+        try:
+            from .candlestick import fetch_tradingview_candles
+            tv_cache = fetch_tradingview_candles()
+        except Exception:
+            pass
     if not doc.tables or len(doc.tables[0].rows) != 14:
         raise ValueError("Template layout changed: expected a 14-row master table")
     table = doc.tables[0]
@@ -252,8 +290,8 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     heading(r8[0], "Ghi chú dữ liệu")
     paragraph(r8[0], "Dấu —: chưa có dữ liệu được xác minh. Giá thị trường có thể thuộc các phiên khác nhau; ngày tham chiếu được lưu trong snapshot và nguồn đi kèm.", size=9)
     paragraph(r8[0], "Các phần dự báo đang để trống theo yêu cầu biên tập.", size=9)
-    plot_cell(r8[1], "EUR-USD", snapshot, ["EURUSD"], output.parent, "eurusd", height=1.9)
-    plot_cell(r8[2], "USD-JPY", snapshot, ["USDJPY"], output.parent, "usdjpy", height=1.9)
+    plot_candlestick_cell(r8[1], "EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
+    plot_candlestick_cell(r8[2], "USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
     heading(r9[1], "Dự báo các chỉ số chính")
     grid(r9[1], ["Chỉ tiêu", "1 tháng", "6 tháng"], [[k, "", ""] for k in ["USD-VND", "EUR-USD", "USD-JPY", "SOFR USD"]], size=8)
     heading(r11[0], "Bảng giá hàng hóa · " + snapshot.as_of.strftime("%d.%m.%Y"))
@@ -271,8 +309,8 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     paragraph(r11[0], "Nguồn Yahoo Finance (futures liên tục). —: thiếu nguồn phù hợp; không thay RON92 bằng RBOB. Biến động năm: so cùng kỳ năm trước.", size=8)
     narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot)
     narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot)
-    plot_cell(r12[1], "Dầu Brent futures · USD/thùng", snapshot, ["BRENT"], output.parent, "brent", height=1.7)
-    plot_cell(r12[2], "Arabica futures · USc/lbs", snapshot, ["ARABICA"], output.parent, "arabica", height=1.7)
+    plot_candlestick_cell(r12[1], "Dầu Brent futures · USD/thùng", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
+    plot_candlestick_cell(r12[2], "Arabica futures · USc/lbs", snapshot, "ARABICA", output.parent, "arabica", chart_type="commodity", tv_cache=tv_cache)
     # Remove orphan chart/image relationships now that all source charts were replaced.
     used = {value for node in doc.element.iter() for key, value in node.attrib.items()
             if key in {qn("r:id"), qn("r:embed"), qn("r:link")}}

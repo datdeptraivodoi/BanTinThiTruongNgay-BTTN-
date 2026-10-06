@@ -13,3 +13,5 @@ opencv-python==5.0.0.93
 numpy==2.5.3
 Pillow==12.3.0
 tzdata==2026.4
+pandas>=2.0.0
+mplfinance>=0.12.10b0
