@@ -46,7 +46,7 @@ jobs:
           python -m pip install -r requirements-dev.txt
           npm install
       - name: Regression tests
-        run: python -m pytest -q
+        run: GITHUB_STEP_SUMMARY="" python -m pytest -q
       - name: Restore delivery ledger
         id: ledger
         uses: actions/cache/restore@v4

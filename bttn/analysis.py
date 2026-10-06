@@ -95,10 +95,9 @@ def gemini(prompt, schema, model, key):
     from google.genai import types
 
     models_to_try = [model]
-    if model != "gemini-2.5-flash":
-        models_to_try.append("gemini-2.5-flash")
-    if "gemini-flash-latest" not in models_to_try:
-        models_to_try.append("gemini-flash-latest")
+    for fallback in ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-pro"]:
+        if fallback not in models_to_try:
+            models_to_try.append(fallback)
 
     last_exc = None
     with genai.Client(api_key=key, http_options=types.HttpOptions(timeout=90000)) as client:
@@ -119,11 +118,8 @@ def gemini(prompt, schema, model, key):
                 return response.text, response.usage_metadata.model_dump(mode="json") if response.usage_metadata else {}
             except Exception as exc:
                 last_exc = exc
-                err_msg = str(exc)
-                if "503" in err_msg or "UNAVAILABLE" in err_msg:
-                    LOG.warning("Gemini model %s unavailable (503); trying next model in pool...", m)
-                    continue
-                raise
+                LOG.warning("Gemini model %s failed (%s); trying next model in pool...", m, exc)
+                continue
         if last_exc:
             raise last_exc
 
@@ -134,7 +130,14 @@ def openrouter(prompt, schema, model, key):
         model = "inclusionai/ling-3.0-flash-fin"
 
     models_to_try = [model]
-    for fallback in ["inclusionai/ling-3.0-flash-fin", "google/gemma-4-31b-it:free", "qwen/qwen3.8-27b:free"]:
+    for fallback in [
+        "inclusionai/ling-3.0-flash-fin",
+        "google/gemma-3-27b-it:free",
+        "qwen/qwen-2.5-72b-instruct:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "mistralai/mistral-small-3.2-24b-instruct:free",
+        "deepseek/deepseek-chat",
+    ]:
         if fallback not in models_to_try:
             models_to_try.append(fallback)
 
@@ -181,8 +184,8 @@ def openrouter(prompt, schema, model, key):
                     timeout=(10, 90),
                 )
 
-            # If 404 (model not found) or 402 (insufficient credits/payment required), try next fallback model
-            if response.status_code in (402, 404):
+            # If 400, 402, 404, 429, 500, 502, 503, 504: fall back to next model
+            if response.status_code in (400, 402, 404, 429, 500, 502, 503, 504):
                 LOG.warning("OpenRouter model %s returned HTTP %d; falling back to next model...", current_model, response.status_code)
                 last_exc = requests.HTTPError(f"HTTP {response.status_code}: {response.text[:200]}", response=response)
                 continue
@@ -193,16 +196,14 @@ def openrouter(prompt, schema, model, key):
             finish_reason = choice.get("finish_reason")
             content_text = choice.get("message", {}).get("content")
             if finish_reason in ("length", "content_filter") or not content_text:
-                raise ValueError(f"Incomplete OpenRouter final content (finish_reason: {finish_reason})")
-            return content_text, data.get("usage", {})
-        except requests.HTTPError as http_err:
-            last_exc = http_err
-            if http_err.response is not None and http_err.response.status_code in (402, 404):
+                LOG.warning("OpenRouter model %s produced incomplete content (finish_reason: %s); falling back...", current_model, finish_reason)
+                last_exc = ValueError(f"Incomplete OpenRouter final content (finish_reason: {finish_reason})")
                 continue
-            raise
+            return content_text, data.get("usage", {})
         except Exception as exc:
             last_exc = exc
-            raise
+            LOG.warning("OpenRouter model %s error (%s); trying next model in pool...", current_model, exc)
+            continue
 
     if last_exc:
         raise last_exc
