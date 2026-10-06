@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "dependencies": {
     "@mathieuc/tradingview": "^4.0.0-rc.0"
   }
