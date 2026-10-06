@@ -16,11 +16,32 @@ from .validation import ROOT, highlight_limits, rules, validate_content
 LOG = logging.getLogger("bttn.analysis")
 
 
-def make_prompt(snapshot):
+def make_prompt(snapshot, translations_path=None):
     instruction = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     # Only verified metadata and plain source text are sent. Raw HTML is archived
     # for diagnosis, never used as agent instructions.
     data = snapshot.model_dump(mode="json")
+    if translations_path is not None and translations_path.is_file():
+        from .nvidia_translation import MODEL, RULES_VERSION
+        from .translation_service import TranslationRecord, cache_key, check_segments
+
+        translations = json.loads(translations_path.read_text(encoding="utf-8"))
+        if translations.get("review_only"):
+            raise ValueError("Historical translation tests cannot be used for report generation")
+        for sid, item in translations.get("articles", {}).items():
+            source = snapshot.sources.get(sid)
+            record = TranslationRecord.model_validate(item["record"])
+            if (source is None or item.get("cache_key") != cache_key(source)
+                    or record.original_text != source.text or record.url != source.url
+                    or record.version != RULES_VERSION or record.requested_model != MODEL
+                    or record.published_at != source.published_at
+                    or " ".join(record.original_segments).split() != source.text.split()
+                    or record.source_sha256 != hashlib.sha256(source.text.encode()).hexdigest()):
+                raise ValueError("Translation does not match report source")
+            check_segments(record.original_segments, record.translated_segments)
+            data["sources"][sid]["original_text"] = source.text
+            data["sources"][sid]["text"] = record.text
+            data["sources"][sid]["translation_model"] = record.requested_model
     for observation in data["observations"].values():
         observation.pop("series", None)
 
@@ -353,7 +374,7 @@ def repair_invalid_sections(content: ReportContent, issues: list, snapshot, call
 
 
 def generate(snapshot, directory: Path):
-    prompt = make_prompt(snapshot)
+    prompt = make_prompt(snapshot, directory / "translations.json")
     (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
     schema = ReportContent.model_json_schema()
 

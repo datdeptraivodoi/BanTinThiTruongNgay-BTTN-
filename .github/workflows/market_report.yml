@@ -61,6 +61,8 @@ jobs:
       - name: Collect, validate, render and publish
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          TRADINGECONOMICS_API_KEY: ${{ secrets.TRADINGECONOMICS_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPEN_ROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY || secrets.OPENROUTER_TOKEN || secrets.OPEN_ROUTER_KEY || secrets.OPENROUTER_TOKEN }}
           OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY || secrets.OPENROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY || secrets.OPENROUTER_TOKEN }}

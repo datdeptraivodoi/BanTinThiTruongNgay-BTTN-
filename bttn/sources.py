@@ -654,6 +654,7 @@ def collect_vira_daily(http, snapshot):
 def collect_snapshot(http, as_of):
     from .calculations import derive_swaps
     from .trader_quotes import collect_trader_quotes
+    from .tradingeconomics_news import collect_tradingeconomics
     from .vira import collect_vira
 
     snapshot = Snapshot(as_of=as_of)
@@ -664,6 +665,7 @@ def collect_snapshot(http, as_of):
         ("YAHOO", collect_yahoo),
         ("COFFEE", collect_vietnambiz_coffee),
         ("NEWS", collect_news),
+        ("TE_NEWS", collect_tradingeconomics),
         ("MACRO_NEWS", collect_vietnam_macro_news),
         ("SJC_GOLD", collect_sjc_gold),
         ("VIRA_DAILY", collect_vira_daily),

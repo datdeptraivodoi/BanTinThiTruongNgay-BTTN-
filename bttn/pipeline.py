@@ -26,6 +26,43 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def run_news_translation(args):
+    """Isolated NVIDIA-only review, without prices, other models, Word or SMTP."""
+    from .tradingeconomics_news import collect_tradingeconomics
+    from .translation_service import translate_snapshot
+
+    as_of = parse_as_of(args.as_of)
+    directory = Path(args.output_dir) / (as_of.strftime("%Y%m%d-%H%M%S") + "-translations-" + uuid4().hex[:8])
+    directory.mkdir(parents=True, exist_ok=False)
+    manifest = {"status": "started", "as_of": as_of.isoformat(), "send_requested": False,
+                "mode": "nvidia_translation_only"}
+    try:
+        if args.snapshot:
+            snapshot = Snapshot.model_validate_json(Path(args.snapshot).read_text(encoding="utf-8"))
+            if args.as_of and snapshot.as_of != as_of:
+                raise ValueError("--as-of must match snapshot cutoff exactly")
+        else:
+            snapshot = Snapshot(as_of=as_of)
+            collect_tradingeconomics(None, snapshot, import_file=getattr(args, "news_file", None))
+        manifest["as_of"] = snapshot.as_of.isoformat()
+        (directory / "snapshot.json").write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
+        result = translate_snapshot(snapshot, directory, Path(args.state_dir) / "translations")
+        manifest["translation_review_pending"] = len(result["pending_review"])
+        if result["status"] == "checked":
+            manifest["status"] = "translated_news_pending_review" if result["pending_review"] else "translated_news_approved"
+        else:
+            manifest["status"] = "blocked_translation"
+        return 0 if result["status"] == "checked" else 2
+    except Exception as exc:
+        manifest["status"] = "failed"
+        manifest["error_type"] = type(exc).__name__
+        LOG.error("Translation run failed (%s); see %s", type(exc).__name__, directory)
+        return 1
+    finally:
+        write_json(directory / "manifest.json", manifest)
+        LOG.info("Translation status: %s; directory: %s; no email sent", manifest["status"], directory)
+
+
 def run_test_smtp(args):
     """Bypasses AI and web scraping to immediately verify SMTP authentication and email delivery."""
     from .delivery import send_report
@@ -73,6 +110,8 @@ def run_test_smtp(args):
 
 
 def run(args):
+    if getattr(args, "translate_news_only", False):
+        return run_news_translation(args)
     if getattr(args, "test_smtp", False):
         return run_test_smtp(args)
 
@@ -131,10 +170,21 @@ def run(args):
 
         ai_error = None
         content = None
+        translation_issues = []
         if args.content:
             content = ReportContent.model_validate_json(Path(args.content).read_text(encoding="utf-8"))
         else:
             try:
+                if os.getenv("NVIDIA_API_KEY"):
+                    from .translation_service import translate_snapshot
+
+                    translated = translate_snapshot(snapshot, directory, Path(args.state_dir) / "translations")
+                    manifest["translation_status"] = translated["status"]
+                    if translated["status"] != "checked":
+                        raise RuntimeError("NVIDIA translation incomplete; see translations.json. No translation fallback used.")
+                    if translated["pending_review"]:
+                        translation_issues.append(Issue(severity="error", code="TRANSLATION_REVIEW_REQUIRED",
+                            message="Bản dịch NVIDIA cần review nghĩa/văn phong trước khi phát hành; kiểm tra số không thay thế biên tập."))
                 content = generate(snapshot, directory)
             except Exception as exc:
                 ai_error = str(exc)
@@ -148,6 +198,7 @@ def run(args):
             ]
         else:
             content_issues = validate_content(content, snapshot)
+        content_issues.extend(translation_issues)
 
         write_json(directory / "validation-content.json", [i.model_dump() for i in content_issues])
         (directory / "content.json").write_text(content.model_dump_json(indent=2), encoding="utf-8")
@@ -221,6 +272,8 @@ def main(argv=None):
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--send", action="store_true", help="Send only after all validation gates pass")
     modes.add_argument("--dry-run", action="store_true", help="Generate and validate without sending (default)")
+    modes.add_argument("--translate-news-only", action="store_true", help="NVIDIA translation review only; no other models or email")
+    parser.add_argument("--news-file", help="Imported Trading Economics article JSON for translation review")
     parser.add_argument("--test-recipient", help="Recipient email for test delivery outside the midday window")
     parser.add_argument("--test-smtp", action="store_true", help="Bypass AI to immediately test SMTP delivery to test-recipient")
     parser.add_argument("--as-of", help="ISO timestamp including UTC offset")
@@ -230,6 +283,10 @@ def main(argv=None):
     parser.add_argument("--output-dir", default=str(ROOT / "output"))
     parser.add_argument("--state-dir", default=str(ROOT / ".state"))
     args = parser.parse_args(argv)
+    if args.translate_news_only and (args.test_smtp or args.test_recipient or args.collect_only or args.content):
+        parser.error("--translate-news-only cannot be combined with SMTP, content or collection options")
+    if args.news_file and not args.translate_news_only:
+        parser.error("--news-file requires --translate-news-only")
     if args.test_smtp or (args.test_recipient and not args.dry_run):
         args.send = True
         args.dry_run = False

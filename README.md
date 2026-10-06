@@ -58,6 +58,71 @@ python market_report.py --snapshot path/to/snapshot.json --content path/to/conte
 
 ## Model và GitHub Actions
 
+### Dịch riêng từng bài bằng NVIDIA Riva
+
+`NVIDIA_API_KEY` chỉ dùng tại `https://integrate.api.nvidia.com/v1` với model
+`nvidia/riva-translate-4b-instruct-v2`. [Chat template của NVIDIA](https://huggingface.co/nvidia/Riva-Translate-4B-Instruct-v2)
+nhận system message **`en-vi`**; không dùng một system prompt dài để thay mã ngôn ngữ.
+Python truyền ví dụ thuật ngữ tài chính, dịch tiêu đề riêng và chia đoạn để giữ toàn văn.
+Không yêu cầu Riva trả JSON, viết nhận định, rút gọn hoặc giới hạn từ.
+
+```powershell
+# Chỉ dịch tin: không gọi Gemini/OpenRouter, không dựng báo cáo, không gửi email.
+python market_report.py --translate-news-only --news-file path/to/te-news.json
+# Hoặc dịch các nguồn TE có trong snapshot đã lưu.
+python market_report.py --translate-news-only --snapshot path/to/snapshot.json
+```
+
+Trading Economics hiện trả HTTP 403 khi Python truy cập website từ môi trường đã kiểm tra.
+Không dùng tiêu đề Google News thay toàn văn. Bộ thu thập mới dùng
+[API tin theo quốc gia](https://docs.tradingeconomics.com/news/news-by-country-and-date/)
+khi có `TRADINGECONOMICS_API_KEY`, hoặc file nhập do người dùng cung cấp qua
+`TE_NEWS_IMPORT_PATH`. Key NVIDIA không cấp quyền đọc API Trading Economics.
+File nhập có cùng cấu trúc API: danh sách các bản ghi `id`, `title`, `date`,
+`description` (nội dung bài), `country`, `url`; country là Euro Area/United States/Japan/China.
+Date của API là UTC; file nhập nên ghi rõ múi giờ. Chọn bài mới nhất từng quốc gia
+trước giờ chốt, tối đa 36 giờ; bài thiếu nội dung bị loại. Bộ thu thập nguồn này
+chưa được kiểm thử trực tiếp qua API TE có trả phí/quyền truy cập.
+
+Mỗi bài có bản gốc, bản dịch từng đoạn, nguồn, ngày, model, phiên bản quy tắc và hash.
+Kiểm tra giá trị số (chấp nhận dấu thập phân Anh/Việt), đơn vị %, tiền tệ,
+thuật ngữ, thẻ `dnt`, ngôn ngữ và phản hồi bị cắt. Giữ thuật ngữ hawkish/cứng rắn,
+dovish/mềm mỏng, tâm lý tiêu dùng, Bảng lương phi nông nghiệp, lạm phát cơ bản,
+lạm phát danh nghĩa; không dùng “nhích nhẹ”. Lỗi API/kiểm tra được ghi mã an toàn,
+không có key hoặc response body; không chuyển sang nhà cung cấp dịch khác.
+
+**Kiểm tra số không chứng minh bản dịch đúng nghĩa.** Trong thử nghiệm thực tế,
+Riva từng dịch sai chiều yết giá JPY và dùng tiêu đề Trung Quốc chưa tự nhiên.
+Đã bổ sung ví dụ yết giá và kiểm tra lỗi quan sát được; bản dịch mới vẫn mang trạng thái
+`needs_review`. Phát hành bị chặn cho tới khi các bài dùng trong báo cáo đã được review.
+Riêng cách diễn đạt “yen depreciated past X per dollar”, Python chỉ sửa câu mở đầu
+khi con số và cấu trúc nguồn khớp: đồng yên suy yếu đồng nghĩa tỷ giá USD-JPY vượt X,
+không phải xuống dưới X. Nhật ký ghi `python_postprocessed`; đây là sửa bằng quy tắc,
+không phải bằng chứng model tự dịch đúng mọi chiều tỷ giá. Giảm nhiệt độ về 0,
+thử lại đầu ra bị từ chối tối đa một lần, cùng nhà cung cấp.
+Vòng biên tập báo cáo hiện có vẫn dùng Gemini/OpenRouter; chỉ bước dịch riêng đã chuyển
+sang NVIDIA. Muốn loại bỏ mọi API khác ở toàn pipeline cần tiếp tục hoàn thiện biên tập bằng Python.
+
+```powershell
+# Sau khi sửa file JSON có trường translated_segments (danh sách đoạn):
+python -m bttn.translation_service edit --cache-dir .state/translations --key HASH --text-file reviewed.json
+# Đánh dấu đã review nghĩa và văn phong; lệnh này không gửi email.
+python -m bttn.translation_service approve --cache-dir .state/translations --key HASH
+python -m bttn.translation_service cleanup --cache-dir .state/translations
+```
+
+Cache nằm trong `.state/translations`, không commit. Sửa bản gốc/model/quy tắc sẽ
+tạo cache khác; đọc lại không kéo dài thời gian lưu. Xóa bản dịch không chỉnh sửa
+ít nhất **bảy ngày**, chỉ xóa đúng file bản dịch trực tiếp, không đụng báo cáo hay ledger.
+Cleanup chạy trước lượt dịch; trên VPS có timer trong `deploy/` để xóa cả khi không chạy bản tin.
+`--allow-stale-review` của CLI dịch chỉ dành cho thử lịch sử, không được dùng để biên tập phát hành.
+
+Để nhập key mới trên VPS: chạy `/usr/local/sbin/configure-bttn-nvidia.py` qua SSH tương tác.
+Helper chỉ thêm `NVIDIA_API_KEY` vào `/etc/bttn/bttn.env`, giữ các cấu hình khác,
+nhập ẩn và không gửi thư. `deploy/translate-news-preview.sh` chạy từ checkout riêng
+`/opt/bttn-nvidia-preview`, dùng môi trường hiện có; không tự cập nhật checkout phát hành.
+GitHub Actions đọc `secrets.NVIDIA_API_KEY` và `secrets.TRADINGECONOMICS_API_KEY` nếu được cấu hình.
+
 Cấu hình ít nhất một key: `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`), `OPENROUTER_API_KEY` (tương thích secret cũ `Open_Router_API_Key`). Các tên model cấu hình qua `GEMINI_MODEL`, `OPENROUTER_MODEL`; giá trị mặc định giữ baseline Gemini và Ling Fin fallback trong `.env.example`. Tên model phải tồn tại và tài khoản phải có quyền gọi. Chưa tự động nâng Ling Fin thành model chính khi chưa có đánh giá trên bản tin thực tế.
 
 Mỗi provider tối đa hai lần thử; đầu ra sai sẽ được yêu cầu sửa rồi mới chuyển fallback. Có thể chạy chỉ bằng OpenRouter mà không cần key Gemini. Bản free không gửi response_format bắt buộc; vẫn phải qua cùng Pydantic và kiểm tra nội dung. Không lấy reasoning_content làm bản tin. Nhật ký `model-attempts.json` ghi model, thời gian, usage và lỗi kiểm tra để so sánh sau này. Skills cải thiện chỉ dẫn, không tương đương fine-tuning trọng số.
