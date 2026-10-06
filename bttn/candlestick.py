@@ -183,8 +183,8 @@ def render_currency_chart(df: pd.DataFrame, output_path: Path, title: str, sourc
     s = mpf.make_mpf_style(marketcolors=mc, gridstyle=":", gridcolor="#e8e8e8", facecolor="white", figcolor="white")
 
     ap = [
-        mpf.make_addplot(display_df["MA89"], color="#2962FF", width=1.1, label="MA89"),
-        mpf.make_addplot(display_df["MA200"], color="#E65100", width=1.3, label="MA200"),
+        mpf.make_addplot(display_df["MA89"], color="#2962FF", width=1.1),
+        mpf.make_addplot(display_df["MA200"], color="#E65100", width=1.3),
         mpf.make_addplot(display_df["BB_Upper"], color="#787B86", linestyle="--", width=0.8),
         mpf.make_addplot(display_df["BB_Lower"], color="#787B86", linestyle="--", width=0.8),
     ]
@@ -217,16 +217,19 @@ def render_currency_chart(df: pd.DataFrame, output_path: Path, title: str, sourc
     if s_min == s_max:
         s_max = s_min * 1.003
 
+    # Format decimals: 2 decimals for JPY, 4 decimals for EURUSD
+    fmt = ".2f" if r_max > 20 else ".4f"
+
     # Draw shaded Support & Resistance zones
     ax.axhspan(r_min, r_max, color="#ef5350", alpha=0.14)
     ax.axhspan(s_min, s_max, color="#26a69a", alpha=0.14)
 
     # Text annotations
-    ax.text(0.02, 0.94, f"Kháng cự: {r_min:.4f} - {r_max:.4f}", transform=ax.transAxes, fontsize=6.8, color="#c62828", weight="bold")
-    ax.text(0.02, 0.05, f"Hỗ trợ: {s_min:.4f} - {s_max:.4f}", transform=ax.transAxes, fontsize=6.8, color="#2e7d32", weight="bold")
+    ax.text(0.02, 0.93, f"Kháng cự: {r_min:{fmt}} - {r_max:{fmt}}", transform=ax.transAxes, fontsize=6.8, color="#c62828", weight="bold")
+    ax.text(0.02, 0.05, f"Hỗ trợ: {s_min:{fmt}} - {s_max:{fmt}}", transform=ax.transAxes, fontsize=6.8, color="#2e7d32", weight="bold")
 
     # Legend / Indicators note
-    ax.text(0.55, 0.94, "MA89 (xanh) | MA200 (cam) | BB(20,2)", transform=ax.transAxes, fontsize=6.3, color="#1565C0")
+    ax.text(0.55, 0.93, "MA89 (xanh) · MA200 (cam) · BB(20,2)", transform=ax.transAxes, fontsize=6.3, color="#1565C0", weight="bold")
 
     ax.tick_params(labelsize=6.8)
     output_path.parent.mkdir(parents=True, exist_ok=True)
