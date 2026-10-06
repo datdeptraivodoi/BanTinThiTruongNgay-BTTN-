@@ -35,12 +35,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libreoffice fonts-dejavu fonts-liberation libgl1
           python -m pip install -r requirements-dev.txt
+          npm install
       - name: Regression tests
         run: python -m pytest -q
       - name: Restore delivery ledger

@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 
 import matplotlib.pyplot as plt
 import mplfinance as mpf
-import numpy as np
 import pandas as pd
 import requests
 
@@ -66,15 +65,15 @@ def fetch_yahoo_fallback_candles(key: str) -> list[dict]:
         timestamps = data["timestamp"]
         q = data["indicators"]["quote"][0]
         candles = []
-        for t, o, h, l, c, v in zip(timestamps, q["open"], q["high"], q["low"], q["close"], q["volume"]):
-            if o is not None and h is not None and l is not None and c is not None:
+        for t, op, hi, lo, cl, vol in zip(timestamps, q["open"], q["high"], q["low"], q["close"], q["volume"]):
+            if op is not None and hi is not None and lo is not None and cl is not None:
                 candles.append({
                     "time": t,
-                    "open": float(o),
-                    "high": float(h),
-                    "low": float(l),
-                    "close": float(c),
-                    "volume": float(v or 0),
+                    "open": float(op),
+                    "high": float(hi),
+                    "low": float(lo),
+                    "close": float(cl),
+                    "volume": float(vol or 0),
                 })
         LOG.info("Fetched %d fallback candles from Yahoo for %s", len(candles), key)
         return candles
