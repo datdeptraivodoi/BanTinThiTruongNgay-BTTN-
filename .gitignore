@@ -17,6 +17,7 @@ ENV/
 *.docx
 !template.docx
 *.pdf
+*.png
 
 # File nháp & cào dữ liệu tạm thời
 article_dump.txt

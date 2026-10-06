@@ -195,7 +195,7 @@ def test_renderer_uses_ai_output_removes_template_charts(snapshot, content, tmp_
         assert b'UNIQUE_CHANGED_AI_OUTPUT' in b_xml
         assert b'{{' not in b_xml
         assert not any(name.startswith('word/charts/') for name in b.namelist())
-        assert len([name for name in b.namelist() if name.startswith('word/media/')])==7
+        assert len([name for name in b.namelist() if name.startswith('word/media/')]) == 8
 
 def test_workflow_is_noon_weekdays():
     text=(ROOT/'.github/workflows/market_report.yml').read_text(encoding='utf-8')
