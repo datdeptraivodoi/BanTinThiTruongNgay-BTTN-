@@ -48,8 +48,8 @@
   },
   "eur_usd": {
     "paragraphs": [
-      "Tỷ giá {{EURUSD}}. Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây.",
-      "Về phía Châu Âu, Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là."
+      "Trong phiên giao dịch hôm qua, tính đến ngày 23.09.2026, tỷ giá EUR-USD đóng cửa quanh mức {{EURUSD_prev}}. Trong phiên 24.09.2026, tỷ giá EUR-USD ổn định quanh mức {{EURUSD}}. Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường.",
+      "Về phía Châu Âu, Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục."
     ],
     "source_ids": [
       "market",
@@ -58,7 +58,7 @@
   },
   "japan": {
     "paragraphs": [
-      "Nội dung kiểm thử Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả."
+      "Trong phiên hôm qua ngày 23.09.2026, tỷ giá USD-JPY đóng cửa ở mức {{USDJPY_prev}}. Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{USDJPY}}. Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường Đây là nội dung kiểm thử bố cục bằng dữ liệu giả lập không phải nhận định thị trường."
     ],
     "source_ids": [
       "market",

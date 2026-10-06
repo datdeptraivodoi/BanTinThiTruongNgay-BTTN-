@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
+
+from .models import previous_weekday
 
 if TYPE_CHECKING:
     from .models import ReportContent, Section, Snapshot
@@ -138,6 +141,22 @@ def normalize_text_prose(text: str, snapshot: Snapshot) -> str:
                 text = pattern.sub(token, text, count=1)
                 break
 
+        # Also check prev_value if available
+        prev_val = getattr(obs, "prev_value", None)
+        if prev_val is None and len(obs.series) >= 2:
+            prev_val = obs.series[-2].value
+        if prev_val is not None:
+            prev_token = f"{{{{{obs.id}_prev}}}}"
+            p_places = 4 if obs.id in {"EURUSD", "USDCNY"} else 0 if obs.unit == "VND/USD" else 2
+            p_vn = f"{prev_val:,.{p_places}f}".translate(str.maketrans({",": ".", ".": ","}))
+            p_en = f"{prev_val:,.{p_places}f}"
+            for p_cand in [p_vn, p_en]:
+                if p_cand and len(p_cand) >= 2:
+                    p_pattern = re.compile(rf"(?<![\w{{]){re.escape(p_cand)}(?![\w}}])")
+                    if p_pattern.search(text) and prev_token not in text:
+                        text = p_pattern.sub(prev_token, text, count=1)
+                        break
+
         # Also check daily_pct if available
         if obs.daily_pct is not None:
             pct_token = f"{{{{{obs.id}_daily_pct}}}}%"
@@ -150,10 +169,10 @@ def normalize_text_prose(text: str, snapshot: Snapshot) -> str:
                     break
 
     # 5. Eliminate remaining raw digits if they are simple numbers or unbound percentages
-    # e.g., '2026' left over outside tokens
-    text = re.sub(r"(?<![\w{{])2026(?![\w}}])", "năm nay", text)
-    text = re.sub(r"(?<![\w{{])2025(?![\w}}])", "năm trước", text)
-    text = re.sub(r"(?<![\w{{])2027(?![\w}}])", "năm tới", text)
+    # e.g., '2026' left over outside tokens and dates
+    text = re.sub(r"(?<![\w{./])2026(?![\w}./])", "năm nay", text)
+    text = re.sub(r"(?<![\w{./])2025(?![\w}./])", "năm trước", text)
+    text = re.sub(r"(?<![\w{./])2027(?![\w}./])", "năm tới", text)
 
     # Remaining percentage like 'giảm 0,5%' or '0.5%' without placeholder -> 'giảm nhẹ'
     def replace_unbound_pct(m):
@@ -167,10 +186,10 @@ def normalize_text_prose(text: str, snapshot: Snapshot) -> str:
         "0": "không", "1": "một", "2": "hai", "3": "ba", "4": "bốn",
         "5": "năm", "6": "sáu", "7": "bảy", "8": "tám", "9": "chín",
     }
-    # Protect ALLOWED_INDEX_NAMES and TOKENS
+    # Protect ALLOWED_INDEX_NAMES, DATES and TOKENS
     pieces = []
     last_end = 0
-    protected_re = re.compile(r"\{\{[^}]+\}\}|Nikkei\s*225|S&P\s*500|VN-?Index", re.I)
+    protected_re = re.compile(r"\{\{[^}]+\}\}|\b\d{1,2}[./]\d{1,2}[./]\d{4}\b|Nikkei\s*225|S&P\s*500|VN-?Index", re.I)
     for m in protected_re.finditer(text):
         non_protected = text[last_end:m.start()]
         # Convert any remaining single digits in non-protected text
@@ -321,6 +340,15 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
         adjust_word_count(content.usd_vnd, *word_limits["usd_vnd"], snapshot)
 
     # 4. EUR/USD
+    as_of_vn = snapshot.as_of.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+    today_str = as_of_vn.strftime("%d.%m.%Y")
+    yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
+    eur_opening = (
+        f"Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, "
+        f"tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. "
+        f"Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}."
+    )
+
     eur_paras = [normalize_text_prose(p, snapshot) for p in content.eur_usd.paragraphs if p.strip()]
     if len(eur_paras) == 1:
         # Split into 2 paragraphs
@@ -329,6 +357,10 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
         p1 = " ".join(sentences[:mid])
         p2 = " ".join(sentences[mid:])
         eur_paras = [p1, p2]
+    if eur_paras:
+        if not eur_paras[0].startswith("Trong phiên giao dịch hôm qua, tính đến ngày"):
+            cleaned_p0 = re.sub(r"^Tỷ giá\s+\{\{EURUSD\}\}\.\s*", "", eur_paras[0]).strip()
+            eur_paras[0] = f"{eur_opening} {cleaned_p0}".strip()
     if len(eur_paras) >= 2:
         if not eur_paras[1].startswith("Về phía Châu Âu,"):
             eur_paras[1] = f"Về phía Châu Âu, {eur_paras[1].lstrip()}"
@@ -338,9 +370,17 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
         adjust_word_count(content.eur_usd, *word_limits["eur_usd"], snapshot)
 
     # 5. Japan
-    content.japan.paragraphs = [
-        normalize_text_prose(p, snapshot) for p in content.japan.paragraphs if p.strip()
-    ]
+    jpy_opening = (
+        f"Trong phiên hôm qua ngày {yesterday_str}, "
+        f"tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. "
+        f"Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}."
+    )
+    jpy_paras = [normalize_text_prose(p, snapshot) for p in content.japan.paragraphs if p.strip()]
+    if jpy_paras:
+        if not jpy_paras[0].startswith("Trong phiên hôm qua ngày"):
+            cleaned_j0 = re.sub(r"^Tỷ giá\s+\{\{USDJPY\}\}\.\s*", "", jpy_paras[0]).strip()
+            jpy_paras[0] = f"{jpy_opening} {cleaned_j0}".strip()
+    content.japan.paragraphs = jpy_paras
     ensure_section_provenance(content.japan, snapshot)
     if "japan" in word_limits:
         adjust_word_count(content.japan, *word_limits["japan"], snapshot)

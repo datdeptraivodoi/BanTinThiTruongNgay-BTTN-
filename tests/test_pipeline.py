@@ -901,9 +901,32 @@ def test_coffee_unit_normalization_to_usc_lbs(snapshot):
     assert "US cents/pound" not in normalized
 
 
+def test_eurusd_and_usdjpy_opening_sentence_template(snapshot, content):
+    """Verifies that EUR-USD and USD-JPY opening templates resolve correctly with dates, yesterday close, and spot."""
+    from bttn.normalization import normalize_report_content
+    from bttn.validation import resolve, validate_content
 
+    normalized = normalize_report_content(content, snapshot)
 
+    eur_text = normalized.eur_usd.paragraphs[0]
+    assert eur_text.startswith("Trong phiên giao dịch hôm qua, tính đến ngày")
+    assert "{{EURUSD_prev}}" in eur_text
+    assert "{{EURUSD}}" in eur_text
 
+    jpy_text = normalized.japan.paragraphs[0]
+    assert jpy_text.startswith("Trong phiên hôm qua ngày")
+    assert "{{USDJPY_prev}}" in jpy_text
+    assert "{{USDJPY}}" in jpy_text
 
+    resolved_eur = resolve(eur_text, snapshot)
+    assert "1,1189" in resolved_eur
+    assert "1,1200" in resolved_eur
+    assert "{{EURUSD" not in resolved_eur
 
+    resolved_jpy = resolve(jpy_text, snapshot)
+    assert "144,86" in resolved_jpy
+    assert "145,00" in resolved_jpy
+    assert "{{USDJPY" not in resolved_jpy
 
+    issues = validate_content(normalized, snapshot)
+    assert not [i for i in issues if i.severity == "error"]

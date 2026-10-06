@@ -1,8 +1,11 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 class StrictModel(BaseModel):
@@ -33,6 +36,8 @@ class Observation(StrictModel):
     trading_date: date
     basis: str
     tenor: str | None = None
+    prev_value: Decimal | None = None
+    prev_trading_date: date | None = None
     daily_pct: Decimal | None = None
     annual_pct: Decimal | None = None
     annual_basis: Literal["YoY", "YTD"] | None = None
@@ -98,15 +103,12 @@ def business_days_between(start: date, end: date) -> int:
 
 
 def parse_as_of(value: str | None) -> datetime:
-    from zoneinfo import ZoneInfo
-
-    vn = ZoneInfo("Asia/Ho_Chi_Minh")
     if not value:
-        return datetime.now(vn)
+        return datetime.now(VN_TZ)
     result = datetime.fromisoformat(value)
     if result.tzinfo is None:
         raise ValueError("--as-of requires a UTC offset, e.g. 2026-09-24T12:00:00+07:00")
-    return result.astimezone(vn)
+    return result.astimezone(VN_TZ)
 
 
 def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> ReportContent:
@@ -115,6 +117,12 @@ def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> Re
     Preserves all verified market data, tables, and charts while clearly marking commentary as pending.
     """
     ref_src = ["vira"] if "vira" in snapshot.sources else (list(snapshot.sources.keys())[:1] if snapshot.sources else ["manual"])
+    as_of_vn = snapshot.as_of.astimezone(VN_TZ)
+    today_str = as_of_vn.strftime("%d.%m.%Y")
+    yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
+    src_eur = [s for s in ["yf_EURUSD", "market", "vira"] if s in snapshot.sources] or ref_src
+    src_jpy = [s for s in ["yf_USDJPY", "market", "vira"] if s in snapshot.sources] or ref_src
+
     return ReportContent(
         highlights=[
             Section(paragraphs=["[Bản nháp kỹ thuật: Nhận định thị trường nổi bật đang chờ cập nhật.]"], source_ids=ref_src),
@@ -131,14 +139,14 @@ def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> Re
         ),
         eur_usd=Section(
             paragraphs=[
-                "[Phần nhận xét thị trường ngoại hối EUR-USD chưa hoàn tất.]",
+                f"Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}. [Phần nhận xét thị trường ngoại hối EUR-USD đang chờ cập nhật.]",
                 "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
             ],
-            source_ids=ref_src,
+            source_ids=src_eur,
         ),
         japan=Section(
-            paragraphs=["[Phần nhận xét thị trường Nhật Bản chưa hoàn tất. Vui lòng tham khảo diễn biến tỷ giá USD-JPY và chỉ số Nikkei 225 trên bảng số liệu.]"],
-            source_ids=ref_src,
+            paragraphs=[f"Trong phiên hôm qua ngày {yesterday_str}, tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}. [Phần nhận xét thị trường Nhật Bản đang chờ cập nhật.]"],
+            source_ids=src_jpy,
         ),
         china=Section(
             paragraphs=["[Phần nhận xét thị trường Trung Quốc chưa hoàn tất. Vui lòng tham khảo tỷ giá USD-CNY trên bảng số liệu.]"],

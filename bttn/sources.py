@@ -79,6 +79,7 @@ def yahoo_observation(payload, key, as_of, source_id):
     _, label, unit = INSTRUMENTS[key]
     return Observation(id=key, label=label, value=latest.value, unit=unit,
         source_id=source_id, trading_date=latest.at.date(), basis="Yahoo last price vs preceding completed session; futures continuous contract",
+        prev_value=previous.value, prev_trading_date=previous.at.date(),
         daily_pct=day_change, annual_pct=annual, annual_basis="YoY" if annual is not None else None,
         series=(history + [latest])[-90:])
 

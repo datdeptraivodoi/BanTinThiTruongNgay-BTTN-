@@ -5,10 +5,11 @@ import os
 import re
 import time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 
-from .models import ReportContent, Section
+from .models import ReportContent, Section, previous_weekday
 from .normalization import normalize_report_content
 from .validation import ROOT, rules, validate_content
 
@@ -38,13 +39,20 @@ def make_prompt(snapshot):
             "'Dữ liệu giá cà phê Robusta kỳ hạn hiện chưa có cập nhật từ sở giao dịch.'\n"
         )
 
+    as_of_vn = snapshot.as_of.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+    today_str = as_of_vn.strftime("%d.%m.%Y")
+    yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
+
     limits_guidance = (
         "\n\nBẮT BUỘC TUÂN THỦ NGHIÊM NGẶT ĐỘ DÀI VÀ CẤU TRÚC (tính bằng số từ sau khi thay thế {{OBSERVATION_ID}}):\n"
         f"- highlights: đúng 3 mục, mỗi mục từ 12 đến 45 từ.\n"
         f"- interbank: đúng 1 đoạn, từ {word_limits.get('interbank', [88, 95])[0]} đến {word_limits.get('interbank', [88, 95])[1]} từ.\n"
         f"- usd_vnd: đúng 1 đoạn, từ {word_limits.get('usd_vnd', [75, 80])[0]} đến {word_limits.get('usd_vnd', [75, 80])[1]} từ.\n"
-        f"- eur_usd: đúng 2 đoạn, tổng từ {word_limits.get('eur_usd', [150, 200])[0]} đến {word_limits.get('eur_usd', [150, 200])[1]} từ. Đoạn 2 BẮT BUỘC bắt đầu bằng: 'Về phía Châu Âu,'.\n"
-        f"- japan: đúng 1 đoạn, từ {word_limits.get('japan', [100, 130])[0]} đến {word_limits.get('japan', [100, 130])[1]} từ.\n"
+        f"- eur_usd: đúng 2 đoạn, tổng từ {word_limits.get('eur_usd', [150, 200])[0]} đến {word_limits.get('eur_usd', [150, 200])[1]} từ. "
+        f"Đoạn 1 BẮT BUỘC bắt đầu bằng mẫu câu: 'Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}'. "
+        f"Đoạn 2 BẮT BUỘC bắt đầu bằng: 'Về phía Châu Âu,'.\n"
+        f"- japan: đúng 1 đoạn, từ {word_limits.get('japan', [100, 130])[0]} đến {word_limits.get('japan', [100, 130])[1]} từ. "
+        f"BẮT BUỘC bắt đầu bằng mẫu câu: 'Trong phiên hôm qua ngày {yesterday_str}, tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}'.\n"
         f"- china: đúng 1 đoạn, từ {word_limits.get('china', [50, 70])[0]} đến {word_limits.get('china', [50, 70])[1]} từ.\n"
         f"- coffee: đúng 1 đoạn, từ {word_limits.get('coffee', [130, 135])[0]} đến {word_limits.get('coffee', [130, 135])[1]} từ (chuẩn 135 từ). BẮT BUỘC bắt đầu bằng: 'Cập nhật giá cà phê thế giới,'. Tóm tắt diễn biến giá Arabica và Robusta kèm các nguyên nhân cốt lõi dẫn dắt giá từ bài viết VietnamBiz (hoạt động mua bù vị thế bán khống của giới đầu cơ, mức tồn kho chứng nhận suy giảm, lo ngại thời tiết và El Niño tại Brazil, tình hình xuất khẩu tại Indonesia).\n"
         f"- energy_metals: đúng 2 đoạn, tổng từ {word_limits.get('energy_metals', [125, 135])[0]} đến {word_limits.get('energy_metals', [125, 135])[1]} từ. Đoạn 1 về dầu Brent. Đoạn 2 về vàng (BẮT BUỘC có đúng 2 câu kết thúc bằng dấu chấm).\n"
@@ -56,10 +64,11 @@ def make_prompt(snapshot):
         "\n\nQUY TẮC BẮT BUỘC VỀ SỐ LIỆU, PLACEHOLDER VÀ NGÔN NGỮ:\n"
         "1. TOÀN BỘ VĂN BẢN PHẢI VIẾT 100% BẰNG TIẾNG VIỆT CHUẨN. Tuyệt đối không viết bằng tiếng Anh.\n"
         "2. TUYỆT ĐỐI KHÔNG để lọt chuỗi kỹ thuật (như 'source_ids', 'paragraphs', dấu ngoặc JSON) vào nội dung câu văn.\n"
-        "3. TUYỆT ĐỐI KHÔNG VIẾT CHỮ SỐ (0-9) TỰ DO TRONG VĂN BẢN (ngoại trừ tên chỉ số Nikkei 225, S&P 500):\n"
+        "3. TUYỆT ĐỐI KHÔNG VIẾT CHỮ SỐ (0-9) TỰ DO TRONG VĂN BẢN (ngoại trừ tên chỉ số Nikkei 225, S&P 500 và ngày tháng DD.MM.YYYY):\n"
         "   - Các kỳ hạn hay mốc thời gian BẮT BUỘC VIẾT BẰNG CHỮ: 'một tháng', 'ba tháng', 'sáu tháng', 'tháng mười một', 'năm nay'.\n"
         "   - Mọi số liệu giá, lãi suất, tỷ giá phải dùng đúng các thẻ placeholder sau:\n"
         f"     * Giá / lãi suất / tỷ giá: {', '.join(valid_tokens_sample)}...\n"
+        "     * Giá đóng cửa phiên hôm trước: {{EURUSD_prev}}, {{USDJPY_prev}} (hoặc {{EURUSD_yesterday}}, {{USDJPY_yesterday}}).\n"
         "     * Biến động % ngày (nếu cần): {{BRENT_daily_pct}}, {{GOLD_daily_pct}}, {{EURUSD_daily_pct}}, v.v.\n"
         "     * Khi sử dụng số liệu chênh lệch lãi suất {{SWAP_ON}} (hoặc các kỳ hạn SWAP), section source_ids điền là 'vira'.\n"
         "4. TUYỆT ĐỐI KHÔNG DÙNG CÁC TỪ DỰ BÁO: 'dự kiến', 'dự báo', 'khuyến nghị', 'mục tiêu giá'.\n"

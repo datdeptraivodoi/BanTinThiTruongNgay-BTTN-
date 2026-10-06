@@ -32,6 +32,8 @@ ALLOWED_INDEX_NAMES = re.compile(
     re.I,
 )
 
+ALLOWED_DATE_FORMAT = re.compile(r"\b\d{1,2}[./]\d{1,2}[./]\d{4}\b")
+
 
 TECHNICAL_LEAKAGE_RE = re.compile(
     r"(?:"
@@ -67,6 +69,9 @@ def parse_placeholder_key(key: str, snapshot: Snapshot):
         ("_daily_pct", "daily_pct"),
         ("_annual_pct", "annual_pct"),
         ("_pct", "daily_pct"),
+        ("_prev", "prev_value"),
+        ("_yesterday", "prev_value"),
+        ("_close", "prev_value"),
     ]:
         if key.endswith(suffix):
             base_id = key[:-len(suffix)]
@@ -84,6 +89,14 @@ def format_value(obs, field: str = "value"):
         if obs.annual_pct is None:
             return "—"
         return f"{obs.annual_pct:.2f}".translate(str.maketrans({",": ".", ".": ","}))
+    elif field in ("prev_value", "prev", "yesterday"):
+        val = getattr(obs, "prev_value", None)
+        if val is None and len(obs.series) >= 2:
+            val = obs.series[-2].value
+        if val is None:
+            val = obs.value
+        places = 4 if obs.id in {"EURUSD", "USDCNY"} else 0 if obs.unit == "VND/USD" else 2
+        return f"{val:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
     else:
         places = 4 if obs.id in {"EURUSD", "USDCNY"} else 0 if obs.unit == "VND/USD" else 2
         return f"{obs.value:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
@@ -196,7 +209,8 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
         # Index names (e.g. Nikkei 225, S&P 500) are recognized and excluded
         # so their digits are not falsely flagged as unbound market data.
         without_tokens = TOKEN.sub("", raw)
-        without_indices = ALLOWED_INDEX_NAMES.sub("", without_tokens)
+        without_dates = ALLOWED_DATE_FORMAT.sub("", without_tokens)
+        without_indices = ALLOWED_INDEX_NAMES.sub("", without_dates)
         if re.search(r"\d", without_indices):
             error("UNBOUND_NUMBER", "Số liệu phải dùng {{OBSERVATION_ID}}")
         if TECHNICAL_LEAKAGE_RE.search(raw):
