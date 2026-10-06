@@ -5,11 +5,11 @@ import os
 import re
 import time
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import requests
 
-from .models import ReportContent, Section, previous_weekday
+from .fx_editorial import EUR_SECOND_OPENING, fx_opening
+from .models import ReportContent, Section
 from .normalization import normalize_report_content
 from .validation import ROOT, highlight_limits, rules, validate_content
 
@@ -60,20 +60,16 @@ def make_prompt(snapshot, translations_path=None):
             "'Dữ liệu giá cà phê Robusta kỳ hạn hiện chưa có cập nhật từ sở giao dịch.'\n"
         )
 
-    as_of_vn = snapshot.as_of.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
-    today_str = as_of_vn.strftime("%d.%m.%Y")
-    yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
-
     limits_guidance = (
         "\n\nBẮT BUỘC TUÂN THỦ NGHIÊM NGẶT ĐỘ DÀI VÀ CẤU TRÚC (tính bằng số từ sau khi thay thế {{OBSERVATION_ID}}):\n"
         "- highlights: đúng 3 mục; mục thứ nhất và thứ hai 35–45 từ; mục thứ ba 12–45 từ.\n"
         f"- interbank: đúng 1 đoạn, từ {word_limits.get('interbank', [88, 95])[0]} đến {word_limits.get('interbank', [88, 95])[1]} từ.\n"
         f"- usd_vnd: đúng 1 đoạn, từ {word_limits.get('usd_vnd', [75, 80])[0]} đến {word_limits.get('usd_vnd', [75, 80])[1]} từ.\n"
         f"- eur_usd: đúng 2 đoạn, tổng từ {word_limits.get('eur_usd', [150, 200])[0]} đến {word_limits.get('eur_usd', [150, 200])[1]} từ. "
-        f"Đoạn 1 BẮT BUỘC bắt đầu bằng mẫu câu: 'Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}'. "
-        f"Đoạn 2 BẮT BUỘC bắt đầu bằng: 'Về phía Châu Âu,'.\n"
+        f"Đoạn 1 BẮT BUỘC bắt đầu bằng mẫu câu: '{fx_opening(snapshot, 'eur_usd')}'. "
+        f"Đoạn 2 BẮT BUỘC bắt đầu bằng: '{EUR_SECOND_OPENING}'.\n"
         f"- japan: đúng 1 đoạn, từ {word_limits.get('japan', [100, 130])[0]} đến {word_limits.get('japan', [100, 130])[1]} từ. "
-        f"BẮT BUỘC bắt đầu bằng mẫu câu: 'Trong phiên hôm qua ngày {yesterday_str}, tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}'.\n"
+        f"BẮT BUỘC bắt đầu bằng mẫu câu: '{fx_opening(snapshot, 'japan')}'.\n"
         f"- china: đúng 1 đoạn, từ {word_limits.get('china', [50, 70])[0]} đến {word_limits.get('china', [50, 70])[1]} từ.\n"
         f"- coffee: đúng 1 đoạn, từ {word_limits.get('coffee', [130, 135])[0]} đến {word_limits.get('coffee', [130, 135])[1]} từ (chuẩn 135 từ). BẮT BUỘC bắt đầu bằng: 'Cập nhật giá cà phê thế giới,'. Tóm tắt diễn biến giá Arabica và Robusta kèm các nguyên nhân cốt lõi dẫn dắt giá từ bài viết VietnamBiz (hoạt động mua bù vị thế bán khống của giới đầu cơ, mức tồn kho chứng nhận suy giảm, lo ngại thời tiết và El Niño tại Brazil, tình hình xuất khẩu tại Indonesia).\n"
         f"- energy_metals: đúng 2 đoạn, tổng từ {word_limits.get('energy_metals', [125, 135])[0]} đến {word_limits.get('energy_metals', [125, 135])[1]} từ. Đoạn 1 về dầu Brent. Đoạn 2 về vàng (BẮT BUỘC có đúng 2 câu kết thúc bằng dấu chấm).\n"

@@ -13,9 +13,8 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING
-from zoneinfo import ZoneInfo
 
-from .models import previous_weekday
+from .fx_editorial import EUR_SECOND_OPENING, replace_fx_opening
 
 if TYPE_CHECKING:
     from .models import ReportContent, Section, Snapshot
@@ -341,15 +340,6 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
         adjust_word_count(content.usd_vnd, *word_limits["usd_vnd"], snapshot)
 
     # 4. EUR/USD
-    as_of_vn = snapshot.as_of.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
-    today_str = as_of_vn.strftime("%d.%m.%Y")
-    yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
-    eur_opening = (
-        f"Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, "
-        f"tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. "
-        f"Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}."
-    )
-
     eur_paras = [normalize_text_prose(p, snapshot) for p in content.eur_usd.paragraphs if p.strip()]
     if len(eur_paras) == 1:
         # Split into 2 paragraphs
@@ -359,29 +349,20 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
         p2 = " ".join(sentences[mid:])
         eur_paras = [p1, p2]
     if eur_paras:
-        if not eur_paras[0].startswith("Trong phiên giao dịch hôm qua, tính đến ngày"):
-            cleaned_p0 = re.sub(r"^Tỷ giá\s+\{\{EURUSD\}\}\.\s*", "", eur_paras[0]).strip()
-            eur_paras[0] = f"{eur_opening} {cleaned_p0}".strip()
+        eur_paras[0] = replace_fx_opening(eur_paras[0], snapshot, "eur_usd")
     if len(eur_paras) >= 2:
-        if not eur_paras[1].startswith("Về phía Châu Âu,"):
-            eur_paras[1] = f"Về phía Châu Âu, {eur_paras[1].lstrip()}"
+        if not eur_paras[1].startswith(EUR_SECOND_OPENING):
+            eur_paras[1] = f"{EUR_SECOND_OPENING} {eur_paras[1].lstrip()}"
     content.eur_usd.paragraphs = eur_paras[:2]
     ensure_section_provenance(content.eur_usd, snapshot)
     if "eur_usd" in word_limits:
         adjust_word_count(content.eur_usd, *word_limits["eur_usd"], snapshot)
 
     # 5. Japan
-    jpy_opening = (
-        f"Trong phiên hôm qua ngày {yesterday_str}, "
-        f"tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. "
-        f"Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}."
-    )
     jpy_paras = [normalize_text_prose(p, snapshot) for p in content.japan.paragraphs if p.strip()]
     if jpy_paras:
-        if not jpy_paras[0].startswith("Trong phiên hôm qua ngày"):
-            cleaned_j0 = re.sub(r"^Tỷ giá\s+\{\{USDJPY\}\}\.\s*", "", jpy_paras[0]).strip()
-            jpy_paras[0] = f"{jpy_opening} {cleaned_j0}".strip()
-    content.japan.paragraphs = jpy_paras
+        jpy_paras[0] = replace_fx_opening(jpy_paras[0], snapshot, "japan")
+    content.japan.paragraphs = [" ".join(jpy_paras)] if jpy_paras else []
     ensure_section_provenance(content.japan, snapshot)
     if "japan" in word_limits:
         adjust_word_count(content.japan, *word_limits["japan"], snapshot)

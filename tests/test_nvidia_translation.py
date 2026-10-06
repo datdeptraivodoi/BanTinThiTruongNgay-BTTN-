@@ -193,6 +193,16 @@ def test_corrupt_cache_and_revised_source_are_not_reused(tmp_path):
     assert cache_key(news) != cache_key(source(ENGLISH + " A revision."))
 
 
+def test_previous_fx_translation_rules_are_not_reused_or_considered_approved(tmp_path):
+    store, news = TranslationStore(tmp_path), source()
+    record = store.save(news, [VIETNAMESE])
+    path = store.path(cache_key(news))
+    record.version = "riva-en-vi-finance-v5"
+    record.review_status = "approved"
+    path.write_text(record.model_dump_json(), encoding="utf-8")
+    assert store.load(news) is None
+
+
 def test_split_preserves_title_and_article_tail():
     text = "News title\n\n" + "Inflation is falling. " * 300 + "Final sentence."
     chunks = split_article(text)
@@ -271,11 +281,37 @@ def test_source_derived_quote_correction_preserves_number_and_tail():
     original = "The Japanese yen depreciated past 158 per dollar on Tuesday, but remained range-bound."
     translated = "Đồng yên Nhật suy giảm xuống dưới 158 đồng/USD vào thứ Ba, nhưng vẫn dao động trong biên độ hẹp."
     corrected = normalize_fx_quote(original, translated)
-    assert "vượt 158 yên đổi một USD" in corrected
+    assert corrected.startswith("USD-JPY vượt mức 158 cho thấy JPY đang suy yếu")
     assert corrected.endswith("vào thứ Ba, nhưng vẫn dao động trong biên độ hẹp.")
     check_translation(original, corrected)
     assert normalize_fx_quote(original.replace("158", "159"), translated) == translated
     assert normalize_fx_quote(original.replace("depreciated", "appreciated"), translated) == translated
+
+
+@pytest.mark.parametrize("quote", [
+    "Đồng yên Nhật suy yếu, đưa tỷ giá vượt 158 yên đổi một USD",
+    "Đồng yên Nhật suy yếu, đưa tỷ giá USD-JPY vượt 158 yên đổi một USD",
+    "Yên Nhật Bản giảm giá vượt mức 158 yên cho mỗi USD",
+])
+def test_jpy_pair_notation_preserves_source_direction_and_following_news(quote):
+    original = "The Japanese yen depreciated past 158 per dollar, but remained range-bound."
+    tail = ", nhưng vẫn dao động trong biên độ hẹp."
+    corrected = normalize_fx_quote(original, quote + tail)
+    assert corrected == "USD-JPY vượt mức 158 cho thấy JPY đang suy yếu" + tail
+    assert normalize_fx_quote(original, corrected) == corrected
+    check_translation(original, corrected)
+
+
+def test_quote_formatter_keeps_decimal_value_and_does_not_guess_unrelated_direction():
+    original = "The Japanese yen depreciated past 158.25 per dollar."
+    translated = "Đồng yên Nhật giảm xuống dưới 158,25 yên đổi một USD."
+    corrected = normalize_fx_quote(original, translated)
+    assert corrected == "USD-JPY vượt mức 158,25 cho thấy JPY đang suy yếu."
+    check_translation(original, corrected)
+    for other in ["The Japanese yen appreciated to 158.25 per dollar.",
+                  "The euro traded at 158.25 per dollar.",
+                  "The Japanese yen traded around 158.25 per dollar."]:
+        assert normalize_fx_quote(other, translated) == translated
 
 
 def test_dnt_prose_is_not_modified_by_postprocessing():

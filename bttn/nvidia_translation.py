@@ -8,7 +8,7 @@ import requests
 
 MODEL = "nvidia/riva-translate-4b-instruct-v2"
 ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions"
-RULES_VERSION = "riva-en-vi-finance-v5"
+RULES_VERSION = "riva-en-vi-finance-v6"
 TERMS = {
     "federal reserve": "Cục Dự trữ Liên bang Mỹ",
     "hawkish": "cứng rắn", "dovish": "mềm mỏng",
@@ -33,7 +33,7 @@ GLOSSARY_EXAMPLES = [
     ("Core inflation slowed to 2.8%, while headline inflation ticked up.",
      "Lạm phát cơ bản giảm xuống 2.8%, trong khi lạm phát danh nghĩa tăng nhẹ."),
     ("The Japanese yen depreciated past 150 per dollar, but remained range-bound.",
-     "Đồng yên Nhật suy yếu, đưa tỷ giá vượt 150 yên đổi một USD, nhưng vẫn dao động trong biên độ hẹp."),
+     "USD-JPY vượt mức 150 cho thấy JPY đang suy yếu, nhưng vẫn dao động trong biên độ hẹp."),
     ("The offshore yuan strengthened to 7.12 per dollar as fiscal support increased.",
      "Đồng nhân dân tệ ngoại biên tăng giá lên mức 7,12 nhân dân tệ đổi một USD khi hỗ trợ tài khóa gia tăng."),
 ]
@@ -75,21 +75,23 @@ def normalize_terms(original, translated):
 
 
 def normalize_fx_quote(original, translated):
-    """A narrow source-derived correction, never inferred from the Vietnamese output.
+    """A narrow source-derived quote rule, never inferred from the Vietnamese output.
 
     A yen depreciation past X yen/USD means USD-JPY exceeds X. Riva repeatedly
-    produced 'below X'. Correct only the observed opening-clause pattern when
-    the quoted number matches exactly, retaining the rest of the translation.
+    produced 'below X'. Use the agreed pair notation for both correct and
+    inverted yen/USD wording, only when the source and number match.
+    Retain the complete translation after the quote clause.
     """
     match = re.match(r"The Japanese yen depreciated past (\d+(?:\.\d+)?) per dollar\b", original, re.I)
     prefix = re.match(
-        r"(?:Đồng )?yên Nhật(?: Bản)? (?:suy giảm|suy yếu|giảm)(?: giá)? xuống dưới "
+        r"(?:Đồng )?yên Nhật(?: Bản)? (?:suy giảm|suy yếu|giảm)(?: giá)?"
+        r"(?: (?:xuống dưới|xuống mức|vượt(?: qua)?(?: mức)?)|, đưa tỷ giá(?: USD-JPY)? vượt(?: mức)?) "
         r"(\d+(?:[.,]\d+)?) (?:đồng|yên)(?:/USD| đổi một USD| mỗi (?:đô la|USD)| cho mỗi (?:đô la|USD))",
         translated, re.I,
     )
     if match and prefix and same_numbers([match.group(1)], [prefix.group(1)]):
-        return ("Đồng yên Nhật suy yếu, đưa tỷ giá USD-JPY vượt " + prefix.group(1)
-                + " yên đổi một USD" + translated[prefix.end():])
+        return ("USD-JPY vượt mức " + prefix.group(1)
+                + " cho thấy JPY đang suy yếu" + translated[prefix.end():])
     return translated
 
 

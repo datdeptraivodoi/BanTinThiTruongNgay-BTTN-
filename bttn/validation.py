@@ -4,6 +4,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from .fx_editorial import EUR_SECOND_OPENING, fx_opening
 from .models import Issue, ReportContent, Snapshot, business_days_between, previous_weekday
 from .trader_quotes import validate_trader_observations
 
@@ -255,7 +256,11 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
             error("WORD_COUNT", f"{count} từ, yêu cầu {low}–{high}")
         if name == "coffee" and not rendered.startswith("Cập nhật giá cà phê thế giới,"):
             error("OPENING", "Thiếu câu mở đầu cà phê")
-        if name == "eur_usd" and (len(section.paragraphs) != 2 or not section.paragraphs[1].startswith("Về phía Châu Âu,")):
+        if name in {"eur_usd", "japan"} and (not section.paragraphs or not section.paragraphs[0].startswith(fx_opening(snapshot, name))):
+            error("FX_OPENING", "Câu mở đầu phải đúng mẫu, ngày và placeholder tỷ giá")
+        if name == "japan" and len(section.paragraphs) != 1:
+            error("JPY_STRUCTURE", "Cần đúng một đoạn")
+        if name == "eur_usd" and (len(section.paragraphs) != 2 or not section.paragraphs[1].startswith(EUR_SECOND_OPENING)):
             error("EU_STRUCTURE", "Cần hai đoạn; đoạn hai bắt đầu Về phía Châu Âu,")
         if name == "energy_metals":
             if len(section.paragraphs) != 2:

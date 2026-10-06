@@ -116,10 +116,9 @@ def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> Re
     
     Preserves all verified market data, tables, and charts while clearly marking commentary as pending.
     """
+    from .fx_editorial import fx_opening
+
     ref_src = ["vira"] if "vira" in snapshot.sources else (list(snapshot.sources.keys())[:1] if snapshot.sources else ["manual"])
-    as_of_vn = snapshot.as_of.astimezone(VN_TZ)
-    today_str = as_of_vn.strftime("%d.%m.%Y")
-    yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
     src_eur = [s for s in ["yf_EURUSD", "market", "vira"] if s in snapshot.sources] or ref_src
     src_jpy = [s for s in ["yf_USDJPY", "market", "vira"] if s in snapshot.sources] or ref_src
 
@@ -139,13 +138,13 @@ def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> Re
         ),
         eur_usd=Section(
             paragraphs=[
-                f"Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}. [Phần nhận xét thị trường ngoại hối EUR-USD đang chờ cập nhật.]",
+                f"{fx_opening(snapshot, 'eur_usd')} [Phần nhận xét thị trường ngoại hối EUR-USD đang chờ cập nhật.]",
                 "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
             ],
             source_ids=src_eur,
         ),
         japan=Section(
-            paragraphs=[f"Trong phiên hôm qua ngày {yesterday_str}, tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}. [Phần nhận xét thị trường Nhật Bản đang chờ cập nhật.]"],
+            paragraphs=[f"{fx_opening(snapshot, 'japan')} [Phần nhận xét thị trường Nhật Bản đang chờ cập nhật.]"],
             source_ids=src_jpy,
         ),
         china=Section(
@@ -175,6 +174,7 @@ def sanitize_content_for_draft_render(
     Sections with placeholder, language or technical leakage errors are replaced by clean draft pending notices,
     preventing renderer crashes while preserving all verified tables and charts in the draft document.
     """
+    from .fx_editorial import fx_opening
     from .validation import resolve
 
     ref_src = ["vira"] if "vira" in snapshot.sources else (list(snapshot.sources.keys())[:1] if snapshot.sources else ["manual"])
@@ -203,19 +203,13 @@ def sanitize_content_for_draft_render(
                     "Cập nhật giá cà phê thế giới, [Phần nhận xét thị trường cà phê chưa hoàn tất do lỗi kiểm định nội dung. Bảng số liệu đã được đối soát đầy đủ.]"
                 ]
             elif sec_name == "eur_usd":
-                as_of_vn = snapshot.as_of.astimezone(VN_TZ)
-                today_str = as_of_vn.strftime("%d.%m.%Y")
-                yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
                 sec.paragraphs = [
-                    f"Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}. [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.]",
+                    f"{fx_opening(snapshot, 'eur_usd')} [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.]",
                     "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
                 ]
             elif sec_name == "japan":
-                as_of_vn = snapshot.as_of.astimezone(VN_TZ)
-                today_str = as_of_vn.strftime("%d.%m.%Y")
-                yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
                 sec.paragraphs = [
-                    f"Trong phiên hôm qua ngày {yesterday_str}, tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}. [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.]"
+                    f"{fx_opening(snapshot, 'japan')} [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.]"
                 ]
             elif sec_name == "energy_metals":
                 sec.paragraphs = [

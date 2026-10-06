@@ -934,3 +934,59 @@ def test_eurusd_and_usdjpy_opening_sentence_template(snapshot, content):
 
     issues = validate_content(normalized, snapshot)
     assert not [i for i in issues if i.severity == "error"]
+
+
+@pytest.mark.parametrize("section,pair", [("eur_usd", "EURUSD"), ("japan", "USDJPY")])
+def test_stale_fx_opening_is_replaced_once_and_commentary_is_preserved(snapshot, content, section, pair):
+    from bttn.fx_editorial import fx_opening
+    from bttn.normalization import normalize_report_content
+
+    paragraphs = getattr(content, section).paragraphs
+    original = paragraphs[0]
+    tail = original.split(". ", 2)[2]
+    paragraphs[0] = original.replace("23.09.2026", "01.09.2026").replace("24.09.2026", "02.09.2026")
+    paragraphs[0] = paragraphs[0].replace(f"{{{{{pair}_prev}}}}", "{{GOLD}}")
+    assert "FX_OPENING" in codes(validate_content(content, snapshot))
+
+    # Replace stale dates, a wrong price token and unsupported flat-market wording.
+    paragraphs[0] = paragraphs[0].replace("giao dịch quanh mức", "đi ngang quanh mức")
+    normalized = normalize_report_content(content, snapshot)
+    repaired = getattr(normalized, section).paragraphs[0]
+    assert repaired == fx_opening(snapshot, section) + " " + tail
+    assert repaired.count(f"{{{{{pair}_prev}}}}") == 1
+    assert "chiều nay" not in repaired and "đi ngang" not in repaired
+    assert not validate_content(normalized, snapshot)
+    assert normalize_report_content(normalized, snapshot) == normalized
+
+
+def test_fx_opening_uses_friday_close_on_monday_and_actual_holiday_close(snapshot):
+    from datetime import date
+
+    from bttn.fx_editorial import fx_opening
+
+    snapshot.as_of = parse_as_of("2026-09-28T05:00:00Z")  # Monday at noon in Vietnam
+    for section, pair in [("eur_usd", "EURUSD"), ("japan", "USDJPY")]:
+        obs = snapshot.observations[pair]
+        obs.prev_value = Decimal("1")
+        obs.prev_trading_date = date(2026, 9, 25)
+        assert "25.09.2026" in fx_opening(snapshot, section)
+        assert "28.09.2026" in fx_opening(snapshot, section)
+        assert "27.09.2026" not in fx_opening(snapshot, section)
+        obs.prev_trading_date = date(2026, 9, 24)  # Actual preceding quote, not a guessed Friday
+        assert "24.09.2026" in fx_opening(snapshot, section)
+
+
+def test_fx_report_opening_validation_checks_day_and_jpy_paragraph_count(snapshot, content):
+    content.japan.paragraphs[0] = content.japan.paragraphs[0].replace("24.09.2026", "22.09.2026")
+    assert "FX_OPENING" in codes(validate_content(content, snapshot))
+    content.japan.paragraphs.append("Nội dung kiểm thử.")
+    assert "JPY_STRUCTURE" in codes(validate_content(content, snapshot))
+
+
+@pytest.mark.parametrize("section", ["eur_usd", "japan"])
+def test_empty_fx_model_output_fails_validation_without_exception(snapshot, content, section):
+    from bttn.normalization import normalize_report_content
+
+    getattr(content, section).paragraphs = ["   "]
+    normalized = normalize_report_content(content, snapshot)
+    assert "FX_OPENING" in codes(validate_content(normalized, snapshot))

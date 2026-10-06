@@ -95,13 +95,22 @@ không có key hoặc response body; không chuyển sang nhà cung cấp dịch
 Riva từng dịch sai chiều yết giá JPY và dùng tiêu đề Trung Quốc chưa tự nhiên.
 Đã bổ sung ví dụ yết giá và kiểm tra lỗi quan sát được; bản dịch mới vẫn mang trạng thái
 `needs_review`. Phát hành bị chặn cho tới khi các bài dùng trong báo cáo đã được review.
-Riêng cách diễn đạt “yen depreciated past X per dollar”, Python chỉ sửa câu mở đầu
-khi con số và cấu trúc nguồn khớp: đồng yên suy yếu đồng nghĩa tỷ giá USD-JPY vượt X,
-không phải xuống dưới X. Nhật ký ghi `python_postprocessed`; đây là sửa bằng quy tắc,
+Riêng cách diễn đạt “yen depreciated past X per dollar”, Python chuẩn hóa câu mở đầu
+khi con số và cấu trúc nguồn khớp thành “USD-JPY vượt mức X cho thấy JPY đang suy yếu”.
+Giữ nguyên phần tin theo sau và số gốc, không đảo thành “dưới X”. Nhật ký ghi `python_postprocessed`; đây là sửa bằng quy tắc,
 không phải bằng chứng model tự dịch đúng mọi chiều tỷ giá. Giảm nhiệt độ về 0,
 thử lại đầu ra bị từ chối tối đa một lần, cùng nhà cung cấp.
 Vòng biên tập báo cáo hiện có vẫn dùng Gemini/OpenRouter; chỉ bước dịch riêng đã chuyển
 sang NVIDIA. Muốn loại bỏ mọi API khác ở toàn pipeline cần tiếp tục hoàn thiện biên tập bằng Python.
+
+Mẫu mở đầu EUR/JPY dùng chung tại `bttn/fx_editorial.py`: EUR bắt đầu bằng
+“Trong phiên giao dịch hôm qua, tính đến ngày…”, đoạn hai “Về phía Châu Âu,”;
+JPY bắt đầu bằng “Trong phiên hôm qua ngày…”. Ngày phiên trước đi cùng dữ liệu
+đóng cửa, ngày hôm nay theo múi giờ Việt Nam. Câu giá hiện tại dùng “giao dịch quanh mức”,
+không mặc định thị trường đi ngang hay gọi phiên trưa là “chiều nay”. Prompt, hậu xử lý
+Python, bản nháp và kiểm định dùng cùng mẫu; đầu vào JSON sai mẫu hoặc ngày bị chặn.
+Giới hạn EUR vẫn 150–200 từ trong hai đoạn, JPY 100–130 từ trong một đoạn.
+Phiên bản quy tắc dịch mới tạo cache mới; bản cũ không được tự coi là đã áp dụng quy tắc mới.
 
 ```powershell
 # Sau khi sửa file JSON có trường translated_segments (danh sách đoạn):
