@@ -203,9 +203,19 @@ def sanitize_content_for_draft_render(
                     "Cập nhật giá cà phê thế giới, [Phần nhận xét thị trường cà phê chưa hoàn tất do lỗi kiểm định nội dung. Bảng số liệu đã được đối soát đầy đủ.]"
                 ]
             elif sec_name == "eur_usd":
+                as_of_vn = snapshot.as_of.astimezone(VN_TZ)
+                today_str = as_of_vn.strftime("%d.%m.%Y")
+                yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
                 sec.paragraphs = [
-                    "[Phần nhận xét ngoại hối EUR-USD chưa hoàn tất do lỗi kiểm định nội dung.]",
+                    f"Trong phiên giao dịch hôm qua, tính đến ngày {yesterday_str}, tỷ giá EUR-USD đóng cửa quanh mức {{{{EURUSD_prev}}}}. Trong phiên {today_str}, tỷ giá EUR-USD ổn định quanh mức {{{{EURUSD}}}}. [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.]",
                     "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
+                ]
+            elif sec_name == "japan":
+                as_of_vn = snapshot.as_of.astimezone(VN_TZ)
+                today_str = as_of_vn.strftime("%d.%m.%Y")
+                yesterday_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
+                sec.paragraphs = [
+                    f"Trong phiên hôm qua ngày {yesterday_str}, tỷ giá USD-JPY đóng cửa ở mức {{{{USDJPY_prev}}}}. Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{{{USDJPY}}}}. [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.]"
                 ]
             elif sec_name == "energy_metals":
                 sec.paragraphs = [
