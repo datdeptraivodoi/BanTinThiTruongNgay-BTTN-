@@ -172,32 +172,52 @@ def run(args):
         content = None
         translation_issues = []
         if args.content:
-            content = ReportContent.model_validate_json(Path(args.content).read_text(encoding="utf-8"))
+            supplied = Path(args.content)
+            content = ReportContent.model_validate_json(supplied.read_text(encoding="utf-8"))
+            stored_translations = supplied.parent / "translations.json"
+            if stored_translations.is_file():
+                from .translation_service import load_verified_translations
+
+                records = load_verified_translations(snapshot, stored_translations)
+                (directory / "translations.json").write_bytes(stored_translations.read_bytes())
+                used = {ref.source_id for name in content.__class__.model_fields
+                        for section in (getattr(content, name) if name == "highlights" else [getattr(content, name)])
+                        for ref in section.sentence_refs}
+                pending = [sid for sid, record in records.items() if sid in used and record.review_status != "approved"]
+                if pending:
+                    translation_issues.append(Issue(severity="error", code="TRANSLATION_REVIEW_REQUIRED",
+                        message="Bản dịch trong nội dung tái hiện cần review trước khi phát hành."))
         else:
             try:
-                if os.getenv("NVIDIA_API_KEY"):
-                    from .translation_service import translate_snapshot
+                from .translation_service import translate_snapshot
 
-                    translated = translate_snapshot(snapshot, directory, Path(args.state_dir) / "translations")
-                    manifest["translation_status"] = translated["status"]
-                    if translated["status"] != "checked":
-                        raise RuntimeError("NVIDIA translation incomplete; see translations.json. No translation fallback used.")
-                    if translated["pending_review"]:
-                        translation_issues.append(Issue(severity="error", code="TRANSLATION_REVIEW_REQUIRED",
-                            message="Bản dịch NVIDIA cần review nghĩa/văn phong trước khi phát hành; kiểm tra số không thay thế biên tập."))
+                translated = translate_snapshot(snapshot, directory, Path(args.state_dir) / "translations")
+                manifest["translation_status"] = translated["status"]
+                manifest["editor"] = "python-extractive-v1"
+                if translated.get("missing_topics") or (translated["status"] != "checked" and not translated.get("failures")):
+                    translation_issues.append(Issue(severity="error", code="TRANSLATION_INCOMPLETE",
+                        message="Thiếu tin hoặc bản dịch NVIDIA đạt kiểm tra; xem translations.json."))
                 content = generate(snapshot, directory)
+                used = {ref.source_id for name in content.__class__.model_fields
+                        for section in (getattr(content, name) if name == "highlights" else [getattr(content, name)])
+                        for ref in section.sentence_refs}
+                pending = sorted(set(translated["pending_review"]) & used)
+                manifest["translation_review_pending"] = len(pending)
+                if pending:
+                    translation_issues.append(Issue(severity="error", code="TRANSLATION_REVIEW_REQUIRED",
+                        message="Các bản dịch đã chọn cần review nghĩa/văn phong trước khi phát hành."))
             except Exception as exc:
                 ai_error = str(exc)
-                LOG.warning("AI generation did not produce validated content: %s", exc)
+                LOG.warning("Translation/Python editing did not complete: %s", exc)
 
         if content is None:
             # Produce draft placeholder content so verified tables/charts are preserved in draft
-            content = create_draft_placeholder_content(snapshot, reason=ai_error or "AI generation incomplete")
+            content = create_draft_placeholder_content(snapshot, reason=ai_error or "Python editing incomplete")
             content_issues = [
                 Issue(severity="error", code="AI_INCOMPLETE", message=f"Phần nhận xét chưa hoàn tất ({ai_error or 'Lỗi tạo nội dung'})")
             ]
         else:
-            content_issues = validate_content(content, snapshot)
+            content_issues = validate_content(content, snapshot, translations_path=directory / "translations.json")
         content_issues.extend(translation_issues)
 
         write_json(directory / "validation-content.json", [i.model_dump() for i in content_issues])

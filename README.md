@@ -1,6 +1,6 @@
 # Bản tin thị trường ngày BTTN
 
-Pipeline Python tạo bản tin từ dữ liệu có nguồn, nội dung AI dạng JSON và template Word. Workflow bắt đầu **12:00 giờ Việt Nam, thứ Hai–thứ Sáu** (`05:00 UTC`). Đây là giờ trigger; GitHub Actions có thể xếp hàng nên không bảo đảm email đến đúng 12:00.
+Pipeline Python tạo bản tin từ dữ liệu có nguồn, Riva dịch từng bài và Python chọn câu và template Word. Workflow bắt đầu **12:00 giờ Việt Nam, thứ Hai–thứ Sáu** (`05:00 UTC`). Đây là giờ trigger; GitHub Actions có thể xếp hàng nên không bảo đảm email đến đúng 12:00.
 
 ## Các thay đổi
 
@@ -8,8 +8,8 @@ Pipeline Python tạo bản tin từ dữ liệu có nguồn, nội dung AI dạ
 - VIRA Market Watch: chọn ấn bản theo thời gian xuất bản, bỏ bài cũ ghim đầu trang và bài sau cutoff. Bảng ảnh được OCR cục bộ ở bốn cấu hình; một ô chỉ được dùng khi ít nhất hai lần đọc đồng ý và không có kết quả trái nhau. OCR đồng thuận vẫn không thay thế kiểm tra nghiệp vụ; thay đổi bố cục nguồn có thể khiến bản tin bị chặn.
 - VNIBOR VND/USD, SOFR và lợi suất trái phiếu lấy từ VIRA. Lợi suất trái phiếu hiện là chuẩn **10 năm theo quốc gia**, không tự tạo đường cong nhiều kỳ hạn.
 - Swap tham khảo = **lãi suất VND − lãi suất USD**, cùng kỳ hạn và cùng ấn bản, đơn vị **điểm phần trăm**. VND có ngày fixing riêng; USD ghi Last trong ấn bản, không khẳng định hai fixing cùng thời điểm. Đây không phải báo giá FX swap mua/bán.
-- AI chỉ tạo nội dung theo schema. Các số trong văn xuôi phải dùng `{{OBSERVATION_ID}}`; Python thay bằng giá trị đã kiểm tra. Giới hạn từ, nguồn, cấu trúc đoạn và việc tạm dừng dự báo đều được kiểm tra trước khi dựng file.
-- Mọi ô dữ liệu, bảng và biểu đồ động cũ trong template bị xóa trước khi dựng lại. Không dùng số mẫu làm fallback. Nội dung AI thực sự xuất hiện trong Word.
+- Python chọn câu nguyên vẹn từ nguồn tiếng Việt hoặc bản dịch NVIDIA đã kiểm tra. Mỗi câu có `sentence_refs` đối chiếu đúng bài/bản dịch. Số liệu thị trường dùng `{{OBSERVATION_ID}}`; số trong tin chỉ được phép khi nằm trong câu nguyên vẹn có nguồn. Giới hạn từ và cấu trúc đoạn được kiểm tra trước khi dựng file.
+- Mọi ô dữ liệu, bảng và biểu đồ động cũ trong template bị xóa trước khi dựng lại. Không dùng số mẫu làm fallback. Nội dung biên tập thực sự xuất hiện trong Word.
 - Biến động ngày so với phiên hoàn tất liền trước, không dùng `chartPreviousClose` của toàn khoảng tải. Biến động năm ghi rõ **YoY**.
 - Phần dự báo và ý tưởng sản phẩm để trống. Thiếu nguồn cho mục tùy chọn thì hiện `—`; thiếu dữ liệu bắt buộc thì dừng và không gửi email.
 - PDF phải được xuất mới qua LibreOffice, đủ ba trang và không còn placeholder. Gửi thất bại trả mã lỗi. Ledger ngăn tự gửi lại khi SMTP có kết quả không chắc chắn.
@@ -22,7 +22,8 @@ Pipeline Python tạo bản tin từ dữ liệu có nguồn, nội dung AI dạ
 | Tỷ giá trung tâm | [NHNN](https://sbv.gov.vn/vi/tỷ-giá) | Chặn; trang có thể trả Request Rejected |
 | Tỷ giá chuyển khoản USD | [MBBank](https://www.mbbank.com.vn/ExchangeRate) | Chặn nếu thiếu ngày hiện tại; ngày trước thiếu thì để — |
 | FX, chỉ số, một số hợp đồng hàng hóa | Yahoo Finance chart API | FX bắt buộc thiếu thì chặn; chỉ tiêu tùy chọn để — |
-| Tin tức | RSS và bài VietnamBiz, VIRA; Google News RSS tìm Trading Economics | Cần ít nhất ba nguồn trong cửa sổ 36 giờ; RSS có thể chỉ cung cấp tóm tắt |
+| Tin quốc tế | Trading Economics: United States, Euro Area, Japan, China | API hoặc nhập bài có nội dung; tối đa ba bài/quốc gia trong 36 giờ |
+| Tin nội địa, cà phê | VietnamBiz, VIRA và báo kinh tế | Chỉ chọn câu từ thân bài có ngày xuất bản; RSS không đủ để biên tập |
 
 CRB Spot, LME Index, cao su, RON92 và kim loại LME chưa có adapter được xác minh nên để `—`. Không thay bằng chỉ số/hợp đồng khác chỉ vì tên gần giống. Dữ liệu futures Yahoo không phải báo giá spot và có thể có hiệu ứng đổi hợp đồng. Mỗi lần chạy lưu ngày/nguồn cụ thể trong `snapshot.json`; không coi tất cả là giá realtime.
 
@@ -46,7 +47,7 @@ $env:LIBREOFFICE_PATH = 'C:\Program Files\LibreOffice\program\soffice.exe'
 ```powershell
 # Kiểm tra nguồn, không gọi AI và không gửi
 python market_report.py --collect-only
-# Tạo bản xem trước (mặc định), có gọi model khi dữ liệu đạt
+# Tạo bản xem trước (mặc định), dịch bằng NVIDIA và chọn câu bằng Python
 python market_report.py --dry-run
 # Phát hành sau mọi kiểm tra; chỉ ngày làm việc 12:00–15:00 VN
 python market_report.py --send
@@ -54,7 +55,7 @@ python market_report.py --send
 python market_report.py --snapshot path/to/snapshot.json --content path/to/content.json --dry-run
 ```
 
-`--as-of` yêu cầu ISO timestamp có múi giờ. Muốn tái hiện chính xác giá intraday cũ phải dùng snapshot đã lưu, không lấy nến ngày hiện tại để suy ngược intraday. Mỗi lần chạy có thư mục riêng dưới `output/`, gồm raw sources, OCR, snapshot, validation, phản hồi model, biểu đồ, Word, PDF và manifest hash/thời gian. Lỗi trả mã khác không; `--collect-only` trả 2 khi dữ liệu chưa đạt. Không lưu API key vào các log này.
+`--as-of` yêu cầu ISO timestamp có múi giờ. Muốn tái hiện chính xác giá intraday cũ phải dùng snapshot đã lưu, không lấy nến ngày hiện tại để suy ngược intraday. Mỗi lần chạy có thư mục riêng dưới `output/`, gồm raw sources, OCR, snapshot, validation, bản dịch, dấu vết chọn câu, biểu đồ, Word, PDF và manifest hash/thời gian. Lỗi trả mã khác không; `--collect-only` trả 2 khi dữ liệu chưa đạt. Không lưu API key vào các log này.
 
 ## Model và GitHub Actions
 
@@ -64,10 +65,17 @@ python market_report.py --snapshot path/to/snapshot.json --content path/to/conte
 `nvidia/riva-translate-4b-instruct-v2`. [Chat template của NVIDIA](https://huggingface.co/nvidia/Riva-Translate-4B-Instruct-v2)
 nhận system message **`en-vi`**; không dùng một system prompt dài để thay mã ngôn ngữ.
 Python truyền ví dụ thuật ngữ tài chính, dịch tiêu đề riêng và chia đoạn để giữ toàn văn.
+Chỉ truyền ví dụ liên quan đến bài. Khi bản dịch bị từ chối, thử lại tối đa một lần
+bằng chỉ dẫn ngôn ngữ tối giản cùng NVIDIA; không thêm yêu cầu sửa vào thân bài.
+“Current account” và “consumer confidence” được khóa bằng marker kiểm tra để Python
+khôi phục thành “cán cân vãng lai” và “niềm tin người tiêu dùng”. Tên thứ trong tuần
+cũng được khóa theo chữ trong nguồn, không suy từ ngày đăng bài. Marker thiếu hoặc
+trùng đều bị từ chối. Các sửa thuật ngữ/quy tắc đều ghi `python_postprocessed`;
+đây là tiền/hậu xử lý Python, không phải model tự tuân thủ hoàn hảo.
 Không yêu cầu Riva trả JSON, viết nhận định, rút gọn hoặc giới hạn từ.
 
 ```powershell
-# Chỉ dịch tin: không gọi Gemini/OpenRouter, không dựng báo cáo, không gửi email.
+# Chỉ dịch tin bằng NVIDIA; không dựng báo cáo hoặc gửi email.
 python market_report.py --translate-news-only --news-file path/to/te-news.json
 # Hoặc dịch các nguồn TE có trong snapshot đã lưu.
 python market_report.py --translate-news-only --snapshot path/to/snapshot.json
@@ -80,19 +88,20 @@ khi có `TRADINGECONOMICS_API_KEY`, hoặc file nhập do người dùng cung c�
 `TE_NEWS_IMPORT_PATH`. Key NVIDIA không cấp quyền đọc API Trading Economics.
 File nhập có cùng cấu trúc API: danh sách các bản ghi `id`, `title`, `date`,
 `description` (nội dung bài), `country`, `url`; country là Euro Area/United States/Japan/China.
-Date của API là UTC; file nhập nên ghi rõ múi giờ. Chọn bài mới nhất từng quốc gia
+Date của API là UTC; file nhập nên ghi rõ múi giờ. Chọn tối đa ba bài mới nhất, khác nội dung, từng quốc gia
 trước giờ chốt, tối đa 36 giờ; bài thiếu nội dung bị loại. Bộ thu thập nguồn này
 chưa được kiểm thử trực tiếp qua API TE có trả phí/quyền truy cập.
 
 Mỗi bài có bản gốc, bản dịch từng đoạn, nguồn, ngày, model, phiên bản quy tắc và hash.
-Kiểm tra giá trị số (chấp nhận dấu thập phân Anh/Việt), đơn vị %, tiền tệ,
+Kiểm tra giá trị số (chấp nhận dấu thập phân Anh/Việt), thứ trong tuần theo đúng thứ tự, tháng Anh/Việt tương ứng, đơn vị %, tiền tệ,
+quý I–IV/Q1–Q4 và số lần tăng lãi suất viết bằng chữ/chữ số (cùng đơn vị),
 thuật ngữ, thẻ `dnt`, ngôn ngữ và phản hồi bị cắt. Giữ thuật ngữ hawkish/cứng rắn,
 dovish/mềm mỏng, tâm lý tiêu dùng, Bảng lương phi nông nghiệp, lạm phát cơ bản,
 lạm phát danh nghĩa; không dùng “nhích nhẹ”. Lỗi API/kiểm tra được ghi mã an toàn,
 không có key hoặc response body; không chuyển sang nhà cung cấp dịch khác.
 
 **Kiểm tra số không chứng minh bản dịch đúng nghĩa.** Trong thử nghiệm thực tế,
-Riva từng dịch sai chiều yết giá JPY và dùng tiêu đề Trung Quốc chưa tự nhiên.
+Riva từng dịch sai chiều yết giá JPY, tên thứ trong tuần và một số thuật ngữ/vai trò nhân vật.
 Đã bổ sung ví dụ yết giá và kiểm tra lỗi quan sát được; bản dịch mới vẫn mang trạng thái
 `needs_review`. Phát hành bị chặn cho tới khi các bài dùng trong báo cáo đã được review.
 Riêng cách diễn đạt “yen depreciated past X per dollar”, Python chuẩn hóa câu mở đầu
@@ -100,15 +109,29 @@ khi con số và cấu trúc nguồn khớp thành “USD-JPY vượt mức X ch
 Giữ nguyên phần tin theo sau và số gốc, không đảo thành “dưới X”. Nhật ký ghi `python_postprocessed`; đây là sửa bằng quy tắc,
 không phải bằng chứng model tự dịch đúng mọi chiều tỷ giá. Giảm nhiệt độ về 0,
 thử lại đầu ra bị từ chối tối đa một lần, cùng nhà cung cấp.
-Vòng biên tập báo cáo hiện có vẫn dùng Gemini/OpenRouter; chỉ bước dịch riêng đã chuyển
-sang NVIDIA. Muốn loại bỏ mọi API khác ở toàn pipeline cần tiếp tục hoàn thiện biên tập bằng Python.
+Toàn bộ pipeline dùng **NVIDIA Riva để dịch, Python để chọn câu và dựng báo cáo**.
+Không có model viết/tóm tắt lại nội dung. Bộ chọn câu ưu tiên chủ đề, giữ câu nguyên vẹn,
+loại dự báo và tin ngoài giờ chốt, khử câu trùng, áp trần từ. Những câu mở đầu phụ thuộc
+ngữ cảnh như “Kết quả này…” được loại khỏi phần chọn câu để tránh mất đối tượng tham chiếu;
+bản dịch toàn văn vẫn giữ nguyên để review. Mục EUR cần cả tin Mỹ và
+Euro Area. Nếu không đủ câu để đạt sàn từ, giữ bản nháp có cảnh báo; không cắt giữa câu
+hoặc thêm nhận định để đủ chữ. `selection.json` lưu câu được chọn và lý do loại;
+`editorial-validation.json` lưu kết quả kiểm tra.
+
+Xem riêng phần chọn tin (không gọi API, không gửi email):
+```powershell
+python -m bttn.editorial_preview --snapshot output/translation-review/snapshot.json --translations output/translation-review/translations.json --output-dir output/news-selection
+```
+Preview này không có bảng giá FX nên chưa phải báo cáo đủ điều kiện phát hành.
+Chỉ thêm `--allow-stale-review` để thử lịch sử; bài cũ luôn được ghi rõ và không
+được luồng phát hành chấp nhận.
 
 Mẫu mở đầu EUR/JPY dùng chung tại `bttn/fx_editorial.py`: EUR bắt đầu bằng
 “Trong phiên giao dịch hôm qua, tính đến ngày…”, đoạn hai “Về phía Châu Âu,”;
 JPY bắt đầu bằng “Trong phiên hôm qua ngày…”. Ngày phiên trước đi cùng dữ liệu
 đóng cửa, ngày hôm nay theo múi giờ Việt Nam. Câu giá hiện tại dùng “giao dịch quanh mức”,
-không mặc định thị trường đi ngang hay gọi phiên trưa là “chiều nay”. Prompt, hậu xử lý
-Python, bản nháp và kiểm định dùng cùng mẫu; đầu vào JSON sai mẫu hoặc ngày bị chặn.
+không mặc định thị trường đi ngang hay gọi phiên trưa là “chiều nay”. Python chọn câu,
+bản nháp và kiểm định dùng cùng mẫu; đầu vào JSON sai mẫu hoặc ngày bị chặn.
 Giới hạn EUR vẫn 150–200 từ trong hai đoạn, JPY 100–130 từ trong một đoạn.
 Phiên bản quy tắc dịch mới tạo cache mới; bản cũ không được tự coi là đã áp dụng quy tắc mới.
 
@@ -132,9 +155,7 @@ nhập ẩn và không gửi thư. `deploy/translate-news-preview.sh` chạy t�
 `/opt/bttn-nvidia-preview`, dùng môi trường hiện có; không tự cập nhật checkout phát hành.
 GitHub Actions đọc `secrets.NVIDIA_API_KEY` và `secrets.TRADINGECONOMICS_API_KEY` nếu được cấu hình.
 
-Cấu hình ít nhất một key: `GEMINI_API_KEY` (hoặc `GOOGLE_API_KEY`), `OPENROUTER_API_KEY` (tương thích secret cũ `Open_Router_API_Key`). Các tên model cấu hình qua `GEMINI_MODEL`, `OPENROUTER_MODEL`; giá trị mặc định giữ baseline Gemini và Ling Fin fallback trong `.env.example`. Tên model phải tồn tại và tài khoản phải có quyền gọi. Chưa tự động nâng Ling Fin thành model chính khi chưa có đánh giá trên bản tin thực tế.
-
-Mỗi provider tối đa hai lần thử; đầu ra sai sẽ được yêu cầu sửa rồi mới chuyển fallback. Có thể chạy chỉ bằng OpenRouter mà không cần key Gemini. Bản free không gửi response_format bắt buộc; vẫn phải qua cùng Pydantic và kiểm tra nội dung. Không lấy reasoning_content làm bản tin. Nhật ký `model-attempts.json` ghi model, thời gian, usage và lỗi kiểm tra để so sánh sau này. Skills cải thiện chỉ dẫn, không tương đương fine-tuning trọng số.
+Chỉ cần `NVIDIA_API_KEY` cho dịch thuật; không còn dependency hoặc cấu hình nhà cung cấp model khác. Quy tắc Python và ví dụ thuật ngữ không phải fine-tuning trọng số của model hosted.
 
 Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biến `RECIPIENTS` có thể cấu hình trong GitHub Repository Variables; mặc định giữ danh sách nhận cũ. Workflow schedule gọi `--send`. Chạy thủ công mặc định chỉ preview, bật `send_email` nếu muốn gửi; cùng giới hạn giờ và dữ liệu áp dụng. Workflow kiểm tra riêng chạy trên push/PR và không cần secrets.
 
@@ -144,7 +165,7 @@ Không chạy workflow gửi thư chỉ để kiểm thử code. Xem `validation
 
 ## Quy tắc bố cục và báo giá trader
 
-Tin nổi bật thứ nhất và thứ hai **35–45 từ**, tin thứ ba **12–45 từ**; liên ngân hàng **88–95 từ**, USD-VND **75–80 từ**. Đếm theo khoảng trắng sau khi thay placeholder; không tính số thứ tự, tiêu đề, nguồn và nhãn dự báo. Các giới hạn nằm trong `config/editorial_rules.json` và được dùng chung ở prompt, bước chuẩn hóa, sửa từng mục và validator. Renderer dùng nguyên nội dung biên tập; không ghi đè bằng tin mẫu, toàn văn VIRA hay dự báo cố định.
+Tin nổi bật thứ nhất và thứ hai **35–45 từ**, tin thứ ba **12–45 từ**; liên ngân hàng **88–95 từ**, USD-VND **75–80 từ**. Đếm theo khoảng trắng sau khi thay placeholder; không tính số thứ tự, tiêu đề, nguồn và nhãn dự báo. Các giới hạn nằm trong `config/editorial_rules.json` và được dùng chung ở bộ chọn câu Python và validator. Renderer dùng nguyên nội dung biên tập; không ghi đè bằng tin mẫu, toàn văn VIRA hay dự báo cố định.
 
 Bảng NHNN là 4 hàng × 3 cột, tỷ lệ 44/28/28, màu xanh `4F81BD`. Bảng liên ngân hàng có hai cột Hôm qua/Hôm nay, số hôm nay màu đỏ. Cặp mua/bán lấy từ trader, không lấy bảng niêm yết MBBank. “Hôm qua” là phiên làm việc liền trước (thứ Hai dùng thứ Sáu); ngày thực tế ghi dưới bảng. Lịch này chưa nhận diện nghỉ lễ.
 

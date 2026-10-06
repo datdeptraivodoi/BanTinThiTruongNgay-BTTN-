@@ -113,6 +113,108 @@ def test_translated_month_is_allowed_but_extra_figures_are_not():
         check_translation(original, target + " Thêm 100 tỷ đồng.")
 
 
+@pytest.mark.parametrize("original,target", [
+    ("The dollar fell in December as investors awaited reports.", "Đồng đô la giảm trong tháng 12 khi nhà đầu tư chờ các báo cáo."),
+    ("Reports include August wages and September consumer confidence.", "Các báo cáo gồm tiền lương tháng Tám và niềm tin người tiêu dùng tháng 9."),
+    ("An election will be held on November 29 next year.", "Cuộc bầu cử sẽ được tổ chức vào ngày 29 tháng 11 năm sau."),
+])
+def test_calendar_month_numbers_are_not_treated_as_added_statistics(original, target):
+    check_translation(original, target)
+
+
+def test_changed_or_extra_month_is_still_rejected():
+    with pytest.raises(TranslationError, match="TRANSLATION_MONTHS"):
+        check_translation("Reports include August wages.", "Các báo cáo gồm tiền lương tháng 9.")
+    with pytest.raises(TranslationError, match="TRANSLATION_MONTHS"):
+        check_translation("Reports include August wages.", "Các báo cáo gồm tiền lương tháng 8 và tháng 9.")
+
+
+def test_calendar_normalization_does_not_allow_an_extra_financial_number():
+    with pytest.raises(TranslationError, match="TRANSLATION_NUMBERS"):
+        check_translation("Rates rose 25bps in December.", "Lãi suất tăng 25 điểm cơ bản trong tháng 12, lên mức 12%.")
+
+
+def test_quarter_roman_numerals_preserve_identity_and_year():
+    source = "Growth slowed in the second quarter. GDP rose 4.3% in Q2 2026, down from 5.0% in Q1."
+    target = "Tăng trưởng chậm lại trong quý II. GDP tăng 4,3% trong quý II năm 2026, giảm từ 5,0% trong quý I."
+    check_translation(source, target)
+    with pytest.raises(TranslationError, match="TRANSLATION_QUARTERS"):
+        check_translation(source, target.replace("quý I.", "quý IV."))
+
+
+def test_spelled_policy_counts_and_durations_are_bound_to_matching_units():
+    check_translation("Oil hit a one-month low. Markets expected three additional rate hikes.",
+                      "Dầu xuống mức thấp nhất trong một tháng. Thị trường kỳ vọng thêm 3 lần tăng lãi suất.")
+    with pytest.raises(TranslationError, match="TRANSLATION_QUANTITIES"):
+        check_translation("Oil hit a one-month low.", "Dầu xuống mức thấp nhất trong 2 tháng.")
+
+
+def test_protected_english_month_is_kept_verbatim():
+    check_translation("The report applies to <dnt>May 2025</dnt>.", "Báo cáo áp dụng cho <dnt>May 2025</dnt>.")
+
+
+def test_untranslated_short_news_title_is_rejected():
+    with pytest.raises(TranslationError, match="TRANSLATION_LANGUAGE"):
+        check_translation("Dollar Index Falls on Tuesday", "Dollar Index Falls on Tuesday")
+
+
+def test_minimal_vendor_prompt_is_used_after_rejected_translation():
+    session = Mock()
+    source = "The Federal Reserve kept a hawkish stance in December."
+    target = "Cục Dự trữ Liên bang Mỹ duy trì lập trường cứng rắn trong tháng 12."
+    session.post.side_effect = [response(source), response(target)]
+    assert NvidiaTranslator("private", session=session, sleep=Mock()).translate(source) == target
+    assert len(session.post.call_args_list[0].kwargs["json"]["messages"]) > 2
+    assert session.post.call_args_list[1].kwargs["json"]["messages"] == [{"role": "system", "content": "en-vi"}, {"role": "user", "content": source}]
+
+
+def test_yen_spelling_is_normalized_before_source_derived_quote_rule():
+    source = "The Japanese yen depreciated past 158 per dollar on Tuesday."
+    session = Mock()
+    session.post.return_value = response("yen Nhật giảm xuống dưới 158 đồng/USD vào BTTNPROTECTAEND.")
+    assert NvidiaTranslator("private", session=session).translate(source) == "USD-JPY vượt mức 158 cho thấy JPY đang suy yếu vào thứ Ba."
+
+
+def test_weekday_markers_restore_source_day_without_inferencing_publication_date():
+    session = Mock()
+    session.post.return_value = response("Chỉ số đô la giảm trên BTTNPROTECTAEND sau khi tăng vào BTTNPROTECTBEND.")
+    source = "The dollar index fell on Tuesday after rising on Monday."
+    assert NvidiaTranslator("private", session=session).translate(source) == "Chỉ số đô la giảm vào thứ Ba sau khi tăng vào thứ Hai."
+    sent = session.post.call_args.kwargs["json"]["messages"][-1]["content"]
+    assert "Tuesday" not in sent and "Monday" not in sent
+
+
+def test_wrong_or_swapped_weekdays_are_rejected_even_when_numbers_match():
+    with pytest.raises(TranslationError, match="TRANSLATION_WEEKDAYS"):
+        check_translation("The dollar fell on Tuesday.", "Đồng đô la giảm vào thứ Hai.")
+    with pytest.raises(TranslationError, match="TRANSLATION_WEEKDAYS"):
+        check_translation("The dollar fell on Tuesday after rising on Monday.", "Đồng đô la giảm vào thứ Hai sau khi tăng vào thứ Ba.")
+    check_translation("The dollar fell on Tuesday after rising on Monday.", "Đồng đô la giảm vào thứ 3 sau khi tăng vào thứ 2.")
+    check_translation("The policy applies on Sunday.", "Chính sách áp dụng vào Chủ Nhật.")
+
+
+def test_yuan_currency_label_correction_is_bound_to_source_number_and_currency():
+    source = "The offshore yuan traded flat around 6.70 per dollar on Tuesday."
+    target = "Nhân dân tệ ngoại biên đi ngang quanh 6,70 đồng/USD vào thứ Ba."
+    corrected = normalize_fx_quote(source, target)
+    assert corrected == "Nhân dân tệ ngoại biên đi ngang quanh 6,70 nhân dân tệ đổi một USD vào thứ Ba."
+    check_translation(source, corrected)
+    assert normalize_fx_quote(source.replace("6.70", "6.71"), target) == target
+    assert normalize_fx_quote(source.replace("yuan", "yen"), target) == target
+
+
+def test_financial_term_markers_keep_exact_glossary_and_detect_lost_terms():
+    from bttn.nvidia_translation import protect_financial_terms
+    source = "Reports cover the current account and consumer confidence."
+    masked, protected = protect(source)
+    masked = protect_financial_terms(masked, protected)
+    assert "current account" not in masked and "consumer confidence" not in masked
+    translated = restore("Báo cáo bao gồm BTTNPROTECTAEND và BTTNPROTECTBEND.", protected)
+    check_translation(source, translated)
+    with pytest.raises(TranslationError, match="TRANSLATION_PROTECTED_SPANS"):
+        restore("Báo cáo chỉ có BTTNPROTECTAEND.", protected)
+
+
 def test_growth_range_allows_local_decimal_notation_but_not_lost_percent():
     check_translation("The growth target is 4.5%-5.0% this year.",
                       "Mục tiêu tăng trưởng năm nay là 4,5%-5,0%.")
@@ -223,7 +325,7 @@ def test_te_api_dates_are_utc_and_newest_eligible_news_is_selected():
     older["id"] = "122"
     selected, rejected = parse_news([older, latest], AT)
     assert not rejected
-    assert len(selected) == 1
+    assert len(selected) == 1  # Same body/title, keep the latest copy.
     assert next(iter(selected.values())).published_at.utcoffset().total_seconds() == 0
     assert next(iter(selected.values())).published_at.hour == 10
 
@@ -322,8 +424,8 @@ def test_dnt_prose_is_not_modified_by_postprocessing():
     assert "<dnt>Yen nhích nhẹ</dnt>" in result
 
 
-def test_prompt_uses_matching_translation_and_rejects_historical_test(tmp_path):
-    from bttn.analysis import make_prompt
+def test_editor_uses_matching_translation_and_rejects_historical_test(tmp_path):
+    from bttn.translation_service import load_verified_translations
 
     store, news = TranslationStore(tmp_path / "cache"), source()
     store.save(news, [VIETNAMESE])
@@ -331,14 +433,14 @@ def test_prompt_uses_matching_translation_and_rejects_historical_test(tmp_path):
     client = Mock(attempts=[])
     result = translate_snapshot(snap, tmp_path / "run", tmp_path / "cache", translator=client)
     path = tmp_path / "run" / "translations.json"
-    prompt = make_prompt(snap, path)
-    assert VIETNAMESE in prompt and ENGLISH in prompt
+    record = load_verified_translations(snap, path)[news.id]
+    assert VIETNAMESE == record.text and ENGLISH == record.original_text
     assert result["pending_review"] == [news.id]
     client.translate.assert_not_called()
     result["review_only"] = True
     path.write_text(json.dumps(result), encoding="utf-8")
     with pytest.raises(ValueError, match="Historical"):
-        make_prompt(snap, path)
+        load_verified_translations(snap, path)
 
 
 def test_translation_only_pipeline_does_not_call_editor_renderer_or_email(tmp_path, monkeypatch):
@@ -372,10 +474,11 @@ def test_unapproved_translation_blocks_publication(tmp_path, monkeypatch):
     snap.purpose = "live"
     snapshot_path = tmp_path / "snapshot.json"
     snapshot_path.write_text(snap.model_dump_json(), encoding="utf-8")
-    from bttn.models import ReportContent
+    from bttn.models import ReportContent, SentenceReference
     content = ReportContent.model_validate_json((fixtures / "content.json").read_text(encoding="utf-8"))
+    content.highlights[2].sentence_refs = [SentenceReference(paragraph=0, source_id="news_a", quote="Đoạn dịch cần review.")]
     monkeypatch.setenv("NVIDIA_API_KEY", "test-only")
-    monkeypatch.setattr(translation_service, "translate_snapshot", Mock(return_value={"status": "checked", "pending_review": ["news"]}))
+    monkeypatch.setattr(translation_service, "translate_snapshot", Mock(return_value={"status": "checked", "pending_review": ["news_a"]}))
     monkeypatch.setattr(analysis, "generate", Mock(return_value=content))
     monkeypatch.setattr(rendering, "render", Mock())
 

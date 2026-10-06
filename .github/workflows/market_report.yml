@@ -60,13 +60,8 @@ jobs:
           restore-keys: bttn-ledger-
       - name: Collect, validate, render and publish
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           TRADINGECONOMICS_API_KEY: ${{ secrets.TRADINGECONOMICS_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPEN_ROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY || secrets.OPENROUTER_TOKEN || secrets.OPEN_ROUTER_KEY || secrets.OPENROUTER_TOKEN }}
-          OPEN_ROUTER_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY || secrets.OPENROUTER_API_KEY || secrets.Open_Router_API_Key || secrets.OPENROUTER_KEY || secrets.OPENROUTER_TOKEN }}
-          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'inclusionai/ling-3.0-flash-fin' }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn' }}

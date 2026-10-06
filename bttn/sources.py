@@ -9,7 +9,6 @@ from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import quote, quote_plus, urljoin, urlparse
-from zoneinfo import ZoneInfo
 
 import feedparser
 from bs4 import BeautifulSoup
@@ -365,16 +364,7 @@ def collect_vietnambiz_coffee(http, snapshot):
 
         detail_resp = http.get(first_article_url)
         detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
-        meta = detail_soup.find("meta", property="article:published_time")
-        if meta and meta.get("content"):
-            try:
-                published_at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
-                if published_at.tzinfo is None:
-                    published_at = published_at.replace(tzinfo=snapshot.as_of.tzinfo)
-            except Exception:
-                published_at = snapshot.as_of
-        else:
-            published_at = snapshot.as_of
+        published_at = article_time(detail_soup)
 
         if published_at > snapshot.as_of:
             return
@@ -393,15 +383,19 @@ def collect_vietnambiz_coffee(http, snapshot):
             m = re.search(r"(Cập nhật giá cà phê thế giới|Trên sàn giao dịch London|thị trường cà phê thế giới)", full_body, re.I)
             clean_text = full_body[m.start():] if m else full_body
         else:
-            clean_text = unicodedata.normalize("NFC", detail_soup.get_text(" ", strip=True))
+            raise ValueError("COFFEE_ARTICLE_BODY_MISSING")
+
+        title = detail_soup.find("h1")
+        article_text = (title.get_text(" ", strip=True) if title else "Giá cà phê thế giới") + "\n\n" + clean_text
 
         snapshot.sources[sid] = Source(
             id=sid,
             url=first_article_url,
             published_at=published_at,
             retrieved_at=datetime.now(timezone.utc),
-            text=f"[VIETNAMBIZ CẬP NHẬT GIÁ CÀ PHÊ THẾ GIỚI]\n{clean_text[:18000]}",
-            kind="news",
+            text=article_text,
+            sha256=hashlib.sha256(article_text.encode()).hexdigest(),
+            kind="news", text_scope="article",
         )
 
         for key, info in rates.items():
@@ -426,12 +420,6 @@ KEYWORDS_MACRO = [
     "giải ngân", "đầu tư công", "tiêu dùng", "lạm phát", "gdp", "giá xăng dầu", "xăng dầu",
 ]
 
-FALLBACK_MACRO_NEWS = [
-    "Kim ngạch xuất khẩu hàng hóa của Hà Nội 9 tháng năm 2026 ước đạt 16,86 tỷ USD, tăng 9,3% YoY; khu vực có vốn đầu tư nước ngoài tăng 17,9%.",
-    "Theo Sở Tài chính TP. Đà Nẵng, về giải ngân vốn kế hoạch năm 2026, giá trị giải ngân kế hoạch vốn theo dự toán giao năm 2026 lũy kế tính đến ngày 30/9 là hơn 13.265 tỷ đồng, bằng 77,16% kế hoạch vốn được Thủ tướng Chính phủ giao.",
-]
-
-
 def score_macro_text(title: str, desc: str = "") -> int:
     full_text = (title + " " + desc).lower()
     score = 0
@@ -443,118 +431,72 @@ def score_macro_text(title: str, desc: str = "") -> int:
     return score
 
 
+def article_time(soup):
+    """Require source publication metadata; collection time is not publication."""
+    meta = soup.select_one('meta[property="article:published_time"], meta[itemprop="datePublished"], time[datetime]')
+    if meta is None:
+        raise ValueError("ARTICLE_PUBLICATION_TIME_MISSING")
+    value = meta.get("content") or meta.get("datetime")
+    at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if at.tzinfo is None:
+        raise ValueError("ARTICLE_PUBLICATION_TIMEZONE_MISSING")
+    return at
+
+
 def collect_vietnam_macro_news(http, snapshot):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    articles = []
-
-    # 1. TinNhanhChungKhoan
-    try:
-        r = http.get("https://www.tinnhanhchungkhoan.vn/vi-mo/", headers=headers)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for a in soup.select("article, .story, .item-news"):
-            title_tag = a.select_one("h3 a, h2 a, .story__title a")
-            desc_tag = a.select_one(".story__summary, .s-content, p")
-            if title_tag:
-                title = title_tag.get_text(strip=True)
-                desc = desc_tag.get_text(strip=True) if desc_tag else ""
-                link = title_tag.get("href", "")
-                if link and not link.startswith("http"):
-                    link = "https://www.tinnhanhchungkhoan.vn" + link
-                score = score_macro_text(title, desc)
-                if score > 0:
-                    articles.append({"title": title, "desc": desc, "link": link, "score": score, "source": "TinNhanhChungKhoan"})
-    except Exception as exc:
-        LOG.debug("TNCK crawl failed: %s", exc)
-
-    # 2. VnEconomy
-    try:
-        r = http.get("https://vneconomy.vn/tieu-diem.htm", headers=headers)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select("article, .story"):
-            title_tag = item.select_one("h3 a, h2 a, .story__title a")
-            desc_tag = item.select_one(".story__summary, p")
-            if title_tag:
-                title = title_tag.get_text(strip=True)
-                desc = desc_tag.get_text(strip=True) if desc_tag else ""
-                link = title_tag.get("href", "")
-                if link and not link.startswith("http"):
-                    link = "https://vneconomy.vn" + link
-                score = score_macro_text(title, desc)
-                if score > 0:
-                    articles.append({"title": title, "desc": desc, "link": link, "score": score, "source": "VnEconomy"})
-    except Exception as exc:
-        LOG.debug("VnEconomy crawl failed: %s", exc)
-
-    # 3. BaoDauTu
-    try:
-        r = http.get("https://baodautu.vn/kinh-te-vi-mo-d2/", headers=headers)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for item in soup.select(".item-news, article, .story"):
-            title_tag = item.select_one("h3 a, h2 a, a.title")
-            desc_tag = item.select_one("p, .s-content")
-            if title_tag:
-                title = title_tag.get_text(strip=True)
-                desc = desc_tag.get_text(strip=True) if desc_tag else ""
-                link = title_tag.get("href", "")
-                if link and not link.startswith("http"):
-                    link = "https://baodautu.vn" + link
-                score = score_macro_text(title, desc)
-                if score > 0:
-                    articles.append({"title": title, "desc": desc, "link": link, "score": score, "source": "BaoDauTu"})
-    except Exception as exc:
-        LOG.debug("BaoDauTu crawl failed: %s", exc)
-
-    articles.sort(key=lambda x: x["score"], reverse=True)
-    selected = []
-    seen_titles = set()
-    for art in articles:
-        norm_title = re.sub(r"\W+", "", art["title"].lower())
-        if norm_title not in seen_titles:
-            seen_titles.add(norm_title)
-            selected.append(art)
-        if len(selected) >= 2:
-            break
-
-    macro_items = []
-    for art in selected:
-        content_text = art["title"]
-        if art.get("desc") and 20 < len(art["desc"]) < 200:
-            content_text = f"{art['title']}: {art['desc']}"
-        elif art.get("desc") and len(art["desc"]) >= 200:
-            content_text = art["title"]
-        if not content_text.endswith("."):
-            content_text += "."
-        macro_items.append(content_text)
-
-    while len(macro_items) < 2:
-        macro_items.append(FALLBACK_MACRO_NEWS[len(macro_items)])
-
-    snapshot.sources["macro_news_1"] = Source(
-        id="macro_news_1",
-        url=selected[0]["link"] if selected else "https://tinnhanhchungkhoan.vn",
-        published_at=snapshot.as_of,
-        retrieved_at=datetime.now(timezone.utc),
-        text=macro_items[0],
-        kind="news",
-    )
-    snapshot.sources["macro_news_2"] = Source(
-        id="macro_news_2",
-        url=selected[1]["link"] if len(selected) > 1 else "https://tinnhanhchungkhoan.vn",
-        published_at=snapshot.as_of,
-        retrieved_at=datetime.now(timezone.utc),
-        text=macro_items[1],
-        kind="news",
-    )
-    LOG.info("Collected Vietnam macro news: %s", macro_items)
+    listings = [
+        "https://www.tinnhanhchungkhoan.vn/vi-mo/",
+        "https://vneconomy.vn/tieu-diem.htm",
+        "https://baodautu.vn/kinh-te-vi-mo-d2/",
+    ]
+    candidates = {}
+    for url in listings:
+        try:
+            soup = BeautifulSoup(http.get(url).text, "html.parser")
+            for item in soup.select("article, .story, .item-news"):
+                title = item.select_one("h3 a, h2 a, .story__title a, a.title")
+                if not title or not title.get("href"):
+                    continue
+                link = urljoin(url, title["href"])
+                if urlparse(link).hostname != urlparse(url).hostname:
+                    continue
+                description = item.select_one(".story__summary, .s-content, p")
+                score = score_macro_text(title.get_text(" ", strip=True), description.get_text(" ", strip=True) if description else "")
+                if score:
+                    candidates[link] = (score, title.get_text(" ", strip=True))
+        except Exception as exc:
+            LOG.debug("Macro listing failed: %s", type(exc).__name__)
+    count = 0
+    for url, (_, title) in sorted(candidates.items(), key=lambda item: (-item[1][0], item[0]))[:9]:
+        try:
+            detail = BeautifulSoup(http.get(url).text, "html.parser")
+            at = article_time(detail)
+            if not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=36):
+                continue
+            body = detail.select_one("#abody, .cms-body, .detail-content, .article__body, .detail__content, .content-detail")
+            if body is None:
+                continue
+            text = body.get_text(" ", strip=True)
+            if len(text.split()) < 35:
+                continue
+            full = title + "\n\n" + text
+            sid = "macro_news_" + hashlib.sha256(url.encode()).hexdigest()[:12]
+            snapshot.sources[sid] = Source(id=sid, url=url, published_at=at, retrieved_at=datetime.now(timezone.utc),
+                                           text=full, sha256=hashlib.sha256(full.encode()).hexdigest(), kind="news", text_scope="article")
+            count += 1
+            if count >= 3:
+                break
+        except Exception as exc:
+            LOG.debug("Macro article failed: %s", type(exc).__name__)
+    if count < 2:
+        snapshot.add_issue("MACRO_NEWS_MISSING", "Không đủ bài vĩ mô có toàn văn và ngày xuất bản xác minh; không dùng tin mẫu.")
 
 
 def collect_sjc_gold(http, snapshot):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-    buy_str, sell_str = "139,2", "142,2"
+    buy_str, sell_str = None, None
     url = "https://webgia.com/gia-vang/sjc/"
     try:
         r = http.get(url, headers=headers)
@@ -573,6 +515,10 @@ def collect_sjc_gold(http, snapshot):
     except Exception as exc:
         LOG.debug("SJC gold fetch failed: %s", exc)
 
+    if buy_str is None or sell_str is None:
+        snapshot.add_issue("SJC_GOLD_MISSING", "Không đọc được giá SJC; không dùng báo giá mẫu.")
+        return
+
     snapshot.sources["sjc_gold"] = Source(
         id="sjc_gold",
         url=url,
@@ -584,71 +530,31 @@ def collect_sjc_gold(http, snapshot):
 
 
 def collect_vira_daily(http, snapshot):
-    """Fetches the latest VIRA daily report article and extracts interbank & OMO sections."""
+    """Archive actual VIRA prose only; rates still come from Market Watch."""
     list_url = "https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    composed_text = ""
-    detail_url = list_url
     try:
-        r = http.get(list_url, headers=headers)
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(http.get(list_url).text, "html.parser")
         links = soup.find_all("a", href=re.compile(r"/tin/Ban-tin-Kinh-te-Tai-chinh-ngay/Ban-tin.*\.html"))
-        if links:
-            first_href = links[0]["href"]
-            detail_url = f"https://vira.org.vn{first_href}" if first_href.startswith("/") else first_href
-            detail_resp = http.get(detail_url, headers=headers)
-            detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
-            full_text = detail_soup.get_text()
-
-            mm_match = re.search(r"Thị trường tiền tệ LNH:(.*?)(?=Nghiệp vụ thị trường mở|Thị trường chứng khoán|$)", full_text, re.DOTALL)
-            money_market = mm_match.group(1).strip() if mm_match else ""
-            omo_match = re.search(r"Nghiệp vụ thị trường mở:(.*?)(?=Thị trường chứng khoán|Tin quốc tế|$)", full_text, re.DOTALL)
-            omo = omo_match.group(1).strip() if omo_match else ""
-
-            money_market = re.sub(r"\s+", " ", money_market)
-            omo = re.sub(r"\s+", " ", omo)
-
-            omo_sentences = []
-            if omo:
-                for s in omo.split("."):
-                    s_clean = s.strip()
-                    if s_clean:
-                        omo_sentences.append(s_clean + ".")
-            omo_text = " ".join(omo_sentences)
-
-            as_of_vn = snapshot.as_of.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
-            prev_day = previous_weekday(as_of_vn.date())
-            prev_day_str = prev_day.strftime("%d.%m.%Y")
-
-            composed_text = (
-                f"Phiên ngày {prev_day_str}, thị trường interbank giảm về vùng 1,0%-4,5% tại các kỳ hạn ngắn ON-2W. "
-                f"{omo_text} Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm đi ngang, quanh mức 4,2%-4,75%, thanh khoản vừa.\n"
-                f"Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh 2,5%, lãi suất trái phiếu đi ngang."
-            )
+        for link in links[:5]:
+            url = urljoin(list_url, link["href"])
+            if urlparse(url).hostname != "vira.org.vn":
+                continue
+            detail = BeautifulSoup(http.get(url).text, "html.parser")
+            at = article_time(detail)
+            if not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=36):
+                continue
+            text = detail.get_text(" ", strip=True)
+            match = re.search(r"Thị trường tiền tệ LNH:(.*?)(?=Thị trường chứng khoán|Tin quốc tế|$)", text, re.DOTALL)
+            if not match or len(match[1].split()) < 35:
+                continue
+            body = match[1].strip()
+            snapshot.sources["vira_daily"] = Source(id="vira_daily", url=url, published_at=at,
+                retrieved_at=datetime.now(timezone.utc), text=body, sha256=hashlib.sha256(body.encode()).hexdigest(),
+                kind="news", text_scope="excerpt")
+            return
     except Exception as exc:
-        LOG.warning("VIRA daily scrape failed: %s", exc)
-
-    if not composed_text:
-        as_of_vn = snapshot.as_of.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
-        prev_day_str = previous_weekday(as_of_vn.date()).strftime("%d.%m.%Y")
-        composed_text = (
-            f"Phiên ngày {prev_day_str}, thị trường interbank giảm về vùng 1,0%-4,5% tại các kỳ hạn ngắn ON-2W. "
-            f"Trong phiên hôm qua, không có khối lượng trúng thầu ở cả 4 kỳ hạn. Có 18.377,37 tỷ đồng đáo hạn. "
-            f"Như vậy, NHNN hút ròng 18.377,37 tỷ đồng từ thị trường qua nghiệp vụ thị trường mở phiên hôm qua. "
-            f"Có 114.964,56 tỷ đồng lưu hành trên kênh cầm cố. Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm đi ngang, quanh mức 4,2%-4,75%, thanh khoản vừa.\n"
-            f"Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh 2,5%, lãi suất trái phiếu đi ngang."
-        )
-
-    snapshot.sources["vira_daily"] = Source(
-        id="vira_daily",
-        url=detail_url,
-        published_at=snapshot.as_of,
-        retrieved_at=datetime.now(timezone.utc),
-        text=composed_text,
-        kind="news",
-    )
+        LOG.debug("VIRA daily failed: %s", type(exc).__name__)
+    snapshot.add_issue("VIRA_DAILY_MISSING", "Không đọc được đoạn VIRA có ngày xuất bản xác minh; không tạo lãi suất/OMO mẫu.")
 
 
 def collect_snapshot(http, as_of):

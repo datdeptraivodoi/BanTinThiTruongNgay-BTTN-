@@ -17,6 +17,8 @@ from .models import Source
 
 COUNTRIES = {"euro area": "EUR", "united states": "USD", "japan": "JPY", "china": "China"}
 PATHS = {"euro-area": "EUR", "united-states": "USD", "japan": "JPY", "china": "China"}
+NEWS_PAGES = {topic: f"https://tradingeconomics.com/{path}/news" for path, topic in PATHS.items()}
+MAX_ARTICLES_PER_COUNTRY = 3
 
 
 def topic_for(source):
@@ -56,9 +58,12 @@ def parse_news(records, as_of, *, allow_stale=False):
                 raise ValueError("TE_NEWS_STALE")
             identity = str(item.get("id") or url)
             sid = "news_te_" + topic + "_" + hashlib.sha256(identity.encode()).hexdigest()[:12]
+            scope = item.get("text_scope", "article")
+            if scope not in ("article", "excerpt"):
+                raise ValueError("TE_NEWS_BODY_MISSING")
             source = Source(id=sid, url=url, published_at=at, retrieved_at=datetime.now(timezone.utc),
                             text=title + "\n\n" + body, sha256=hashlib.sha256((title + "\n\n" + body).encode()).hexdigest(),
-                            kind="news")
+                            kind="news", text_scope=scope)
             if topic_for(source) != topic:
                 raise ValueError("TE_NEWS_COUNTRY_URL_MISMATCH")
             accepted[sid] = source
@@ -67,13 +72,19 @@ def parse_news(records, as_of, *, allow_stale=False):
         except ValueError as exc:
             code = str(exc) if str(exc).startswith("TE_NEWS_") else "TE_NEWS_DATE"
             rejected.append({"code": code})
-    # Bound model calls: newest eligible article in each country, with stable tie break.
+    # A few distinct articles provide currency and macro context. Never translate
+    # an unbounded country archive; keep the newest eligible bodies first.
     selected = {}
     for topic in COUNTRIES.values():
         matching = [s for s in accepted.values() if topic_for(s) == topic]
-        if matching:
-            latest = max(matching, key=lambda s: (s.published_at, s.id))
-            selected[latest.id] = latest
+        seen = set()
+        for source in sorted(matching, key=lambda s: (s.published_at, s.id), reverse=True):
+            if source.sha256 in seen:
+                continue
+            seen.add(source.sha256)
+            selected[source.id] = source
+            if len(seen) >= MAX_ARTICLES_PER_COUNTRY:
+                break
     return selected, rejected
 
 

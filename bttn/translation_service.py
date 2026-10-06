@@ -82,6 +82,28 @@ def cache_key(source):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def load_verified_translations(snapshot, path, *, allow_review_only=False):
+    if path is None or not Path(path).is_file():
+        return {}
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if payload.get("review_only") and not allow_review_only:
+        raise ValueError("Historical translation tests cannot be used for report generation")
+    records = {}
+    for sid, item in payload.get("articles", {}).items():
+        source = snapshot.sources.get(sid)
+        record = TranslationRecord.model_validate(item["record"])
+        if (source is None or item.get("cache_key") != cache_key(source)
+                or record.original_text != source.text or record.url != source.url
+                or record.version != RULES_VERSION or record.requested_model != MODEL
+                or record.published_at != source.published_at
+                or " ".join(record.original_segments).split() != source.text.split()
+                or record.source_sha256 != hashlib.sha256(source.text.encode()).hexdigest()):
+            raise ValueError("Translation does not match report source")
+        check_segments(record.original_segments, record.translated_segments)
+        records[sid] = record
+    return records
+
+
 def atomic_write(path, record):
     temporary = path.with_name(path.name + "." + uuid4().hex + ".tmp")
     try:

@@ -8,7 +8,7 @@ import requests
 
 MODEL = "nvidia/riva-translate-4b-instruct-v2"
 ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions"
-RULES_VERSION = "riva-en-vi-finance-v6"
+RULES_VERSION = "riva-en-vi-finance-v10"
 TERMS = {
     "federal reserve": "Cục Dự trữ Liên bang Mỹ",
     "hawkish": "cứng rắn", "dovish": "mềm mỏng",
@@ -18,6 +18,12 @@ TERMS = {
     "non-farm payrolls": "Bảng lương phi nông nghiệp",
     "non-farm payroll": "Bảng lương phi nông nghiệp",
     "core inflation": "lạm phát cơ bản", "headline inflation": "lạm phát danh nghĩa",
+    "current account": "cán cân vãng lai",
+    "consumer confidence": "niềm tin người tiêu dùng",
+    "ECB Chief Economist": "Kinh tế trưởng ECB",
+    "general elections": "tổng tuyển cử",
+    "further tightening": "thắt chặt",
+    "expansionary fiscal policies": "chính sách tài khóa mở rộng",
 }
 NUMBERS = re.compile(r"\d+(?:[.,:/-]\d+)*")
 VIETNAMESE = re.compile(r"[ăâđêôơưáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]", re.I)
@@ -25,6 +31,8 @@ TOKEN = re.compile(r"BTTNPROTECT[A-Z]+END")
 PROTECTED = re.compile(r"<dnt>.*?</dnt>", re.I | re.S)
 MONTHS = {"January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
           "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12}
+WEEKDAYS = {"monday": "thứ Hai", "tuesday": "thứ Ba", "wednesday": "thứ Tư",
+            "thursday": "thứ Năm", "friday": "thứ Sáu", "saturday": "thứ Bảy", "sunday": "Chủ Nhật"}
 GLOSSARY_EXAMPLES = [
     ("The Federal Reserve maintained a hawkish stance, while European officials took a dovish tone.",
      "Cục Dự trữ Liên bang Mỹ duy trì lập trường cứng rắn, trong khi các quan chức châu Âu có giọng điệu mềm mỏng."),
@@ -40,6 +48,14 @@ GLOSSARY_EXAMPLES = [
 TERM_ALIASES = {
     "diều hâu": "cứng rắn", "bồ câu": "mềm mỏng", "tâm lý người tiêu dùng": "tâm lý tiêu dùng",
     "lạm phát lõi": "lạm phát cơ bản", "lạm phát tổng thể": "lạm phát danh nghĩa",
+    "Ngân hàng Trung ương Hoa Kỳ": "Cục Dự trữ Liên bang Mỹ",
+    "Ngân hàng Trung ương Mỹ": "Cục Dự trữ Liên bang Mỹ",
+    "Cục Dự trữ Liên bang Hoa Kỳ": "Cục Dự trữ Liên bang Mỹ",
+    "tài khoản kinh tế": "cán cân vãng lai", "tài khoản vãng lai": "cán cân vãng lai",
+    "chỉ số tín nhiệm người tiêu dùng": "niềm tin người tiêu dùng",
+    "Chủ tịch Viện Kinh tế ECB": "Kinh tế trưởng ECB",
+    "bầu cử tổng thống": "tổng tuyển cử",
+    "chính sách tài chính mở rộng": "chính sách tài khóa mở rộng",
 }
 
 
@@ -60,6 +76,8 @@ def clean_post_translation(text):
 def normalize_terms(original, translated):
     required = {vi for en, vi in TERMS.items() if re.search(r"\b" + re.escape(en) + r"\b", original, re.I)}
     for alias, replacement in TERM_ALIASES.items():
+        if alias == "bầu cử tổng thống" and "presidential" in original.lower():
+            continue  # A mixed election article needs semantic review, not a global replacement.
         if replacement in required:
             translated = re.sub(re.escape(alias), replacement, translated, flags=re.I)
     translated = re.sub(r"\byen\b", "yên", translated, flags=re.I)
@@ -71,6 +89,13 @@ def normalize_terms(original, translated):
     if "fed funds rate" in original.lower():
         translated = translated.replace("lãi suất cho vay của Fed", "lãi suất quỹ liên bang")
         translated = translated.replace("lãi suất tiền gửi của Fed", "lãi suất quỹ liên bang")
+        translated = translated.replace("lãi suất của Quỹ Tiền tệ Liên bang (Fed)", "lãi suất quỹ liên bang")
+    if "further tightening" in original.lower() and not re.search(r"monetary easing|rate cuts|loosening", original, re.I):
+        translated = translated.replace("nới lỏng thêm", "thắt chặt thêm")
+    if "offshore yuan" in original.lower():
+        translated = translated.replace("nhân dân tệ ngoài khơi", "nhân dân tệ ngoại biên")
+    if "reassure financial markets" in original.lower():
+        translated = translated.replace("an ủi các thị trường tài chính", "trấn an thị trường tài chính")
     return translated
 
 
@@ -92,6 +117,11 @@ def normalize_fx_quote(original, translated):
     if match and prefix and same_numbers([match.group(1)], [prefix.group(1)]):
         return ("USD-JPY vượt mức " + prefix.group(1)
                 + " cho thấy JPY đang suy yếu" + translated[prefix.end():])
+    # A source-priced yuan quote must not be labelled as Vietnamese dong.
+    yuan = re.match(r"The offshore yuan (?:traded flat around|strengthened to|weakened to) (\d+(?:\.\d+)?) per dollar\b", original, re.I)
+    quote = re.match(r"((?:Đồng )?nhân dân tệ (?:ngoại biên|ngoài khơi)[^\d]{0,70})(\d+(?:[.,]\d+)?) đồng/USD\b", translated, re.I)
+    if yuan and quote and same_numbers([yuan[1]], [quote[2]]):
+        return quote[1] + quote[2] + " nhân dân tệ đổi một USD" + translated[quote.end():]
     return translated
 
 
@@ -134,30 +164,44 @@ def protect(text):
     return PROTECTED.sub(replace, text), protected
 
 
+def protect_financial_terms(text, protected):
+    """Known mistranslated nouns get checked markers, not another model call.
+
+    DNT spans have already been masked. Every marker must occur exactly once
+    before restore, so dropped or duplicated terms still reject the result.
+    """
+    terms = {"current account": "cán cân vãng lai", "consumer confidence": "niềm tin người tiêu dùng", **WEEKDAYS}
+
+    def replace(match):
+        index, letters = len(protected), ""
+        while True:
+            letters = chr(65 + index % 26) + letters
+            index = index // 26 - 1
+            if index < 0:
+                break
+        token = "BTTNPROTECT" + letters + "END"
+        protected[token] = terms[match[0].lower()]
+        return token
+
+    return re.sub(r"\b(?:" + "|".join(map(re.escape, terms)) + r")\b", replace, text, flags=re.I)
+
+
 def restore(text, protected):
     if Counter(TOKEN.findall(text)) != Counter(list(protected)):
         raise TranslationError("TRANSLATION_PROTECTED_SPANS")
+    for token, value in protected.items():
+        if value in WEEKDAYS.values():
+            text = re.sub(r"\btrên\s+(?=" + re.escape(token) + r")", "vào ", text, flags=re.I)
     return TOKEN.sub(lambda m: protected[m.group()], clean_post_translation(text))
 
 
 def check_translation(original, translated):
     if not isinstance(translated, str) or not translated.strip():
         raise TranslationError("TRANSLATION_EMPTY")
-    source = original
-    target_numbers_text = translated
-    # Translating an English date such as May 2025 to tháng 5 năm 2025 adds a
-    # legitimate month number. Only explicit month+year expressions are allowed.
-    for month, number in MONTHS.items():
-        source = re.sub(r"\b" + month + r"\s+(?=\d{4}\b)", str(number) + " ", source)
-        vietnamese_months = ["Một", "Hai", "Ba", "Tư", "Năm", "Sáu", "Bảy", "Tám", "Chín", "Mười", "Mười Một", "Mười Hai"]
-        if re.search(r"\b" + month + r"\s+\d{4}\b", original):
-            target_numbers_text = re.sub(
-                r"tháng\s+" + vietnamese_months[number - 1] + r"\s+(?=(?:năm\s+)?\d{4}\b)",
-                "tháng " + str(number) + " ", target_numbers_text, flags=re.I,
-            )
-            for year in re.findall(r"\b" + month + r"\s+(\d{4})\b", original):
-                target_numbers_text = re.sub(r"\b" + str(number) + "/" + year + r"\b",
-                                             str(number) + " " + year, target_numbers_text)
+    if len(PROTECTED.sub("", original).split()) > 2 and not is_vietnamese(PROTECTED.sub("", translated)):
+        raise TranslationError("TRANSLATION_LANGUAGE")
+    source, target_numbers_text = normalize_calendar_numbers(PROTECTED.sub("", original), PROTECTED.sub("", translated))
+    source, target_numbers_text = normalize_counted_quantities(source, target_numbers_text)
     expected = numbers(source)
     actual = numbers(target_numbers_text)
     if not same_numbers(expected, actual):
@@ -191,12 +235,100 @@ def check_translation(original, translated):
     for english, vietnamese in TERMS.items():
         if re.search(r"\b" + re.escape(english) + r"\b", original_prose, re.I) and vietnamese.lower() not in translated_prose.lower():
             raise TranslationError("TRANSLATION_TERMINOLOGY")
-    if len(original.split()) > 8 and not is_vietnamese(translated):
-        raise TranslationError("TRANSLATION_LANGUAGE")
     if TOKEN.search(translated):
         raise TranslationError("TRANSLATION_PROTECTED_SPANS")
     if len(original.split()) > 20 and len(translated.split()) < len(original.split()) * .45:
         raise TranslationError("TRANSLATION_TOO_SHORT")
+
+
+def normalize_calendar_numbers(original, translated):
+    """Compare month identities separately from prices, years and day numbers.
+
+    December -> tháng 12 is not an added statistic. A different/extra month is
+    still rejected. This also handles November 29 -> ngày 29 tháng 11 and
+    May 2025 -> tháng 5/2025 without dropping the day or year checks.
+    """
+    # Order matters: matching totals alone could accept Tuesday/Monday swapped
+    # between two sentences. Never infer a weekday from the article's timestamp.
+    source_days = re.findall(r"\b(?:" + "|".join(WEEKDAYS) + r")\b", original, re.I)
+    target_days = []
+    days = {"hai": "monday", "ba": "tuesday", "tư": "wednesday", "bốn": "wednesday",
+            "năm": "thursday", "sáu": "friday", "bảy": "saturday"}
+    digits = dict(zip("234567", list(WEEKDAYS)[:6]))
+
+    def weekday(match):
+        value = match[1]
+        target_days.append((digits.get(value) or days[value.casefold()]) if value else "sunday")
+        return " "
+
+    translated = re.sub(r"\bthứ\s+(Hai|Ba|Tư|Bốn|Năm|Sáu|Bảy|[2-7])\b|\bChủ\s+Nhật\b", weekday, translated, flags=re.I)
+    if [d.casefold() for d in source_days] != target_days:
+        raise TranslationError("TRANSLATION_WEEKDAYS")
+    original = re.sub(r"\b(?:" + "|".join(WEEKDAYS) + r")\b", " ", original, flags=re.I)
+    english_months = []
+    vietnamese_months = []
+    words = {word.casefold(): i for i, word in enumerate(
+        ["một", "hai", "ba", "tư", "năm", "sáu", "bảy", "tám", "chín", "mười", "mười một", "mười hai"], 1)}
+    pattern = r"\btháng\s+(mười\s+hai|mười\s+một|mười|một|hai|ba|tư|năm|sáu|bảy|tám|chín|1[0-2]|[1-9])(?!\d)\b"
+    target = re.sub(r"\b(tháng\s+\d{1,2})/(\d{4})\b", r"\1 năm \2", translated, flags=re.I)
+
+    def english(match):
+        english_months.append(MONTHS[match[0]])
+        return " "
+
+    def vietnamese(match):
+        value = " ".join(match[1].casefold().split())
+        vietnamese_months.append(int(value) if value.isdigit() else words[value])
+        return " "
+
+    source = re.sub(r"\b(?:" + "|".join(MONTHS) + r")\b", english, original)
+    target = re.sub(pattern, vietnamese, target, flags=re.I)
+    if Counter(english_months) != Counter(vietnamese_months):
+        raise TranslationError("TRANSLATION_MONTHS")
+    source_quarters, target_quarters = [], []
+    ordinals = {"first": 1, "second": 2, "third": 3, "fourth": 4}
+    roman = {"i": 1, "ii": 2, "iii": 3, "iv": 4}
+
+    def source_quarter(match):
+        value = match[1] or ordinals[match[2].lower()]
+        source_quarters.append(int(value))
+        return " "
+
+    def target_quarter(match):
+        value = match[1].lower()
+        target_quarters.append(int(value) if value.isdigit() else roman.get(value) or words[value])
+        return " "
+
+    source = re.sub(r"\bQ([1-4])\b|\b(first|second|third|fourth)[ -]+quarter\b", source_quarter, source, flags=re.I)
+    target = re.sub(r"\bquý\s+(IV|III|II|I|[1-4]|một|hai|ba|tư)\b", target_quarter, target, flags=re.I)
+    if Counter(source_quarters) != Counter(target_quarters):
+        raise TranslationError("TRANSLATION_QUARTERS")
+    return source, target
+
+
+def normalize_counted_quantities(original, translated):
+    """Allow written/Arabic counts only within matching duration or rate-move units."""
+    en = dict(zip("one two three four five six seven eight nine ten eleven twelve".split(), range(1, 13)))
+    vi = dict(zip("một hai ba bốn năm sáu bảy tám chín mười".split(), range(1, 11)))
+    source_counts, target_counts = [], []
+
+    def source_count(match):
+        value, unit = match[1].lower(), match[2].lower()
+        kind = "months" if unit.startswith("month") else "weeks" if unit.startswith("week") else "policy_moves"
+        source_counts.append((kind, int(value) if value.isdigit() else en[value]))
+        return " "
+
+    def target_count(match):
+        value, unit = match[1].lower(), match[2].lower()
+        kind = "months" if unit == "tháng" else "weeks" if unit == "tuần" else "policy_moves"
+        target_counts.append((kind, int(value) if value.isdigit() else vi[value]))
+        return " "
+
+    source = re.sub(r"\b(" + "|".join(en) + r"|\d+)[ -]+(?:(?:additional|further)[ -]+)?(months?|weeks?|moves|(?:rate )?hikes)\b", source_count, original, flags=re.I)
+    target = re.sub(r"\b(" + "|".join(vi) + r"|\d+)\s+(tháng|tuần|lần tăng lãi suất|lần tăng|đợt tăng lãi suất|đợt tăng|động thái)\b", target_count, translated, flags=re.I)
+    if Counter(source_counts) != Counter(target_counts):
+        raise TranslationError("TRANSLATION_QUANTITIES")
+    return source, target
 
 
 def numeric_value(token, vietnamese=False):
@@ -251,10 +383,16 @@ class NvidiaTranslator:
             self.attempts.append({"model": self.model, "status": "python_title_rule", "elapsed_seconds": 0})
             return fixed
         masked, protected = protect(text)
+        masked = protect_financial_terms(masked, protected)
         # Riva's chat template expects the language pair as system content.
         messages = [{"role": "system", "content": "en-vi"}]
         for english, vietnamese in GLOSSARY_EXAMPLES:
-            messages.extend([{"role": "user", "content": english}, {"role": "assistant", "content": vietnamese}])
+            # Avoid unrelated multi-turn examples: real requests occasionally
+            # returned English paraphrases with the long generic example list.
+            relevant = any(re.search(r"\b" + re.escape(term) + r"\b", text, re.I)
+                           and re.search(r"\b" + re.escape(term) + r"\b", english, re.I) for term in TERMS)
+            if relevant:
+                messages.extend([{"role": "user", "content": english}, {"role": "assistant", "content": vietnamese}])
         if protected:
             messages.extend([
                 {"role": "user", "content": "The policy applies to BTTNPROTECTAEND."},
@@ -283,7 +421,7 @@ class NvidiaTranslator:
                     if not isinstance(raw, str):
                         raise TranslationError("TRANSLATION_EMPTY")
                     # Normalize prose while protected spans are still masked.
-                    normalized = normalize_terms(text, normalize_fx_quote(text, raw.strip()))
+                    normalized = normalize_fx_quote(text, normalize_terms(text, raw.strip()))
                     result = restore(normalized, protected)
                     check_translation(text, result)
                 except (KeyError, IndexError, TypeError, ValueError):
@@ -299,6 +437,7 @@ class NvidiaTranslator:
                     "status": "checked" if error is None else "failed",
                     "error": str(error) if error else None,
                     "python_postprocessed": bool(result is not None and result != raw.strip()),
+                    "prompt_variant": "direct" if len(messages) == 2 else "glossary_examples",
                 })
             if error is None:
                 return result
@@ -308,5 +447,9 @@ class NvidiaTranslator:
             retryable = retryable or (str(error).startswith("TRANSLATION_") and attempt == 0)
             if not retryable or attempt == 2:
                 raise error
+            if str(error).startswith("TRANSLATION_"):
+                # Retry a rejected translation with the vendor's minimal
+                # language-pair contract, never a new provider or repair text.
+                messages = [{"role": "system", "content": "en-vi"}, {"role": "user", "content": masked}]
             self.sleep(min(2 ** attempt, 4))
         raise TranslationError("NVIDIA_UNAVAILABLE")

@@ -20,6 +20,7 @@ class Source(StrictModel):
     text: str = ""
     sha256: str = ""
     kind: Literal["news", "market", "derived"] = "market"
+    text_scope: Literal["article", "excerpt", "headline", "unknown"] = "unknown"
 
 
 class Point(StrictModel):
@@ -62,9 +63,16 @@ class Snapshot(StrictModel):
         self.issues.append(Issue(code=code, message=message, severity=severity))
 
 
+class SentenceReference(StrictModel):
+    paragraph: int = Field(ge=0)
+    source_id: str
+    quote: str = Field(min_length=1)
+
+
 class Section(StrictModel):
     paragraphs: list[str] = Field(min_length=1, max_length=3)
     source_ids: list[str] = Field(min_length=1)
+    sentence_refs: list[SentenceReference] = Field(default_factory=list)
 
 
 class ReportContent(StrictModel):
@@ -112,7 +120,7 @@ def parse_as_of(value: str | None) -> datetime:
 
 
 def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> ReportContent:
-    """Creates a draft placeholder content when AI generation is incomplete or encounters service errors.
+    """Creates pending notices when translation or Python editing is incomplete.
     
     Preserves all verified market data, tables, and charts while clearly marking commentary as pending.
     """
@@ -175,11 +183,19 @@ def sanitize_content_for_draft_render(
     preventing renderer crashes while preserving all verified tables and charts in the draft document.
     """
     from .fx_editorial import fx_opening
-    from .validation import resolve
+    from .validation import count_words, highlight_limits, resolve, rules
 
     ref_src = ["vira"] if "vira" in snapshot.sources else (list(snapshot.sources.keys())[:1] if snapshot.sources else ["manual"])
     cloned = content.model_copy(deep=True)
-    issue_messages = [i.message for i in (content_issues or [])]
+    issue_messages = []
+    for issue in content_issues or []:
+        name = issue.message.split(":", 1)[0]
+        if issue.code == "WORD_COUNT":
+            section = content.highlights[int(name.split("_")[-1])] if name.startswith("highlight_") else getattr(content, name)
+            high = highlight_limits(int(name.split("_")[-1]))[1] if name.startswith("highlight_") else rules()["word_limits"][name][1]
+            if count_words(resolve(" ".join(section.paragraphs), snapshot, safe=True)) <= high:
+                continue  # Preserve verified underlength prose for draft review.
+        issue_messages.append(issue.message)
 
     def is_safe_text(t: str) -> bool:
         try:

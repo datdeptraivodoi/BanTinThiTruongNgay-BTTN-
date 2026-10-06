@@ -198,8 +198,18 @@ def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
     return result
 
 
-def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
+def validate_content(content: ReportContent, snapshot: Snapshot, *, translations_path=None) -> list[Issue]:
+    from .editorial import sentences
+    from .nvidia_translation import TranslationError
+    from .tradingeconomics_news import topic_for
+    from .translation_service import load_verified_translations
+
     result = []
+    try:
+        translations = load_verified_translations(snapshot, translations_path)
+    except (ValueError, KeyError, TranslationError):
+        result.append(Issue(severity="error", code="TRANSLATION_SOURCE", message="Bản dịch không khớp nguồn báo cáo"))
+        translations = {}
     sections = [(name, getattr(content, name)) for name in rules()["word_limits"]]
     sections += [(f"highlight_{i}", s) for i, s in enumerate(content.highlights)]
     for name, section in sections:
@@ -221,7 +231,32 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
         # snapshot; this also prevents literal unsupported prices/dates.
         # Index names (e.g. Nikkei 225, S&P 500) are recognized and excluded
         # so their digits are not falsely flagged as unbound market data.
-        without_tokens = TOKEN.sub("", raw)
+        # Literal news figures are allowed only inside an intact, cited source
+        # sentence (or a translation bound to that exact article). Never grant
+        # a blanket allowance for a number appearing somewhere in an article.
+        numeric_prose = list(section.paragraphs)
+        seen_refs = set()
+        for ref in section.sentence_refs:
+            source = snapshot.sources.get(ref.source_id)
+            record = translations.get(ref.source_id)
+            source_text = record.text if record else source.text if source else ""
+            identity = (ref.paragraph, ref.source_id, ref.quote)
+            paragraph_text = numeric_prose[ref.paragraph] if ref.paragraph < len(numeric_prose) else ""
+            prefix = "Về phía Châu Âu," if name == "eur_usd" and ref.paragraph == 1 else "Cập nhật giá cà phê thế giới," if name == "coffee" else ""
+            if prefix and paragraph_text.startswith(prefix):
+                paragraph_text = paragraph_text[len(prefix):].strip()
+            valid = (source is not None and source.kind == "news" and ref.source_id in section.source_ids
+                     and source.text_scope in ("article", "excerpt")
+                     and (topic_for(source) is None or record is not None)
+                     and ref.quote in sentences(source_text) and identity not in seen_refs
+                     and ref.paragraph < len(numeric_prose)
+                     and ref.quote in sentences(paragraph_text))
+            if not valid:
+                error("SENTENCE_SOURCE", "Câu trích dẫn bị sửa, cắt hoặc không khớp nguồn/bản dịch")
+                continue
+            seen_refs.add(identity)
+            numeric_prose[ref.paragraph] = numeric_prose[ref.paragraph].replace(ref.quote, "", 1)
+        without_tokens = TOKEN.sub("", " ".join(numeric_prose))
         without_dates = ALLOWED_DATE_FORMAT.sub("", without_tokens)
         without_indices = ALLOWED_INDEX_NAMES.sub("", without_dates)
         if re.search(r"\d", without_indices):
