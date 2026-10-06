@@ -1,0 +1,27 @@
+{
+  "purpose": "fixture",
+  "quotes": [
+    {
+      "quoted_at": "2026-09-23T11:55:00+07:00",
+      "source_url": "https://teams.microsoft.com/l/message/EXAMPLE-NOT-A-REAL-QUOTE/previous",
+      "room": "firm ALM",
+      "fx_bid": "25890",
+      "fx_ask": "26280"
+    },
+    {
+      "quoted_at": "2026-09-24T11:55:00+07:00",
+      "source_url": "https://teams.microsoft.com/l/message/EXAMPLE-NOT-A-REAL-QUOTE/current",
+      "room": "firm ALM",
+      "fx_bid": "25875",
+      "fx_ask": "26265",
+      "swaps": [
+        {"tenor": "ON", "bid": "-2.30", "ask": "-1.80"},
+        {"tenor": "1W", "bid": "-1.00", "ask": "-0.50"},
+        {"tenor": "2W", "bid": "-0.30", "ask": "0.20"},
+        {"tenor": "1M", "bid": "0.70", "ask": "1.20"},
+        {"tenor": "3M", "bid": "2.00", "ask": "2.50"},
+        {"tenor": "6M", "bid": "2.60", "ask": "3.10"}
+      ]
+    }
+  ]
+}

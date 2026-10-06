@@ -41,3 +41,4 @@ output/
 .pytest_cache/
 .ruff_cache/
 node_modules/
+trader_quotes.json

@@ -11,7 +11,7 @@ import requests
 
 from .models import ReportContent, Section, previous_weekday
 from .normalization import normalize_report_content
-from .validation import ROOT, rules, validate_content
+from .validation import ROOT, highlight_limits, rules, validate_content
 
 LOG = logging.getLogger("bttn.analysis")
 
@@ -45,7 +45,7 @@ def make_prompt(snapshot):
 
     limits_guidance = (
         "\n\nBẮT BUỘC TUÂN THỦ NGHIÊM NGẶT ĐỘ DÀI VÀ CẤU TRÚC (tính bằng số từ sau khi thay thế {{OBSERVATION_ID}}):\n"
-        f"- highlights: đúng 3 mục, mỗi mục từ 12 đến 45 từ.\n"
+        "- highlights: đúng 3 mục; mục thứ nhất và thứ hai 35–45 từ; mục thứ ba 12–45 từ.\n"
         f"- interbank: đúng 1 đoạn, từ {word_limits.get('interbank', [88, 95])[0]} đến {word_limits.get('interbank', [88, 95])[1]} từ.\n"
         f"- usd_vnd: đúng 1 đoạn, từ {word_limits.get('usd_vnd', [75, 80])[0]} đến {word_limits.get('usd_vnd', [75, 80])[1]} từ.\n"
         f"- eur_usd: đúng 2 đoạn, tổng từ {word_limits.get('eur_usd', [150, 200])[0]} đến {word_limits.get('eur_usd', [150, 200])[1]} từ. "
@@ -309,7 +309,7 @@ def repair_invalid_sections(content: ReportContent, issues: list, snapshot, call
             try:
                 idx = int(sec_name.split("_")[1])
                 curr_sec = content.highlights[idx]
-                limits = (12, 45)
+                limits = highlight_limits(idx)
             except (IndexError, ValueError):
                 continue
         elif hasattr(content, sec_name):

@@ -30,7 +30,7 @@ Lịch ngày làm việc hiện bỏ thứ Bảy/Chủ nhật, chưa tích hợp
 
 ## Cài đặt và chạy
 
-Python 3.12; cài LibreOffice, font Times New Roman hoặc Liberation Serif tương thích. PDF được kiểm tra lại do khác biệt font có thể làm đổi số trang.
+Python 3.12; cài LibreOffice và font **Times New Roman thực**. Không chấp nhận font thay thế Liberation Serif. PDF phải có đúng ba trang, đúng vị trí các mục và mọi chữ văn bản ở cỡ 11. Biểu đồ cũng dựng tại kích thước vật lý trong Word để nhãn giữ cỡ 11.
 
 ```powershell
 python -m venv .venv
@@ -67,3 +67,15 @@ Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biế
 `.state/` lưu trạng thái gửi theo ngày. Workflow dùng concurrency và Actions cache để lưu qua các lần chạy. Cache có thể bị xóa/evict và ledger ở máy khác không được đồng bộ; đây không phải bảo đảm exactly-once toàn cục. Nếu trạng thái `unknown`/`partial_or_unknown`, kiểm tra hộp thư người gửi và danh sách nhận trước khi xử lý ledger. Không xóa ledger để retry mù. Chạy nhiều môi trường sản xuất cần kho ledger bền vững dùng chung.
 
 Không chạy workflow gửi thư chỉ để kiểm thử code. Xem `validation-data.json`, `validation-content.json` và `manifest.json` trong artifact khi workflow bị chặn.
+
+## Quy tắc bố cục và báo giá trader
+
+Tin nổi bật thứ nhất và thứ hai **35–45 từ**, tin thứ ba **12–45 từ**; liên ngân hàng **88–95 từ**, USD-VND **75–80 từ**. Đếm theo khoảng trắng sau khi thay placeholder; không tính số thứ tự, tiêu đề, nguồn và nhãn dự báo. Các giới hạn nằm trong `config/editorial_rules.json` và được dùng chung ở prompt, bước chuẩn hóa, sửa từng mục và validator. Renderer dùng nguyên nội dung biên tập; không ghi đè bằng tin mẫu, toàn văn VIRA hay dự báo cố định.
+
+Bảng NHNN là 4 hàng × 3 cột, tỷ lệ 44/28/28, màu xanh `4F81BD`. Bảng liên ngân hàng có hai cột Hôm qua/Hôm nay, số hôm nay màu đỏ. Cặp mua/bán lấy từ trader, không lấy bảng niêm yết MBBank. “Hôm qua” là phiên làm việc liền trước (thứ Hai dùng thứ Sáu); ngày thực tế ghi dưới bảng. Lịch này chưa nhận diện nghỉ lễ.
+
+Để nhập báo giá từ room **firm ALM**, tạo file riêng ngoài repo, ví dụ `/etc/bttn/trader_quotes.json`, theo cấu trúc `config/trader_quotes.example.json`. Thay `purpose` bằng `live`, ghi giá thực bằng số thập phân dùng dấu chấm, `quoted_at` có múi giờ và `source_url` là link tin nhắn Teams. Giữ cả báo giá phiên trước và hiện tại. Đặt `TRADER_QUOTES_PATH` trong môi trường chạy BTTN trỏ tới file này. Đây là đầu vào nhập thủ công; code chưa tự đọc room Teams và không xác thực nội dung tin nhắn.
+
+Chỉ báo giá trong ngày, trước giờ chốt mới xuất hiện ở cột Hôm nay và bảng SWAP. Mỗi kỳ hạn chọn báo giá cuối cùng phù hợp. Giá mua lớn hơn giá bán, thiếu một vế hoặc thiếu múi giờ bị từ chối. File ví dụ mang nhãn fixture và không được dùng trong báo cáo live. Khi chưa nhập dữ liệu, hiển thị `—` và ghi cảnh báo, không lấy `config/swap_rates.json` làm giá thật. Chênh lệch VND − USD vẫn nằm trong snapshot dưới các mã `SWAP_*` để tham khảo; báo giá trader dùng mã `ALM_SWAP_*`.
+
+Biểu đồ nội địa cũng chỉ dùng snapshot của kỳ báo cáo: lãi suất theo kỳ hạn VIRA, lịch sử báo giá trader USD-VND và so sánh lợi suất trái phiếu mười năm theo quốc gia. Không dựng chuỗi lịch sử bằng các file giá mẫu cũ. Times New Roman trên Linux có thể cài qua `ttf-mscorefonts-installer` theo điều khoản Microsoft; workflow kiểm tra font trước khi chạy.

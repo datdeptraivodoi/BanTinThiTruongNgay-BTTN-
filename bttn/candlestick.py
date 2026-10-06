@@ -193,7 +193,7 @@ def render_currency_chart(df: pd.DataFrame, output_path: Path, title: str, sourc
         type="candle",
         addplot=ap,
         style=s,
-        figsize=(5.6, 4.28),
+        figsize=(3.45, 5.3 / 2.54),
         returnfig=True,
         volume=False,
         tight_layout=True,
@@ -223,17 +223,10 @@ def render_currency_chart(df: pd.DataFrame, output_path: Path, title: str, sourc
     ax.axhspan(r_min, r_max, color="#ef5350", alpha=0.14)
     ax.axhspan(s_min, s_max, color="#26a69a", alpha=0.14)
 
-    # Text annotations
-    ax.text(0.02, 0.93, f"Kháng cự: {r_min:{fmt}} - {r_max:{fmt}}", transform=ax.transAxes, fontsize=6.8, color="#c62828", weight="bold")
-    ax.text(0.02, 0.05, f"Hỗ trợ: {s_min:{fmt}} - {s_max:{fmt}}", transform=ax.transAxes, fontsize=6.8, color="#2e7d32", weight="bold")
-
-    # Legend / Indicators note
-    ax.text(0.55, 0.93, "MA89 (xanh) · MA200 (cam) · BB(20,2)", transform=ax.transAxes, fontsize=6.3, color="#1565C0", weight="bold")
-
-    ax.tick_params(labelsize=6.8)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=180, bbox_inches="tight")
-    plt.close(fig)
+    fig.text(0.03, .96, "MA89 · MA200 · BB(20,2)", va="top", color="#1565C0")
+    fig.text(0.03, .85, f"KC {r_min:{fmt}}–{r_max:{fmt}}", va="top")
+    fig.text(0.03, .74, f"HT {s_min:{fmt}}–{s_max:{fmt}}", va="top")
+    finish_chart(fig, axlist, display_df, output_path)
     return True
 
 
@@ -265,7 +258,7 @@ def render_commodity_chart(df: pd.DataFrame, output_path: Path, title: str, sour
         type="candle",
         addplot=ap,
         style=s,
-        figsize=(5.6, 4.04),
+        figsize=(3.45, 4.4 / 2.54),
         returnfig=True,
         volume=False,
         tight_layout=True,
@@ -289,9 +282,28 @@ def render_commodity_chart(df: pd.DataFrame, output_path: Path, title: str, sour
         color="#ef5350", alpha=0.18, interpolate=True
     )
 
-    ax.text(0.02, 0.94, "Mây Ichimoku (9, 26, 52)", transform=ax.transAxes, fontsize=6.8, color="#1565C0", weight="bold")
-    ax.tick_params(labelsize=6.8)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=180, bbox_inches="tight")
-    plt.close(fig)
+    fig.text(0.03, .96, "Tenkan · Kijun · Ichimoku", va="top", color="#1565C0")
+    finish_chart(fig, axlist, display_df, output_path, commodity=True)
     return True
+
+
+def finish_chart(fig, axes, display_df, output_path, commodity=False):
+    """Render at the physical Word image size so raster labels remain 11 pt."""
+    from matplotlib.text import Text
+    from matplotlib.ticker import MaxNLocator
+
+    from .layout import FONT, SIZE
+
+    for ax in axes:
+        ax.set_position([.17, .19, .72, .43 if not commodity else .65])
+        ax.yaxis.set_major_locator(MaxNLocator(3))
+        indexes = [0, len(display_df) // 2, len(display_df) - 1]
+        ax.set_xticks(indexes)
+        ax.set_xticklabels([display_df.index[i].strftime("%d/%m") for i in indexes], rotation=0)
+        ax.tick_params(labelsize=SIZE)
+    for label in fig.findobj(Text):
+        label.set_fontfamily(FONT)
+        label.set_fontsize(SIZE)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)

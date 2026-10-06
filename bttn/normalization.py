@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 from .validation import (
     TOKEN,
+    count_words,
+    highlight_limits,
     parse_placeholder_key,
     resolve,
     rules,
@@ -290,8 +292,7 @@ def adjust_word_count(section: Section, low: int, high: int, snapshot: Snapshot)
     except Exception:
         rendered = raw
 
-    words = rendered.split()
-    count = len(words)
+    count = count_words(rendered)
     if low <= count <= high:
         return
 
@@ -306,7 +307,7 @@ def adjust_word_count(section: Section, low: int, high: int, snapshot: Snapshot)
                 if f in p and count > high:
                     section.paragraphs[i] = p.replace(f, " ", 1)
                     raw = " ".join(section.paragraphs)
-                    count = len(resolve(raw, snapshot, safe=True).split())
+                    count = count_words(resolve(raw, snapshot, safe=True))
                     if count <= high:
                         break
             if count <= high:
@@ -318,10 +319,10 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
     word_limits = rules().get("word_limits", {})
 
     # 1. Highlights
-    for h in content.highlights:
+    for index, h in enumerate(content.highlights):
         h.paragraphs = [normalize_text_prose(p, snapshot) for p in h.paragraphs if p.strip()]
         ensure_section_provenance(h, snapshot)
-        adjust_word_count(h, 12, 45, snapshot)
+        adjust_word_count(h, *highlight_limits(index), snapshot)
 
     # 2. Interbank
     content.interbank.paragraphs = [

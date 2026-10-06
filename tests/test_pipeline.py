@@ -385,6 +385,10 @@ def test_expected_session_date():
 
 def test_midnight_validation_uses_previous_session(snapshot):
     from datetime import date
+    # This test advances the cutoff to a different week. Optional trader quotes
+    # from the fixture's original date must not be carried into that issue.
+    snapshot.observations = {k: v for k, v in snapshot.observations.items()
+                             if not k.startswith(('INTERBANK_', 'ALM_SWAP_'))}
     # Run at 00:10 on Tuesday 29/09 with Monday 28/09 VIRA and 23/09 VNIBOR
     snapshot.as_of = parse_as_of('2026-09-29T00:10:00+07:00')
     snapshot.sources['vira'].published_at = parse_as_of('2026-09-28T11:00:00+07:00')

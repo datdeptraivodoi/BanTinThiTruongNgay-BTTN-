@@ -6,7 +6,8 @@ from pathlib import Path
 from bttn.calculations import derive_swaps
 from bttn.models import Observation, Point, ReportContent, Section, Snapshot, Source, parse_as_of
 from bttn.sources import INSTRUMENTS
-from bttn.validation import rules
+from bttn.trader_quotes import QuoteFile, apply_trader_quotes
+from bttn.validation import highlight_limits, rules
 
 ROOT = Path(__file__).resolve().parents[1]
 at = parse_as_of('2026-09-24T12:00:00+07:00')
@@ -36,6 +37,8 @@ for key, (_, _, unit) in INSTRUMENTS.items():
 for key, val in {'SBV_CENTRAL':25000,'SBV_FLOOR':23750,'SBV_CEILING':26250,'SBV_BUY':23800,'SBV_SELL':26200,'MB_BUY':25800,'MB_SELL':26000,'MB_BUY_PREV':25700,'MB_SELL_PREV':25900}.items():
     add(key,val,'VND/USD')
 derive_swaps(snapshot)
+apply_trader_quotes(snapshot, QuoteFile.model_validate_json(
+    (ROOT / 'config/trader_quotes.example.json').read_text(encoding='utf-8')))
 
 # Deliberately repetitive prose tests layout and word-count boundaries only;
 # it is not a sample of model quality or a market assessment.
@@ -51,14 +54,21 @@ def section(paragraphs):
 sections = {}
 for name, (low, high) in rules()['word_limits'].items():
     if name == 'eur_usd':
-        paragraphs = [words('Tỷ giá {{EURUSD}}.', 80), words('Về phía Châu Âu,',high-80)]
+        paragraphs = [words(
+            'Trong phiên giao dịch hôm qua, tính đến ngày 23.09.2026, tỷ giá EUR-USD đóng cửa quanh mức {{EURUSD_prev}}. '
+            'Trong phiên 24.09.2026, tỷ giá EUR-USD ổn định quanh mức {{EURUSD}}.', 80),
+            words('Về phía Châu Âu,',high-80)]
+    elif name == 'japan':
+        paragraphs = [words(
+            'Trong phiên hôm qua ngày 23.09.2026, tỷ giá USD-JPY đóng cửa ở mức {{USDJPY_prev}}. '
+            'Trong phiên giao dịch chiều nay, tỷ giá USD-JPY đi ngang quanh mức {{USDJPY}}.', high)]
     elif name == 'energy_metals':
         paragraphs = [words('Brent {{BRENT}} USD mỗi thùng.',high-40), words('Giá vàng {{GOLD}} USD mỗi ounce',20)+' '+words('Thông tin kiểm thử',20)]
     else:
         prefix = 'Cập nhật giá cà phê thế giới,' if name == 'coffee' else 'Nội dung kiểm thử'
         paragraphs = [words(prefix,high)]
     sections[name] = section(paragraphs)
-content = ReportContent(highlights=[section([words('Bản kiểm thử không dùng phát hành',30)]) for _ in range(3)], **sections)
+content = ReportContent(highlights=[section([words('Bản kiểm thử không dùng phát hành',highlight_limits(i)[1])]) for i in range(3)], **sections)
 folder = ROOT/'tests/fixtures'
 folder.mkdir(parents=True,exist_ok=True)
 (folder/'snapshot.json').write_text(snapshot.model_dump_json(indent=2),encoding='utf-8')

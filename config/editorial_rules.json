@@ -1,6 +1,7 @@
 {
   "version": 1,
   "forecasts_enabled": false,
+  "highlight_word_limits": [[35, 45], [35, 45], [12, 45]],
   "word_limits": {
     "interbank": [88, 95], "usd_vnd": [75, 80], "eur_usd": [150, 200],
     "japan": [100, 130], "china": [50, 70], "coffee": [130, 135],

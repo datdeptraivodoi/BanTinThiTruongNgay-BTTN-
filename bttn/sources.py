@@ -1,10 +1,7 @@
 import hashlib
-import json
 import logging
 import math
-import os
 import re
-import sqlite3
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time, timedelta, timezone
@@ -654,44 +651,9 @@ def collect_vira_daily(http, snapshot):
     )
 
 
-def collect_swap_quotes(http, snapshot):
-    swap_data = []
-    db_path = Path(os.environ.get("MARKET_DB_PATH", r"D:\TyGia\MasterData\market_master.db"))
-    if db_path.is_file():
-        try:
-            conn = sqlite3.connect(db_path)
-            cur = conn.cursor()
-            cur.execute("SELECT on_bid, on_ask, w1_bid, w1_ask, w2_bid, w2_ask, m1_bid, m1_ask, m3_bid, m3_ask, m6_bid, m6_ask FROM swap_mbb_history ORDER BY date DESC LIMIT 1")
-            row = cur.fetchone()
-            conn.close()
-            if row:
-                tenors = ["ON", "1W", "2W", "1M", "3M", "6M"]
-                for i, t in enumerate(tenors):
-                    b_val, s_val = row[i * 2], row[i * 2 + 1]
-                    swap_data.append({"tenor": t, "buy": f"{b_val:+.2f}".replace(".", ","), "sell": f"{s_val:+.2f}".replace(".", ",")})
-        except Exception as exc:
-            LOG.debug("Error reading swap_mbb_history: %s", exc)
-
-    if not swap_data:
-        swap_file = ROOT / "config" / "swap_rates.json"
-        if swap_file.is_file():
-            try:
-                swap_data = json.loads(swap_file.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-
-    snapshot.sources["swap_quotes"] = Source(
-        id="swap_quotes",
-        url="https://mbbank.com.vn",
-        published_at=snapshot.as_of,
-        retrieved_at=datetime.now(timezone.utc),
-        text=json.dumps(swap_data, ensure_ascii=False),
-        kind="market",
-    )
-
-
 def collect_snapshot(http, as_of):
     from .calculations import derive_swaps
+    from .trader_quotes import collect_trader_quotes
     from .vira import collect_vira
 
     snapshot = Snapshot(as_of=as_of)
@@ -705,7 +667,7 @@ def collect_snapshot(http, as_of):
         ("MACRO_NEWS", collect_vietnam_macro_news),
         ("SJC_GOLD", collect_sjc_gold),
         ("VIRA_DAILY", collect_vira_daily),
-        ("SWAP_QUOTES", collect_swap_quotes),
+        ("TRADER_QUOTES", collect_trader_quotes),
     ]:
         try:
             collector(http, snapshot)

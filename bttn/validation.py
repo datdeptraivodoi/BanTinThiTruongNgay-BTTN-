@@ -1,9 +1,11 @@
 import json
 import re
+import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .models import Issue, ReportContent, Snapshot, business_days_between, previous_weekday
+from .trader_quotes import validate_trader_observations
 
 ROOT = Path(__file__).resolve().parents[1]
 TOKEN = re.compile(r"\{\{([A-Za-z0-9_ ]+)\}\}")
@@ -56,6 +58,16 @@ ENGLISH_BOILERPLATE_RE = re.compile(
 
 def rules():
     return json.loads((ROOT / "config/editorial_rules.json").read_text(encoding="utf-8"))
+
+
+def highlight_limits(index):
+    return rules().get("highlight_word_limits", [[35, 45], [35, 45], [12, 45]])[index]
+
+
+def count_words(text):
+    # Numbering is presentation; amounts/dates remain one whitespace token.
+    text = unicodedata.normalize("NFC", text)
+    return len(re.sub(r"^\s*\d+[.)]\s+", "", text).split())
 
 
 def parse_placeholder_key(key: str, snapshot: Snapshot):
@@ -135,7 +147,7 @@ def expected_session_date(as_of: datetime, snapshot: Snapshot | None = None) -> 
 
 
 def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
-    result = [i for i in snapshot.issues if i.severity == "error"]
+    result = [i for i in snapshot.issues if i.severity == "error"] + validate_trader_observations(snapshot)
     cfg = rules()
     def error(code, message):
         result.append(Issue(severity="error", code=code, message=message))
@@ -234,9 +246,9 @@ def validate_content(content: ReportContent, snapshot: Snapshot) -> list[Issue]:
         except ValueError as exc:
             error("PLACEHOLDER", str(exc))
             continue
-        count = len(rendered.split())
+        count = count_words(rendered)
         if name.startswith("highlight"):
-            low, high = 12, 45
+            low, high = highlight_limits(int(name.split("_")[1]))
         else:
             low, high = rules()["word_limits"][name]
         if not low <= count <= high:
