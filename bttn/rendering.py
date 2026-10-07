@@ -12,6 +12,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Pt, RGBColor
 
+from .domestic_charts import render_bond_yield_chart, render_interbank_chart, render_usdvnd_chart
 from .layout import FONT, SIZE, normalize_typography, split_pages, style_run, styled_table
 from .trader_quotes import TENORS, trader_observation
 from .validation import format_value, resolve
@@ -322,21 +323,66 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
 
     narrative(r3[1], "Thị trường tiền tệ liên ngân hàng", content.interbank, snapshot)
     # Domestic charts use this issue's snapshot, never the undated legacy JSON.
-    plot_cell(r3[2], "Lãi suất liên ngân hàng theo kỳ hạn", snapshot,
-              [("VND_", "VND"), ("USD_", "USD")], output.parent,
-              "vnibor", category=True, height=1.5)
+    heading(r3[2], "Diễn biến lãi suất trên thị trường liên ngân hàng")
+    chart1_path = output.parent / "interbank.png"
+    if render_interbank_chart(chart1_path):
+        p1 = r3[2].add_paragraph()
+        p1.paragraph_format.space_before = Pt(0)
+        p1.paragraph_format.space_after = Pt(0)
+        p1.add_run().add_picture(str(chart1_path), width=Cm(10.34), height=Cm(5.41))
+    else:
+        plot_cell(r3[2], "Lãi suất liên ngân hàng theo kỳ hạn", snapshot,
+                  [("VND_", "VND"), ("USD_", "USD")], output.parent,
+                  "vnibor", category=True, height=1.5)
 
     render_sbv_block(r4[0], snapshot)
     narrative(r4[1], "Thị trường ngoại hối USD-VND", content.usd_vnd, snapshot)
-    plot_trader_fx(r4[2], snapshot, output.parent)
+    heading(r4[2], "Diễn biến tỷ giá USD-VND thị trường liên ngân hàng")
+    chart2_path = output.parent / "usdvnd_domestic.png"
+    if render_usdvnd_chart(chart2_path):
+        p2 = r4[2].add_paragraph()
+        p2.paragraph_format.space_before = Pt(0)
+        p2.paragraph_format.space_after = Pt(0)
+        p2.add_run().add_picture(str(chart2_path), width=Cm(10.34), height=Cm(4.81))
+    else:
+        plot_trader_fx(r4[2], snapshot, output.parent)
 
     heading(r5[0], "Lãi suất SWAP · báo giá trader")
     grid(r5[0], ["Kỳ hạn", "Mua %", "Bán %"], [
         [t, value(snapshot, f"ALM_SWAP_{t}_BID"), value(snapshot, f"ALM_SWAP_{t}_ASK")]
         for t in TENORS])
     paragraph(r5[0], "Nguồn: firm ALM · báo giá trước giờ chốt", color="666666")
+
+    # Row 6 Col 2 (r5[1]): Ý tưởng sản phẩm
     heading(r5[1], "Ý tưởng sản phẩm")
-    plot_bonds(r5[2], snapshot, output.parent)
+    mb_buy = snapshot.observations.get("MB_BUY")
+    mb_sell = snapshot.observations.get("MB_SELL")
+    min_str, max_str = "25.700", "26.200"
+    if mb_buy and mb_sell and mb_buy.value and mb_sell.value:
+        try:
+            b_val = float(mb_buy.value)
+            s_val = float(mb_sell.value)
+            min_val = round(b_val - 100, -1)
+            max_val = round(s_val + 100, -1)
+            min_str = f"{int(min_val):,}".replace(",", ".")
+            max_str = f"{int(max_val):,}".replace(",", ".")
+        except Exception:
+            pass
+
+    paragraph(r5[1], f"Nhiều khả năng tỷ giá USD-VND có thể biến động trong khu vực từ {min_str}-{max_str}.", bold=False, color=BLUE)
+    paragraph(r5[1], "- Sử dụng sản phẩm vay VND lãi suất ưu đãi kết hợp sản phẩm AIRS để giúp khách hàng có thể vay VND với lãi suất cạnh tranh hơn so với phương án vay VND thông thường.", bold=True, color="C00000")
+    paragraph(r5[1], "- Sử dụng sản phẩm mua ngoại tệ kỳ hạn FX FWD kỳ hạn dưới 1 tháng để tận dụng điểm kỳ hạn đang ở mức hấp dẫn và tỷ giá điều chỉnh về vùng phù hợp.", bold=True, color="C00000")
+
+    # Row 6 Col 3 (r5[2]): Chart 3 Lãi suất trái phiếu
+    heading(r5[2], "Diễn biến lãi suất trái phiếu thị trường liên ngân hàng")
+    chart3_path = output.parent / "bond_yield.png"
+    if render_bond_yield_chart(chart3_path):
+        p3 = r5[2].add_paragraph()
+        p3.paragraph_format.space_before = Pt(0)
+        p3.paragraph_format.space_after = Pt(0)
+        p3.add_run().add_picture(str(chart3_path), width=Cm(10.34), height=Cm(4.81))
+    else:
+        plot_bonds(r5[2], snapshot, output.parent)
     heading(r7[0], "VNIBOR và SOFR · VIRA Market Watch")
     grid(r7[0], ["Kỳ hạn", "VND", "USD", "SOFR USD"], [[t, value(snapshot, "VND_"+t), value(snapshot, "USD_"+t), value(snapshot, "SOFR_"+t)] for t in ["ON", "1W", "2W", "1M", "2M", "3M", "6M", "9M", "1Y"]])
     vira = snapshot.sources.get("vira")

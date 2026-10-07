@@ -557,6 +557,108 @@ def collect_vira_daily(http, snapshot):
     snapshot.add_issue("VIRA_DAILY_MISSING", "Không đọc được đoạn VIRA có ngày xuất bản xác minh; không tạo lãi suất/OMO mẫu.")
 
 
+def collect_china_news(http, snapshot):
+    """Ingest China economy news within 48 hours from SCMP and Nikkei Asia."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    # 1. South China Morning Post (SCMP) Economy
+    try:
+        r = http.get("https://www.scmp.com/economy", headers=headers)
+        soup = BeautifulSoup(r.text, "html.parser")
+        links = []
+        for a in soup.find_all("a", href=True):
+            href = a["href"].split("?")[0]
+            if "/economy/" in href and "/article/" in href:
+                full = urljoin("https://www.scmp.com", href)
+                if full not in links:
+                    links.append(full)
+        for link in links[:6]:
+            try:
+                r2 = http.get(link, headers=headers)
+                s2 = BeautifulSoup(r2.text, "html.parser")
+                m_time = s2.find("meta", property="article:published_time")
+                if not m_time or not m_time.get("content"):
+                    continue
+                at = datetime.fromisoformat(m_time["content"].replace("Z", "+00:00"))
+                if at.tzinfo is None:
+                    at = at.replace(tzinfo=timezone.utc)
+                age = snapshot.as_of - at
+                if not timedelta(0) <= age <= timedelta(hours=48):
+                    continue
+                title_elem = s2.find("meta", property="og:title")
+                title = title_elem["content"].strip() if title_elem and title_elem.get("content") else ""
+                paras = [p.get_text(" ", strip=True) for p in s2.find_all("p") if len(p.get_text(" ", strip=True).split()) >= 8]
+                body = "\n\n".join(paras)
+                if len(body.split()) < 30 or not title:
+                    continue
+                sid = "news_china_" + hashlib.sha256(link.encode()).hexdigest()[:12]
+                text = title + "\n\n" + body
+                snapshot.sources[sid] = Source(
+                    id=sid,
+                    url=link,
+                    published_at=at,
+                    retrieved_at=datetime.now(timezone.utc),
+                    text=text,
+                    sha256=hashlib.sha256(text.encode()).hexdigest(),
+                    kind="news",
+                    text_scope="article",
+                )
+            except Exception as exc:
+                LOG.debug("SCMP article failed: %s: %s", link, exc)
+    except Exception as exc:
+        snapshot.add_issue("SCMP_NEWS", f"SCMP: {type(exc).__name__}: {exc}")
+
+    # 2. Nikkei Asia East Asia Economy
+    try:
+        r = http.get("https://asia.nikkei.com/economy/east-asia", headers=headers)
+        soup = BeautifulSoup(r.text, "html.parser")
+        links = []
+        for a in soup.find_all("a", href=True):
+            href = a["href"].split("?")[0]
+            slug = href.strip("/").split("/")[-1]
+            if href.startswith("/economy/") and len(slug.split("-")) >= 4 and not any(tag in slug for tag in ["rest-of-the-world", "south-east-asia", "east-asia"]):
+                full = urljoin("https://asia.nikkei.com", href)
+                if full not in links:
+                    links.append(full)
+        for link in links[:6]:
+            try:
+                r2 = http.get(link, headers=headers)
+                s2 = BeautifulSoup(r2.text, "html.parser")
+                m_time = s2.find("meta", attrs={"name": "date"}) or s2.find("meta", property="article:published_time")
+                if not m_time or not m_time.get("content"):
+                    continue
+                at = datetime.fromisoformat(m_time["content"].replace("Z", "+00:00"))
+                if at.tzinfo is None:
+                    at = at.replace(tzinfo=timezone.utc)
+                age = snapshot.as_of - at
+                if not timedelta(0) <= age <= timedelta(hours=48):
+                    continue
+                title_elem = s2.find("meta", property="og:title")
+                title = title_elem["content"].strip() if title_elem and title_elem.get("content") else ""
+                paras = [p.get_text(" ", strip=True) for p in s2.find_all("p") if len(p.get_text(" ", strip=True).split()) >= 8]
+                body = "\n\n".join(paras)
+                if len(body.split()) < 30 or not title:
+                    continue
+                sid = "news_china_" + hashlib.sha256(link.encode()).hexdigest()[:12]
+                text = title + "\n\n" + body
+                snapshot.sources[sid] = Source(
+                    id=sid,
+                    url=link,
+                    published_at=at,
+                    retrieved_at=datetime.now(timezone.utc),
+                    text=text,
+                    sha256=hashlib.sha256(text.encode()).hexdigest(),
+                    kind="news",
+                    text_scope="article",
+                )
+            except Exception as exc:
+                LOG.debug("Nikkei article failed: %s: %s", link, exc)
+    except Exception as exc:
+        snapshot.add_issue("NIKKEI_NEWS", f"Nikkei: {type(exc).__name__}: {exc}")
+
+
 def collect_snapshot(http, as_of):
     from .calculations import derive_swaps
     from .trader_quotes import collect_trader_quotes
@@ -572,6 +674,7 @@ def collect_snapshot(http, as_of):
         ("COFFEE", collect_vietnambiz_coffee),
         ("NEWS", collect_news),
         ("TE_NEWS", collect_tradingeconomics),
+        ("CHINA_NEWS", collect_china_news),
         ("MACRO_NEWS", collect_vietnam_macro_news),
         ("SJC_GOLD", collect_sjc_gold),
         ("VIRA_DAILY", collect_vira_daily),

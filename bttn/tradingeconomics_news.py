@@ -23,9 +23,15 @@ MAX_ARTICLES_PER_COUNTRY = 3
 
 def topic_for(source):
     parsed = urlparse(source.url)
-    if parsed.scheme != "https" or parsed.hostname != "tradingeconomics.com":
+    if parsed.scheme != "https":
         return None
-    return PATHS.get(parsed.path.strip("/").split("/")[0])
+    if parsed.hostname == "tradingeconomics.com":
+        return PATHS.get(parsed.path.strip("/").split("/")[0])
+    if parsed.hostname in ("www.scmp.com", "scmp.com", "asia.nikkei.com", "nikkei.com"):
+        return "China"
+    if getattr(source, "id", "").startswith("news_china_"):
+        return "China"
+    return None
 
 
 def parse_news(records, as_of, *, allow_stale=False):
@@ -54,7 +60,8 @@ def parse_news(records, as_of, *, allow_stale=False):
             age = as_of - at
             if age < timedelta(0):
                 raise ValueError("TE_NEWS_AFTER_CUTOFF")
-            if age > timedelta(hours=36) and not allow_stale:
+            cutoff_hours = 48 if topic == "China" else 36
+            if age > timedelta(hours=cutoff_hours) and not allow_stale:
                 raise ValueError("TE_NEWS_STALE")
             identity = str(item.get("id") or url)
             sid = "news_te_" + topic + "_" + hashlib.sha256(identity.encode()).hexdigest()[:12]

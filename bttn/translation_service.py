@@ -200,7 +200,8 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
         if source.kind != "news" or topic is None:
             continue
         age = (snapshot.as_of - source.published_at).total_seconds()
-        if age < 0 or (age > 36 * 3600 and not allow_stale):
+        cutoff_hours = 48 if topic == "China" else 36
+        if age < 0 or (age > cutoff_hours * 3600 and not allow_stale):
             result["failures"][sid] = "TE_NEWS_DATE"
             continue
         try:

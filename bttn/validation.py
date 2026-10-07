@@ -219,8 +219,9 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
             error("CONTENT_SOURCE", "Nguồn trích dẫn không tồn tại")
         for sid in section.source_ids:
             source = snapshot.sources.get(sid)
+            cutoff = 48 if (name == "china" or (source and topic_for(source) == "China")) else rules()["news_max_age_hours"]
             if source and (source.published_at > snapshot.as_of or
-                           source.kind == "news" and snapshot.as_of - source.published_at > timedelta(hours=rules()["news_max_age_hours"])):
+                           source.kind == "news" and snapshot.as_of - source.published_at > timedelta(hours=cutoff)):
                 error("CONTENT_SOURCE_DATE", "Nguồn trích dẫn nằm ngoài thời gian hợp lệ")
         raw = " ".join(section.paragraphs)
         if re.search(r"dự kiến|dự báo|khuyến nghị|mục tiêu giá", raw, re.I):

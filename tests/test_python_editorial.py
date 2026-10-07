@@ -190,3 +190,37 @@ def test_foreign_numbers_require_translation_bound_to_exact_article(tmp_path):
     assert any(i.code == "SENTENCE_SOURCE" for i in validate_content(content, snap))
     source.text = original.replace("0.3%", "0.4%")
     assert any(i.code == "TRANSLATION_SOURCE" for i in validate_content(content, snap, translations_path=path))
+
+
+def test_china_sources_recognize_topic_and_allow_48h_cutoff():
+    from bttn.tradingeconomics_news import topic_for
+
+    scmp = Source(id="news_china_1", url="https://www.scmp.com/economy/china-economy/article/1",
+                  published_at=AT - timedelta(hours=47), retrieved_at=AT,
+                  text="Title\n\nBody text with more than twenty words about the China economy and PBOC monetary policy.",
+                  kind="news", text_scope="article")
+    nikkei = Source(id="news_china_2", url="https://asia.nikkei.com/economy/china-factory-activity-expands",
+                    published_at=AT - timedelta(hours=40), retrieved_at=AT,
+                    text="Title\n\nBody text with more than twenty words about China manufacturing growth and investment.",
+                    kind="news", text_scope="article")
+    stale = Source(id="news_china_3", url="https://www.scmp.com/economy/article/old",
+                   published_at=AT - timedelta(hours=49), retrieved_at=AT,
+                   text="Title\n\nStale news.", kind="news", text_scope="article")
+
+    assert topic_for(scmp) == "China"
+    assert topic_for(nikkei) == "China"
+    assert topic_for(stale) == "China"
+
+    snap = Snapshot(as_of=AT, sources={scmp.id: scmp, nikkei.id: nikkei, stale.id: stale})
+    rec = {
+        scmp.id: SimpleNamespace(text="Ngân hàng Nhân dân Trung Quốc PBOC duy trì chính sách tiền tệ hỗ trợ tăng trưởng kinh tế."),
+        nikkei.id: SimpleNamespace(text="Sản xuất công nghiệp của Trung Quốc ghi nhận mức tăng trưởng ổn định trong tháng qua."),
+        stale.id: SimpleNamespace(text="Tin tức cũ về kinh tế Trung Quốc.")
+    }
+    candidates, rejected = news_candidates(snap, rec, "China")
+    source_ids = {c.source_id for c in candidates}
+    assert scmp.id in source_ids
+    assert nikkei.id in source_ids
+    assert stale.id not in source_ids
+    assert any(r["source_id"] == stale.id and r["reason"] == "outside_cutoff" for r in rejected)
+

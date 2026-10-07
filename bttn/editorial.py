@@ -69,7 +69,8 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
                 continue
             text = source.text
         age = snapshot.as_of - source.published_at
-        if age < timedelta(0) or (age > timedelta(hours=rules()["news_max_age_hours"]) and not allow_stale):
+        cutoff_hours = 48 if topic == "China" else rules()["news_max_age_hours"]
+        if age < timedelta(0) or (age > timedelta(hours=cutoff_hours) and not allow_stale):
             rejected.append({"source_id": sid, "reason": "outside_cutoff"})
             continue
         parts = text.split("\n\n", 1)
