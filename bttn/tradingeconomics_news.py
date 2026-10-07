@@ -95,30 +95,69 @@ def parse_news(records, as_of, *, allow_stale=False):
     return selected, rejected
 
 
-def collect_tradingeconomics(http, snapshot, *, import_file=None, allow_stale=False):
-    """Archive only public article data, never the credential-bearing API request."""
+def fetch_tradingeconomics_stream(countries=None, limit=15):
+    """Fetch public economic news stream from Trading Economics using browser emulation."""
+    headers_base = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "en-US,en;q=0.9",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    stream_map = [
+        ("euro area", "euro-area"),
+        ("united states", "united-states"),
+        ("japan", "japan"),
+    ]
+    if countries:
+        stream_map = [(c, ref) for c, ref in stream_map if c in countries or COUNTRIES.get(c) in countries]
+
+    all_records = []
+    for c, ref in stream_map:
+        headers = headers_base.copy()
+        headers["Referer"] = f"https://tradingeconomics.com/{ref}/news"
+        url = f"https://tradingeconomics.com/ws/stream.ashx?start=0&size={limit}&c={c}"
+        try:
+            resp = requests.get(url, headers=headers, timeout=(10, 20))
+            if resp.status_code == 200:
+                for item in resp.json():
+                    if not item.get("country"):
+                        item["country"] = c
+                    all_records.append(item)
+        except Exception:
+            continue
+    return all_records
+
+
+def collect_tradingeconomics(http, snapshot, *, import_file=None, allow_stale=False, use_stream=True):
+    """Archive public article data via official API or public stream fallback."""
     import_file = import_file or os.getenv("TE_NEWS_IMPORT_PATH")
     if import_file:
         records = json.loads(Path(import_file).read_text(encoding="utf-8-sig"))
     else:
         key = os.getenv("TRADINGECONOMICS_API_KEY", "").strip()
-        if not key:
+        if key:
+            start = snapshot.as_of - timedelta(hours=36)
+            try:
+                response = requests.get(
+                    "https://api.tradingeconomics.com/news/country/euro%20area,united%20states,japan,china",
+                    params={"c": key, "d1": start.date().isoformat(), "d2": snapshot.as_of.date().isoformat(),
+                            "f": "json"}, timeout=(10, 25), allow_redirects=False,
+                )
+                if response.status_code != 200:
+                    raise RuntimeError(f"TE_NEWS_HTTP_{response.status_code}")
+                records = response.json()
+            except requests.RequestException:
+                raise RuntimeError("TE_NEWS_NETWORK") from None
+            except ValueError:
+                raise RuntimeError("TE_NEWS_RESPONSE_INVALID") from None
+        elif use_stream and not os.getenv("TE_NEWS_DISABLE_STREAM"):
+            records = fetch_tradingeconomics_stream()
+            if not records:
+                snapshot.add_issue("TE_NEWS_ACCESS", "Trading Economics: stream không trả về bản ghi hoặc website phản hồi lỗi.")
+                return
+        else:
             snapshot.add_issue("TE_NEWS_ACCESS", "Trading Economics: chưa có API nguồn tin hoặc file nhập bài; website trả 403.")
             return
-        start = snapshot.as_of - timedelta(hours=36)
-        try:
-            response = requests.get(
-                "https://api.tradingeconomics.com/news/country/euro%20area,united%20states,japan,china",
-                params={"c": key, "d1": start.date().isoformat(), "d2": snapshot.as_of.date().isoformat(),
-                        "f": "json"}, timeout=(10, 25), allow_redirects=False,
-            )
-            if response.status_code != 200:
-                raise RuntimeError(f"TE_NEWS_HTTP_{response.status_code}")
-            records = response.json()
-        except requests.RequestException:
-            raise RuntimeError("TE_NEWS_NETWORK") from None
-        except ValueError:
-            raise RuntimeError("TE_NEWS_RESPONSE_INVALID") from None
     selected, rejected = parse_news(records, snapshot.as_of, allow_stale=allow_stale)
     snapshot.sources.update(selected)
     present = {topic_for(s) for s in selected.values()}
@@ -131,3 +170,4 @@ def collect_tradingeconomics(http, snapshot, *, import_file=None, allow_stale=Fa
         path = http.directory / "tradingeconomics-news.json"
         path.write_text(json.dumps({"sources": {k: s.model_dump(mode="json") for k, s in selected.items()},
                                     "rejected": rejected}, ensure_ascii=False, indent=2), encoding="utf-8")
+

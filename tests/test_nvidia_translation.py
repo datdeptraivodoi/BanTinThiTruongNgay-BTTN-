@@ -355,10 +355,22 @@ def test_no_te_key_does_not_request_website_or_use_search_snippet(monkeypatch):
     get = Mock(side_effect=AssertionError("No unauthorized source request"))
     monkeypatch.setattr(requests, "get", get)
     snap = Snapshot(as_of=AT)
-    collect_tradingeconomics(None, snap)
+    collect_tradingeconomics(None, snap, use_stream=False)
     assert not snap.sources
     assert snap.issues[0].code == "TE_NEWS_ACCESS"
     get.assert_not_called()
+
+
+def test_te_stream_fallback_collects_public_records(monkeypatch):
+    monkeypatch.delenv("TRADINGECONOMICS_API_KEY", raising=False)
+    monkeypatch.delenv("TE_NEWS_IMPORT_PATH", raising=False)
+    row = news_row()
+    row.update(country="euro area", url="/euro-area/stock-market/news/123")
+    mock_resp = Mock(status_code=200, json=lambda: [row])
+    monkeypatch.setattr(requests, "get", Mock(return_value=mock_resp))
+    snap = Snapshot(as_of=AT)
+    collect_tradingeconomics(None, snap, use_stream=True)
+    assert snap.sources
 
 
 def test_translation_failure_is_diagnostic_and_not_saved_as_success(tmp_path):

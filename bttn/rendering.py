@@ -409,8 +409,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     paragraph(r8[0], "Các phần dự báo đang để trống theo yêu cầu biên tập.")
     plot_candlestick_cell(r8[1], "EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
     plot_candlestick_cell(r8[2], "USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
-    heading(r9[1], "Dự báo các chỉ số chính")
-    grid(r9[1], ["Chỉ tiêu", "1 tháng", "6 tháng"], [[k, "", ""] for k in ["USD-VND", "EUR-USD", "USD-JPY", "SOFR USD"]])
+
     heading(r11[0], "Bảng giá hàng hóa · " + snapshot.as_of.strftime("%d.%m.%Y"))
     commodities = [("CRB", "CRB Spot"), ("DXY", "USD Index"), ("LME", "LME Index"),
         ("ROBUSTA", "Robusta USD/tấn"), ("ARABICA", "Arabica USc/lbs"), ("CORN", "Ngô USc/bsh"),

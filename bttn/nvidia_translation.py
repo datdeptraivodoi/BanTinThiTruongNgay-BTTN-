@@ -94,6 +94,8 @@ def normalize_terms(original, translated):
         translated = translated.replace("nới lỏng thêm", "thắt chặt thêm")
     if "offshore yuan" in original.lower():
         translated = translated.replace("nhân dân tệ ngoài khơi", "nhân dân tệ ngoại biên")
+    if "federal reserve" in original.lower():
+        translated = re.sub(r"Cục Dự trữ Liên bang(?!\s+Mỹ)", "Cục Dự trữ Liên bang Mỹ", translated, flags=re.I)
     if "reassure financial markets" in original.lower():
         translated = translated.replace("an ủi các thị trường tài chính", "trấn an thị trường tài chính")
     return translated
