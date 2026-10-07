@@ -170,7 +170,7 @@ GitHub Actions đọc `secrets.NVIDIA_API_KEY` và `secrets.TRADINGECONOMICS_API
 
 Chỉ cần `NVIDIA_API_KEY` cho dịch thuật; không còn dependency hoặc cấu hình nhà cung cấp model khác. Quy tắc Python và ví dụ thuật ngữ không phải fine-tuning trọng số của model hosted.
 
-Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biến `RECIPIENTS` có thể cấu hình trong GitHub Repository Variables; mặc định giữ danh sách nhận cũ. Workflow schedule gọi `--send`. Chạy thủ công mặc định chỉ preview, bật `send_email` nếu muốn gửi; cùng giới hạn giờ và dữ liệu áp dụng. Workflow kiểm tra riêng chạy trên push/PR và không cần secrets.
+Secrets gửi thư: `SENDER_EMAIL`, `SENDER_PASSWORD` (SMTP app password). Biến `RECIPIENTS` có thể cấu hình trong GitHub Repository Variables; mặc định giữ danh sách nhận cũ. Workflow schedule gọi `--send`. Khi chạy thủ công, chọn **1. Gửi file Word đến các email** (mặc định) hoặc **2. Chỉ tạo file Word**. Các kiểm tra dữ liệu và nội dung áp dụng cho cả hai chế độ. Workflow kiểm tra code riêng chạy trên push/PR và không cần secrets.
 
 `.state/` lưu trạng thái gửi theo ngày. Workflow dùng concurrency và Actions cache để lưu qua các lần chạy. Cache có thể bị xóa/evict và ledger ở máy khác không được đồng bộ; đây không phải bảo đảm exactly-once toàn cục. Nếu trạng thái `unknown`/`partial_or_unknown`, kiểm tra hộp thư người gửi và danh sách nhận trước khi xử lý ledger. Không xóa ledger để retry mù. Chạy nhiều môi trường sản xuất cần kho ledger bền vững dùng chung.
 

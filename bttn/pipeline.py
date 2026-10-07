@@ -182,7 +182,7 @@ def run(args):
 
         # If there are data or content issues:
         # In --send mode: Block delivery and return 1 (artifacts preserved for review)
-        # In --dry-run mode: Return 0 with draft_with_issues status
+        # In --create-only mode: Return 0 with draft_with_issues status
         if data_issues:
             manifest["status"] = "blocked_data" if args.send else "draft_with_issues"
             if args.send:
