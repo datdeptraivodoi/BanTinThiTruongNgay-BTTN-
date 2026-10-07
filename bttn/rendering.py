@@ -403,6 +403,39 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     doc.save(output)
 
 
+def validate_docx(docx_path: Path):
+    """Check Word structure and explicit typography without creating a PDF.
+
+    This does not claim to validate pagination in the recipient's Word app.
+    """
+    from matplotlib.font_manager import findfont
+
+    findfont(FONT, fallback_to_default=False)
+    doc = Document(docx_path)
+    if len(doc.tables) != 3:
+        raise ValueError("Word report must contain the three configured page tables")
+    sections = ["Tỷ giá USD-VND của NHNN", "VNIBOR và SOFR", "Bảng giá hàng hóa"]
+    for table, heading in zip(doc.tables, sections):
+        text = " ".join(node.text or "" for node in table._tbl.iter(qn("w:t")))
+        if heading not in text or "{{" in text or "}}" in text:
+            raise ValueError("Word report has a missing section or unresolved placeholder")
+    parts = [doc.part] + [s.header.part for s in doc.sections] + [s.footer.part for s in doc.sections]
+    for part in parts:
+        for run in part.element.iter(qn("w:r")):
+            text = "".join(node.text or "" for node in run.iter(qn("w:t")))
+            if not text.strip():
+                continue
+            if "{{" in text or "}}" in text:
+                raise ValueError("Word report has unresolved placeholders")
+            properties = run.find(qn("w:rPr"))
+            fonts = properties.find(qn("w:rFonts")) if properties is not None else None
+            size = properties.find(qn("w:sz")) if properties is not None else None
+            if fonts is None or any(fonts.get(qn("w:" + name)) != FONT for name in ("ascii", "hAnsi", "eastAsia", "cs")):
+                raise ValueError("Word text must use Times New Roman")
+            if size is None or size.get(qn("w:val")) != str(SIZE * 2):
+                raise ValueError("Word text must use 11 pt")
+
+
 def validate_pdf_layout(pdf_path: Path):
     import pymupdf
 

@@ -146,7 +146,7 @@ def test_delivery_outcomes_and_no_duplicates(snapshot, monkeypatch, tmp_path, fa
         server.send_message.side_effect=ConnectionError('uncertain')
     if failure=='login':
         server.login.side_effect=ConnectionError('before send')
-    attachments=[tmp_path/'x.docx',tmp_path/'x.pdf']
+    attachments=[tmp_path/'x.docx']
     for path in attachments:
         path.write_bytes(b'fixture')
     state=tmp_path/'state'
@@ -184,7 +184,7 @@ def test_workflow_is_noon_weekdays():
     text=(ROOT/'.github/workflows/market_report.yml').read_text(encoding='utf-8')
     assert "cron: '0 5 * * 1-5'" in text
     assert 'cancel-in-progress: false' in text
-    assert '--send' in text and '--dry-run' in text
+    assert '--send' in text and '--create-only' in text
 
 def test_sbv_localized_decimals_and_table_date():
     html='''<p>Archived date 01/01/2020</p><table><tr><td>1 Đô la Mỹ = 25.632 VND</td><td>Ngày ban hành 28/09/2026</td></tr></table><table><tr><td>1</td><td>USD</td><td>Đô la Mỹ</td><td>24.401,00</td><td>26.863,00</td></tr></table>'''
@@ -265,12 +265,7 @@ def test_dry_run_with_stale_data_creates_draft_with_issues(snapshot, content, tm
     snap_path.write_text(snapshot.model_dump_json(), encoding='utf-8')
     content_path.write_text(content.model_dump_json(), encoding='utf-8')
 
-    def fake_convert(p):
-        pdf = p.with_suffix('.pdf')
-        pdf.write_bytes(b'%PDF-1.4')
-        return pdf
 
-    monkeypatch.setattr('bttn.rendering.convert_and_validate', fake_convert)
 
     result = main(['--dry-run', '--snapshot', str(snap_path), '--content', str(content_path), '--output-dir', str(tmp_path)])
     assert result == 0
@@ -292,12 +287,7 @@ def test_send_blocked_when_data_has_issues(snapshot, content, tmp_path, monkeypa
     snap_path.write_text(snapshot.model_dump_json(), encoding='utf-8')
     content_path.write_text(content.model_dump_json(), encoding='utf-8')
 
-    def fake_convert(p):
-        pdf = p.with_suffix('.pdf')
-        pdf.write_bytes(b'%PDF-1.4')
-        return pdf
 
-    monkeypatch.setattr('bttn.rendering.convert_and_validate', fake_convert)
 
     result = main(['--send', '--snapshot', str(snap_path), '--content', str(content_path), '--output-dir', str(tmp_path)])
     assert result == 1
@@ -324,12 +314,7 @@ def test_unrestricted_delivery_timing(snapshot, content, tmp_path, monkeypatch):
     send_mock = MagicMock()
     monkeypatch.setattr("bttn.delivery.send_report", send_mock)
 
-    def fake_convert(docx):
-        pdf = docx.with_suffix(".pdf")
-        pdf.write_bytes(b"%PDF-1.4")
-        return pdf
 
-    monkeypatch.setattr("bttn.rendering.convert_and_validate", fake_convert)
 
     # Running outside 12:00-15:00 should NOT be blocked by timing
     result = main([
@@ -421,18 +406,13 @@ def test_pipeline_draft_fallback_when_ai_fails(snapshot, monkeypatch, tmp_path):
     """When AI fails completely, pipeline produces draft Word/PDF with verified data and blocks --send."""
     from types import SimpleNamespace
 
-    from bttn import delivery, pipeline, rendering
+    from bttn import delivery, pipeline
 
     snapshot.purpose = "live"
     snap_path = tmp_path / "snapshot.json"
     snap_path.write_text(snapshot.model_dump_json(), encoding="utf-8")
 
-    def mock_convert(docx):
-        pdf = docx.with_suffix(".pdf")
-        pdf.write_bytes(b"%PDF-1.4 mock")
-        return pdf
 
-    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
     monkeypatch.setattr(analysis, "generate", MagicMock(side_effect=RuntimeError("EDITOR_FAILURE")))
 
     send_mock = MagicMock()
@@ -511,18 +491,13 @@ def test_pipeline_draft_fallback_with_invalid_ai_content_does_not_crash(snapshot
     """When AI returns content with broken placeholders or technical leakage, pipeline sanitizes it for draft and blocks --send."""
     from types import SimpleNamespace
 
-    from bttn import delivery, pipeline, rendering
+    from bttn import delivery, pipeline
 
     snapshot.purpose = "live"
     snap_path = tmp_path / "snapshot.json"
     snap_path.write_text(snapshot.model_dump_json(), encoding="utf-8")
 
-    def mock_convert(docx):
-        pdf = docx.with_suffix(".pdf")
-        pdf.write_bytes(b"%PDF-1.4 mock")
-        return pdf
 
-    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
 
     bad_content = content.model_copy(deep=True)
     bad_content.energy_metals.paragraphs = ['Dầu brent {{NONEXISTENT_KEY}} và "source_ids": [123]']
@@ -572,72 +547,8 @@ def test_pipeline_draft_fallback_with_invalid_ai_content_does_not_crash(snapshot
 
 
 
-def test_send_report_with_is_test(snapshot, tmp_path, monkeypatch):
-    monkeypatch.setenv("SENDER_EMAIL", "sender@test.com")
-    monkeypatch.setenv("SENDER_PASSWORD", "secret")
-    server = MagicMock()
-    server.send_message.return_value = {}
-    monkeypatch.setattr("smtplib.SMTP_SSL", MagicMock(return_value=MagicMock(__enter__=MagicMock(return_value=server))))
-
-    attachments = [tmp_path / "x.docx", tmp_path / "x.pdf"]
-    for path in attachments:
-        path.write_bytes(b"data")
-    state = tmp_path / "state"
-
-    ledger = delivery.send_report(snapshot, attachments, state, ["dat.nguyen296286@gmail.com"], is_test=True)
-    assert "-test-" in ledger.name
-    record = json.loads(ledger.read_text(encoding="utf-8"))
-    assert record["is_test"] is True
-    assert record["recipients"] == ["dat.nguyen296286@gmail.com"]
-
-    call_args = server.send_message.call_args[0][0]
-    assert "[TEST / GỬI THỬ]" in call_args["Subject"]
-    assert call_args["To"] == "dat.nguyen296286@gmail.com"
 
 
-def test_pipeline_run_test_recipient_bypasses_timing(snapshot, content, tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
-    from bttn import delivery, pipeline, rendering, translation_service
-
-    monkeypatch.setattr(translation_service, "translate_snapshot", MagicMock(return_value={"status": "checked", "pending_review": []}))
-
-    snapshot.purpose = "live"
-    snap_path = tmp_path / "snapshot.json"
-    snap_path.write_text(snapshot.model_dump_json(), encoding="utf-8")
-
-    def mock_convert(docx):
-        pdf = docx.with_suffix(".pdf")
-        pdf.write_bytes(b"%PDF-1.4 mock")
-        return pdf
-
-    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
-    monkeypatch.setattr(analysis, "generate", MagicMock(return_value=content))
-    send_mock = MagicMock()
-    monkeypatch.setattr(delivery, "send_report", send_mock)
-
-    args = SimpleNamespace(
-        type="midday",
-        send=True,
-        dry_run=False,
-        test_recipient="dat.nguyen296286@gmail.com",
-        as_of=str(snapshot.as_of),
-        snapshot=str(snap_path),
-        content=None,
-        collect_only=False,
-        output_dir=str(tmp_path / "out_test_send"),
-        state_dir=str(tmp_path / ".state"),
-    )
-    code = pipeline.run(args)
-    assert code == 0
-    assert send_mock.call_count == 1
-    assert send_mock.call_args[0][3] == ["dat.nguyen296286@gmail.com"]
-    assert send_mock.call_args[1].get("is_test") is True
-
-    out_dir = [d for d in (tmp_path / "out_test_send").iterdir() if d.is_dir()][0]
-    manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["status"] == "sent_test"
-    assert manifest["test_recipient"] == "dat.nguyen296286@gmail.com"
 
 
 def test_normalization_replaces_forecast_and_tenor_digits(snapshot):
@@ -676,48 +587,6 @@ def test_normalization_ensures_gold_two_sentences():
     assert len(re.findall(r"[.!?](?:\s|$)", normalized)) == 2
 
 
-def test_run_test_smtp_directly_sends_without_ai(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
-    from bttn import delivery, pipeline, rendering
-
-    send_mock = MagicMock()
-    monkeypatch.setattr(delivery, "send_report", send_mock)
-
-    def mock_convert(docx):
-        pdf = docx.with_suffix(".pdf")
-        pdf.write_bytes(b"%PDF-1.4 mock")
-        return pdf
-
-    monkeypatch.setattr(rendering, "convert_and_validate", mock_convert)
-    generate_mock = MagicMock()
-    monkeypatch.setattr(analysis, "generate", generate_mock)
-
-    args = SimpleNamespace(
-        type="midday",
-        send=True,
-        dry_run=False,
-        test_smtp=True,
-        test_recipient="dat.nguyen296286@gmail.com",
-        as_of=None,
-        snapshot=None,
-        content=None,
-        collect_only=False,
-        output_dir=str(tmp_path / "out_test_smtp"),
-        state_dir=str(tmp_path / ".state"),
-    )
-    code = pipeline.run(args)
-    assert code == 0
-    assert generate_mock.call_count == 0  # AI was never called!
-    assert send_mock.call_count == 1
-    assert send_mock.call_args[0][3] == ["dat.nguyen296286@gmail.com"]
-    assert send_mock.call_args[1].get("is_test") is True
-
-    out_dirs = list((tmp_path / "out_test_smtp").iterdir())
-    assert len(out_dirs) == 1
-    manifest = json.loads((out_dirs[0] / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["status"] == "sent_test"
-    assert manifest["test_smtp"] is True
 
 
 def test_parse_vietnambiz_coffee():

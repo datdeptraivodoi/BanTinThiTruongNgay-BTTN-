@@ -464,38 +464,40 @@ def test_translation_only_pipeline_does_not_call_editor_renderer_or_email(tmp_pa
     assert json.loads((directory / "translations.json").read_text(encoding="utf-8"))["articles"]
 
 
-def test_unapproved_translation_blocks_publication(tmp_path, monkeypatch):
+def test_matching_unreviewed_translation_can_send_without_faking_human_approval(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
-    from bttn import analysis, delivery, pipeline, rendering, translation_service
+    from bttn import delivery, pipeline
+    from bttn.editorial import Candidate, make_section
 
     fixtures = __import__("pathlib").Path(__file__).parent / "fixtures"
     snap = Snapshot.model_validate_json((fixtures / "snapshot.json").read_text(encoding="utf-8"))
     snap.purpose = "live"
+    news = source()
+    news.published_at = news.retrieved_at = snap.as_of
+    news.text_scope = "article"
+    snap.sources[news.id] = news
     snapshot_path = tmp_path / "snapshot.json"
     snapshot_path.write_text(snap.model_dump_json(), encoding="utf-8")
-    from bttn.models import ReportContent, SentenceReference
+    from bttn.models import ReportContent
     content = ReportContent.model_validate_json((fixtures / "content.json").read_text(encoding="utf-8"))
-    content.highlights[2].sentence_refs = [SentenceReference(paragraph=0, source_id="news_a", quote="Đoạn dịch cần review.")]
-    monkeypatch.setenv("NVIDIA_API_KEY", "test-only")
-    monkeypatch.setattr(translation_service, "translate_snapshot", Mock(return_value={"status": "checked", "pending_review": ["news_a"]}))
-    monkeypatch.setattr(analysis, "generate", Mock(return_value=content))
-    monkeypatch.setattr(rendering, "render", Mock())
-
-    def convert(path):
-        path.write_bytes(b"docx mock")
-        pdf = path.with_suffix(".pdf")
-        pdf.write_bytes(b"pdf mock")
-        return pdf
-
-    monkeypatch.setattr(rendering, "convert_and_validate", convert)
+    content.highlights[2] = make_section(snap, [[Candidate(VIETNAMESE, news.id)]])
+    content_path = tmp_path / "content.json"
+    content_path.write_text(content.model_dump_json(), encoding="utf-8")
+    store = TranslationStore(tmp_path / "state/translations")
+    store.save(news, [VIETNAMESE])
+    translate_snapshot(snap, tmp_path, store.directory, translator=Mock(attempts=[]))
     send = Mock()
     monkeypatch.setattr(delivery, "send_report", send)
-    args = SimpleNamespace(translate_news_only=False, test_smtp=False, as_of=None,
-                           snapshot=str(snapshot_path), content=None, collect_only=False, send=True,
+    args = SimpleNamespace(translate_news_only=False, as_of=None,
+                           snapshot=str(snapshot_path), content=str(content_path), collect_only=False, send=True,
                            output_dir=str(tmp_path / "runs"), state_dir=str(tmp_path / "state"))
-    assert pipeline.run(args) == 1
-    send.assert_not_called()
+    assert pipeline.run(args) == 0
+    send.assert_called_once()
+    assert len(send.call_args.args[1]) == 1 and send.call_args.args[1][0].suffix == ".docx"
     directory = next((tmp_path / "runs").iterdir())
     validation = json.loads((directory / "validation-content.json").read_text(encoding="utf-8"))
-    assert any(i["code"] == "TRANSLATION_REVIEW_REQUIRED" for i in validation)
+    assert not validation
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "sent" and manifest["translation_review_pending"] == 1
+    assert store.load(news).review_status == "needs_review"

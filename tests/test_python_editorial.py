@@ -166,8 +166,8 @@ def test_recovered_translation_attempt_does_not_change_success_to_failure(tmp_pa
     attempts = [{"model": "nvidia/riva-translate-4b-instruct-v2", "status": "failed", "error": "NVIDIA_HTTP_503"},
                 {"model": "nvidia/riva-translate-4b-instruct-v2", "status": "checked", "error": None}]
     (tmp_path / "translation-attempts.json").write_text(json.dumps(attempts), encoding="utf-8")
-    summary = generate_markdown_summary({"status": "validated_draft", "artifacts": {"report.pdf": "abcdef"}}, directory=tmp_path)
-    assert "BẢN NHÁP ĐÃ KIỂM CHỨNG" in summary and "NVIDIA_HTTP_503" in summary
+    summary = generate_markdown_summary({"status": "word_created", "artifacts": {"report.docx": "abcdef"}}, directory=tmp_path)
+    assert "ĐÃ TẠO FILE WORD" in summary and "NVIDIA_HTTP_503" in summary
     assert "Lý do chặn" not in summary and "Chính thức (Official)" not in summary
 
 

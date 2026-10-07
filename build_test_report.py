@@ -6,6 +6,6 @@ from bttn.pipeline import main
 if __name__ == "__main__":
     root = Path(__file__).parent
     raise SystemExit(main([
-        "--dry-run", "--snapshot", str(root / "tests/fixtures/snapshot.json"),
+        "--create-only", "--snapshot", str(root / "tests/fixtures/snapshot.json"),
         "--content", str(root / "tests/fixtures/content.json"),
     ]))

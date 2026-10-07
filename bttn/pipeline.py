@@ -63,62 +63,13 @@ def run_news_translation(args):
         LOG.info("Translation status: %s; directory: %s; no email sent", manifest["status"], directory)
 
 
-def run_test_smtp(args):
-    """Bypasses AI and web scraping to immediately verify SMTP authentication and email delivery."""
-    from .delivery import send_report
-    from .rendering import convert_and_validate, render
-    from .summary import write_step_summary
-
-    started = time.monotonic()
-    now = parse_as_of(None)
-    directory = Path(args.output_dir) / (now.strftime("%Y%m%d-%H%M%S") + "-test-smtp-" + uuid4().hex[:8])
-    directory.mkdir(parents=True, exist_ok=True)
-    test_recipient = getattr(args, "test_recipient", None) or "dat.nguyen296286@gmail.com"
-
-    manifest = {
-        "status": "started",
-        "as_of": now.isoformat(),
-        "send_requested": True,
-        "test_recipient": test_recipient,
-        "test_smtp": True,
-        "artifacts": {},
-    }
-    LOG.info("Running SMTP verification test directly to %s", test_recipient)
-
-    fixtures = ROOT / "tests" / "fixtures"
-    snap_file = fixtures / "snapshot.json"
-    content_file = fixtures / "content.json"
-    if not snap_file.is_file() or not content_file.is_file():
-        raise FileNotFoundError("Fixtures required for SMTP test not found")
-
-    snapshot = Snapshot.model_validate_json(snap_file.read_text(encoding="utf-8"))
-    content = ReportContent.model_validate_json(content_file.read_text(encoding="utf-8"))
-    snapshot.as_of = now
-
-    output = directory / f"BTTN-TEST-{now:%Y%m%d}.docx"
-    render(snapshot, content, ROOT / "template.docx", output, is_draft=False)
-    pdf = convert_and_validate(output)
-    manifest["artifacts"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [output, pdf]}
-
-    send_report(snapshot, [output, pdf], Path(args.state_dir), [test_recipient], is_test=True)
-    manifest["status"] = "sent_test"
-    manifest["elapsed_seconds"] = round(time.monotonic() - started, 3)
-    write_json(directory / "manifest.json", manifest)
-    write_step_summary(manifest, snapshot=snapshot, directory=directory)
-    LOG.info("SMTP test completed successfully; email delivered to %s", test_recipient)
-    return 0
-
-
 def run(args):
     if getattr(args, "translate_news_only", False):
         return run_news_translation(args)
-    if getattr(args, "test_smtp", False):
-        return run_test_smtp(args)
-
     from .analysis import generate
     from .delivery import send_report
     from .http import Http
-    from .rendering import convert_and_validate, render
+    from .rendering import render, validate_docx
     from .sources import collect_snapshot
 
     started = time.monotonic()
@@ -129,12 +80,14 @@ def run(args):
         "status": "started",
         "as_of": as_of.isoformat(),
         "send_requested": args.send,
-        "test_recipient": getattr(args, "test_recipient", None),
+        "output_format": "docx",
+        "pdf_generated": False,
+        "translation_review_policy": "optional",
         "rules_sha256": hashlib.sha256((ROOT / "config/editorial_rules.json").read_bytes()).hexdigest(),
         "skill_sha256": hashlib.sha256((ROOT / "SKILL.md").read_bytes()).hexdigest(),
     }
     try:
-        manifest["commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        manifest["commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip()
     except (OSError, subprocess.SubprocessError):
         manifest["commit"] = "unknown"
     LOG.info("Run directory: %s", directory)
@@ -184,9 +137,7 @@ def run(args):
                         for section in (getattr(content, name) if name == "highlights" else [getattr(content, name)])
                         for ref in section.sentence_refs}
                 pending = [sid for sid, record in records.items() if sid in used and record.review_status != "approved"]
-                if pending:
-                    translation_issues.append(Issue(severity="error", code="TRANSLATION_REVIEW_REQUIRED",
-                        message="Bản dịch trong nội dung tái hiện cần review trước khi phát hành."))
+                manifest["translation_review_pending"] = len(pending)
         else:
             try:
                 from .translation_service import translate_snapshot
@@ -203,9 +154,6 @@ def run(args):
                         for ref in section.sentence_refs}
                 pending = sorted(set(translated["pending_review"]) & used)
                 manifest["translation_review_pending"] = len(pending)
-                if pending:
-                    translation_issues.append(Issue(severity="error", code="TRANSLATION_REVIEW_REQUIRED",
-                        message="Các bản dịch đã chọn cần review nghĩa/văn phong trước khi phát hành."))
             except Exception as exc:
                 ai_error = str(exc)
                 LOG.warning("Translation/Python editing did not complete: %s", exc)
@@ -224,12 +172,13 @@ def run(args):
         (directory / "content.json").write_text(content.model_dump_json(indent=2), encoding="utf-8")
 
         # Distinct draft vs official publication watermark / label
-        is_draft = not args.send or bool(data_issues or content_issues or ai_error)
+        is_draft = snapshot.purpose != "live" or bool(data_issues or content_issues or ai_error)
         output = directory / f"BTTN-{snapshot.as_of:%Y%m%d}.docx"
         render_content = sanitize_content_for_draft_render(content, snapshot, content_issues) if (content_issues or ai_error) else content
         render(snapshot, render_content, ROOT / "template.docx", output, is_draft=is_draft)
-        pdf = convert_and_validate(output)
-        manifest["artifacts"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [output, pdf]}
+        validate_docx(output)
+        manifest["document_validation"] = "docx_structure_times_new_roman_11"
+        manifest["artifacts"] = {output.name: hashlib.sha256(output.read_bytes()).hexdigest()}
 
         # If there are data or content issues:
         # In --send mode: Block delivery and return 1 (artifacts preserved for review)
@@ -251,24 +200,18 @@ def run(args):
                 return 1
             return 0
 
-        manifest["status"] = "validated_draft"
+        manifest["status"] = "word_created"
 
         if args.send:
-            test_recipient = getattr(args, "test_recipient", None)
-            if not test_recipient:
-                recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn").split(",") if r.strip()]
-                send_report(snapshot, [output, pdf], Path(args.state_dir), recipients, is_test=False)
-                manifest["status"] = "sent"
-            else:
-                recipients = [test_recipient.strip()]
-                LOG.info("Sending test report to %s", recipients)
-                send_report(snapshot, [output, pdf], Path(args.state_dir), recipients, is_test=True)
-                manifest["status"] = "sent_test"
+            recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn").split(",") if r.strip()]
+            manifest["recipients"] = recipients
+            send_report(snapshot, [output], Path(args.state_dir), recipients)
+            manifest["status"] = "sent"
 
         LOG.info("Completed: %s", manifest["status"])
         return 0
     except Exception as exc:
-        if manifest["status"] in ("started", "validated_draft"):
+        if manifest["status"] in ("started", "word_created"):
             manifest["status"] = "failed"
         manifest["error_type"] = type(exc).__name__
         message = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else type(exc).__name__
@@ -291,11 +234,9 @@ def main(argv=None):
     parser.add_argument("--type", choices=["midday"], default="midday")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--send", action="store_true", help="Send only after all validation gates pass")
-    modes.add_argument("--dry-run", action="store_true", help="Generate and validate without sending (default)")
+    modes.add_argument("--create-only", "--dry-run", dest="dry_run", action="store_true", help="Create Word without sending email (default); no PDF")
     modes.add_argument("--translate-news-only", action="store_true", help="NVIDIA translation review only; no other models or email")
     parser.add_argument("--news-file", help="Imported Trading Economics article JSON for translation review")
-    parser.add_argument("--test-recipient", help="Recipient email for test delivery outside the midday window")
-    parser.add_argument("--test-smtp", action="store_true", help="Bypass AI to immediately test SMTP delivery to test-recipient")
     parser.add_argument("--as-of", help="ISO timestamp including UTC offset")
     parser.add_argument("--snapshot", help="Replay stored snapshot JSON, without fetching sources")
     parser.add_argument("--content", help="Use existing structured content JSON, without calling AI")
@@ -303,13 +244,10 @@ def main(argv=None):
     parser.add_argument("--output-dir", default=str(ROOT / "output"))
     parser.add_argument("--state-dir", default=str(ROOT / ".state"))
     args = parser.parse_args(argv)
-    if args.translate_news_only and (args.test_smtp or args.test_recipient or args.collect_only or args.content):
-        parser.error("--translate-news-only cannot be combined with SMTP, content or collection options")
+    if args.translate_news_only and (args.collect_only or args.content):
+        parser.error("--translate-news-only cannot be combined with content or collection options")
     if args.news_file and not args.translate_news_only:
         parser.error("--news-file requires --translate-news-only")
-    if args.test_smtp or (args.test_recipient and not args.dry_run):
-        args.send = True
-        args.dry_run = False
     if args.send and args.collect_only:
         parser.error("--send cannot be combined with --collect-only")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")

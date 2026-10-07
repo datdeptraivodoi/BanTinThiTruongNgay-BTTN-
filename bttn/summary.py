@@ -31,8 +31,8 @@ def generate_markdown_summary(
 
     # 1. Header & Status Badge
     status_badges = {
-        "sent": ("🚀 ĐÃ PHÁT HÀNH (SENT)", "Bản tin đã được kiểm chứng và gửi thành công qua email tới các bên liên quan."),
-        "sent_test": ("🧪 ĐÃ GỬI THỬ NGHIỆM (TEST SENT)", "Bản tin đã được kiểm chứng và gửi thử nghiệm thành công tới email riêng chỉ định."),
+        "sent": ("🚀 ĐÃ GỬI FILE WORD (SENT)", "File Word đã qua các kiểm tra tự động và gửi thành công tới danh sách email được cấu hình."),
+        "word_created": ("📄 ĐÃ TẠO FILE WORD — CHƯA GỬI EMAIL", "File Word đã tạo và qua các kiểm tra tự động. Lượt này không gửi email và không tạo PDF."),
         "validated_draft": ("📝 BẢN NHÁP ĐÃ KIỂM CHỨNG (VALIDATED DRAFT)", "Bản nháp đã tạo thành công; toàn bộ kiểm tra dữ liệu và nội dung đều đạt chuẩn."),
         "draft_with_issues": ("📝 BẢN NHÁP CÓ CẢNH BÁO (DRAFT WITH WARNINGS)", "Bản nháp đã tạo thành công; có một số lưu ý/cảnh báo về số liệu hoặc nội dung."),
         "blocked_timing": ("⚠️ CHẶN PHÁT HÀNH (BLOCKED - LỊCH CHẠY MUỘN)", "Lượt chạy ngoài khung giờ phát hành 12:00–15:00 VN. Đã dừng để tránh gửi bản tin trưa vào buổi tối."),
@@ -43,7 +43,7 @@ def generate_markdown_summary(
     }
 
     status_badges.update({
-        "translated_news_pending_review": ("📝 ĐÃ DỊCH TIN — CHỜ REVIEW", "Bản dịch đã qua kiểm tra kỹ thuật; cần review nghĩa trước khi phát hành."),
+        "translated_news_pending_review": ("📝 ĐÃ DỊCH TIN — CHƯA REVIEW THỦ CÔNG", "Bản dịch đã qua kiểm tra kỹ thuật; review nghĩa là tùy chọn trong luồng gửi Word trực tiếp."),
         "translated_news_approved": ("📝 BẢN DỊCH ĐÃ REVIEW", "Bản dịch đã review; lượt này không dựng báo cáo hoặc gửi email."),
         "blocked_translation": ("⚠️ CHƯA ĐỦ BẢN DỊCH", "Thiếu bài hoặc bản dịch đạt kiểm tra; xem translations.json để biết từng nguồn."),
     })
@@ -57,21 +57,20 @@ def generate_markdown_summary(
     as_of_str = manifest.get("as_of", "—")
     elapsed = manifest.get("elapsed_seconds", "—")
     commit = manifest.get("commit", "unknown")
-    test_recipient = manifest.get("test_recipient")
-    if test_recipient:
-        mode_str = f"Gửi thử nghiệm (`--test-recipient {test_recipient}`)"
-    elif send_requested:
-        mode_str = "Phát hành chính thức (`--send`)"
+    if send_requested:
+        mode_str = "Gửi file Word đến danh sách email (`--send`)"
     else:
-        mode_str = "Xem trước / Bản nháp (`--dry-run`)"
+        mode_str = "Chỉ tạo file Word (`--create-only`)"
 
     lines.append("### 📌 Thông tin lượt chạy\n")
     lines.append("| Thông tin | Giá trị |")
     lines.append("| :--- | :--- |")
     lines.append(f"| **Thời điểm chốt dữ liệu (as-of)** | `{as_of_str}` |")
     lines.append(f"| **Chế độ thực thi** | {mode_str} |")
-    if test_recipient:
-        lines.append(f"| **Email nhận thử nghiệm** | `{test_recipient}` |")
+    if manifest.get("output_format"):
+        lines.append("| **Định dạng tài liệu** | Word (.docx); PDF tạm ngừng |")
+    if manifest.get("recipients"):
+        lines.append(f"| **Email nhận bản tin** | {', '.join(manifest['recipients'])} |")
     lines.append(f"| **Trạng thái manifest** | `{status}` |")
     lines.append(f"| **Thời gian xử lý** | `{elapsed}s` |")
     lines.append(f"| **Commit Git** | `{commit[:8] if len(commit) >= 8 else commit}` |\n")
@@ -184,8 +183,8 @@ def generate_markdown_summary(
     # 6. Artifacts
     artifacts = manifest.get("artifacts", {})
     if artifacts:
-        is_draft_doc = manifest.get("status") != "sent"
-        doc_badge = "📝 Bản nháp (Draft)" if is_draft_doc else "✅ Chính thức (Official)"
+        is_draft_doc = status not in ("sent", "word_created")
+        doc_badge = "📝 Bản nháp có cảnh báo" if is_draft_doc else "✅ Word đã gửi email" if status == "sent" else "📄 Word đã tạo; chưa gửi email"
         lines.append("### 📁 Tài liệu xuất xưởng (Artifacts)\n")
         lines.append(f"> Phân loại tài liệu: **{doc_badge}**\n")
         lines.append("| Tên tệp | Định dạng | Trạng thái & Ghi chú | SHA-256 Checksum |")

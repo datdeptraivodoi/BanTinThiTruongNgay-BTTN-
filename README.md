@@ -2,6 +2,15 @@
 
 Pipeline Python tạo bản tin từ dữ liệu có nguồn, Riva dịch từng bài và Python chọn câu và template Word. Workflow bắt đầu **12:00 giờ Việt Nam, thứ Hai–thứ Sáu** (`05:00 UTC`). Đây là giờ trigger; GitHub Actions có thể xếp hàng nên không bảo đảm email đến đúng 12:00.
 
+Trong **Actions → BTTN midday → Run workflow**, chỉ có một menu:
+
+1. **Gửi file Word đến các email**: gửi một file `.docx` tới danh sách `RECIPIENTS` sau kiểm tra tự động.
+2. **Chỉ tạo file Word**: lưu `.docx` trong Artifacts, không gửi email.
+
+Mặc định chọn gửi Word; lịch 12:00 cũng gửi Word. Không còn ô gửi email thử,
+địa chỉ nhận thử hoặc nhánh gửi báo cáo mẫu SMTP. **Tạm ngừng tạo và đính kèm PDF.**
+Kiểm thử mã nguồn nằm trong workflow `BTTN checks`, không chạy lại trước mỗi lượt xuất bản.
+
 ## Các thay đổi
 
 - `bttn/sources.py`, `vira.py`: thu thập, lưu bản gốc và hash; mỗi số có nguồn, thời điểm, đơn vị, ngày giao dịch và cách tính.
@@ -12,7 +21,7 @@ Pipeline Python tạo bản tin từ dữ liệu có nguồn, Riva dịch từng
 - Mọi ô dữ liệu, bảng và biểu đồ động cũ trong template bị xóa trước khi dựng lại. Không dùng số mẫu làm fallback. Nội dung biên tập thực sự xuất hiện trong Word.
 - Biến động ngày so với phiên hoàn tất liền trước, không dùng `chartPreviousClose` của toàn khoảng tải. Biến động năm ghi rõ **YoY**.
 - Phần dự báo và ý tưởng sản phẩm để trống. Thiếu nguồn cho mục tùy chọn thì hiện `—`; thiếu dữ liệu bắt buộc thì dừng và không gửi email.
-- PDF phải được xuất mới qua LibreOffice, đủ ba trang và không còn placeholder. Gửi thất bại trả mã lỗi. Ledger ngăn tự gửi lại khi SMTP có kết quả không chắc chắn.
+- Word được kiểm tra cấu trúc ba bảng trang, không còn placeholder, Times New Roman 11. Không gọi LibreOffice hoặc chuyển đổi PDF trong luồng xuất bản. Gửi thất bại trả mã lỗi; ledger ngăn tự gửi lại khi SMTP có kết quả không chắc chắn.
 
 ## Nguồn và giới hạn hiện tại
 
@@ -31,13 +40,15 @@ Lịch ngày làm việc hiện bỏ thứ Bảy/Chủ nhật, chưa tích hợp
 
 ## Cài đặt và chạy
 
-Python 3.12; cài LibreOffice và font **Times New Roman thực**. Không chấp nhận font thay thế Liberation Serif. PDF phải có đúng ba trang, đúng vị trí các mục và mọi chữ văn bản ở cỡ 11. Biểu đồ cũng dựng tại kích thước vật lý trong Word để nhãn giữ cỡ 11.
+Python 3.12 và font **Times New Roman thực**. Không chấp nhận font thay thế Liberation Serif.
+Word có ba khối trang theo template, cỡ chữ 11; biểu đồ dựng tại kích thước vật lý trong Word.
+Kiểm tra cấu trúc Word không chứng minh số trang khi Word phân trang trên máy người nhận;
+việc kiểm chứng bố cục qua PDF tạm ngừng theo quy trình hiện tại. Không cần LibreOffice để tạo/gửi Word.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env
-$env:LIBREOFFICE_PATH = 'C:\Program Files\LibreOffice\program\soffice.exe'
 .\.venv\Scripts\python -m pytest -q
 .\.venv\Scripts\python build_test_report.py
 ```
@@ -47,15 +58,15 @@ $env:LIBREOFFICE_PATH = 'C:\Program Files\LibreOffice\program\soffice.exe'
 ```powershell
 # Kiểm tra nguồn, không gọi AI và không gửi
 python market_report.py --collect-only
-# Tạo bản xem trước (mặc định), dịch bằng NVIDIA và chọn câu bằng Python
-python market_report.py --dry-run
-# Phát hành sau mọi kiểm tra; chỉ ngày làm việc 12:00–15:00 VN
+# Chỉ tạo Word (mặc định), dịch bằng NVIDIA và chọn câu bằng Python
+python market_report.py --create-only
+# Gửi Word sau kiểm tra tự động; không yêu cầu gửi email thử hoặc duyệt dịch thủ công
 python market_report.py --send
 # Tái hiện bản đã lưu, không gọi nguồn hoặc AI
-python market_report.py --snapshot path/to/snapshot.json --content path/to/content.json --dry-run
+python market_report.py --snapshot path/to/snapshot.json --content path/to/content.json --create-only
 ```
 
-`--as-of` yêu cầu ISO timestamp có múi giờ. Muốn tái hiện chính xác giá intraday cũ phải dùng snapshot đã lưu, không lấy nến ngày hiện tại để suy ngược intraday. Mỗi lần chạy có thư mục riêng dưới `output/`, gồm raw sources, OCR, snapshot, validation, bản dịch, dấu vết chọn câu, biểu đồ, Word, PDF và manifest hash/thời gian. Lỗi trả mã khác không; `--collect-only` trả 2 khi dữ liệu chưa đạt. Không lưu API key vào các log này.
+`--as-of` yêu cầu ISO timestamp có múi giờ. Muốn tái hiện chính xác giá intraday cũ phải dùng snapshot đã lưu, không lấy nến ngày hiện tại để suy ngược intraday. Mỗi lần chạy có thư mục riêng dưới `output/`, gồm raw sources, OCR, snapshot, validation, bản dịch, dấu vết chọn câu, biểu đồ, Word và manifest hash/thời gian. `word_created` nghĩa là chỉ tạo Word; chỉ `sent` xác nhận SMTP đã gửi. `--dry-run` vẫn là tên tương thích của `--create-only`. Lỗi trả mã khác không; `--collect-only` trả 2 khi dữ liệu chưa đạt. Không lưu API key vào các log này.
 
 ## Model và GitHub Actions
 
@@ -103,7 +114,9 @@ không có key hoặc response body; không chuyển sang nhà cung cấp dịch
 **Kiểm tra số không chứng minh bản dịch đúng nghĩa.** Trong thử nghiệm thực tế,
 Riva từng dịch sai chiều yết giá JPY, tên thứ trong tuần và một số thuật ngữ/vai trò nhân vật.
 Đã bổ sung ví dụ yết giá và kiểm tra lỗi quan sát được; bản dịch mới vẫn mang trạng thái
-`needs_review`. Phát hành bị chặn cho tới khi các bài dùng trong báo cáo đã được review.
+`needs_review`. Trạng thái này ghi nhận chưa có người review, không tự đánh dấu model đã được duyệt.
+Theo chế độ gửi trực tiếp, review thủ công là tùy chọn; các kiểm tra nguồn, thời điểm,
+số/đơn vị, thuật ngữ và nội dung vẫn bắt buộc. Lượt gửi không dừng chỉ vì `needs_review`.
 Riêng cách diễn đạt “yen depreciated past X per dollar”, Python chuẩn hóa câu mở đầu
 khi con số và cấu trúc nguồn khớp thành “USD-JPY vượt mức X cho thấy JPY đang suy yếu”.
 Giữ nguyên phần tin theo sau và số gốc, không đảo thành “dưới X”. Nhật ký ghi `python_postprocessed`; đây là sửa bằng quy tắc,

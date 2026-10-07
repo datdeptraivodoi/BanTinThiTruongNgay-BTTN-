@@ -6,18 +6,14 @@ on:
     - cron: '0 5 * * 1-5'
   workflow_dispatch:
     inputs:
-      send_email:
-        description: 'Tích chọn để gửi email phát hành (không giới hạn giờ; gửi tới email thử nếu có, hoặc danh sách chính thức nếu để trống)'
-        type: boolean
-        default: false
-      test_recipient:
-        description: 'Email nhận thử nghiệm (chỉ gửi riêng tới email này khi tích gửi email; để trống để phát hành tới danh sách chính thức)'
-        type: string
-        default: 'dat.nguyen296286@gmail.com'
-      test_smtp:
-        description: 'Kiểm tra gửi SMTP ngay (bỏ qua AI; gửi ngay báo cáo mẫu tới email test để xác minh Gmail/App Password)'
-        type: boolean
-        default: false
+      action:
+        description: 'Chọn cách xuất bản tin Word'
+        type: choice
+        required: true
+        default: '1. Gửi file Word đến các email'
+        options:
+          - '1. Gửi file Word đến các email'
+          - '2. Chỉ tạo file Word'
 
 permissions:
   contents: read
@@ -42,15 +38,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libreoffice fonts-dejavu fonts-liberation libgl1
+          sudo apt-get install -y fonts-dejavu libgl1
           echo 'ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true' | sudo debconf-set-selections
           sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y ttf-mscorefonts-installer
           fc-cache -f
           test "$(fc-match -f '%{family}' 'Times New Roman')" = 'Times New Roman'
-          python -m pip install -r requirements-dev.txt
-          npm install
-      - name: Regression tests
-        run: GITHUB_STEP_SUMMARY="" python -m pytest -q
+          python -m pip install -r requirements.txt
+          npm ci --ignore-scripts
       - name: Restore delivery ledger
         id: ledger
         uses: actions/cache/restore@v4
@@ -65,19 +59,20 @@ jobs:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn' }}
-          SEND_EMAIL: ${{ github.event_name == 'schedule' || inputs.send_email }}
-          TEST_RECIPIENT: ${{ github.event_name == 'workflow_dispatch' && inputs.test_recipient || '' }}
-          TEST_SMTP: ${{ github.event_name == 'workflow_dispatch' && inputs.test_smtp || false }}
+          REPORT_ACTION: ${{ inputs.action || '1. Gửi file Word đến các email' }}
         run: |
-          if [ "$TEST_SMTP" = "true" ]; then
-            python market_report.py --type midday --test-smtp --test-recipient "$TEST_RECIPIENT"
-          elif [ "$SEND_EMAIL" = "true" ] && [ -n "$TEST_RECIPIENT" ]; then
-            python market_report.py --type midday --send --test-recipient "$TEST_RECIPIENT"
-          elif [ "$SEND_EMAIL" = "true" ]; then
-            python market_report.py --type midday --send
-          else
-            python market_report.py --type midday --dry-run
-          fi
+          case "$REPORT_ACTION" in
+            '1. Gửi file Word đến các email')
+              python market_report.py --type midday --send
+              ;;
+            '2. Chỉ tạo file Word')
+              python market_report.py --type midday --create-only
+              ;;
+            *)
+              echo 'Lựa chọn xuất bản không hợp lệ' >&2
+              exit 2
+              ;;
+          esac
       - name: Persist delivery ledger even after SMTP uncertainty
         if: always()
         uses: actions/cache/save@v4
