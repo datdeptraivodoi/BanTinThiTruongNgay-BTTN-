@@ -115,6 +115,11 @@ def split_pages(doc, table):
             spacing.set(qn("w:lineRule"), "exact")
             pr.append(spacing)
             p.append(pr)
+            r = OxmlElement("w:r")
+            br = OxmlElement("w:br")
+            br.set(qn("w:type"), "page")
+            r.append(br)
+            p.append(r)
             parent.insert(position, p)
             position += 1
         tbl = deepcopy(table._tbl)

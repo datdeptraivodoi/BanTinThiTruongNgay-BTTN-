@@ -36,9 +36,16 @@ KEYWORDS = {
 
 
 def sentences(text):
-    text = " ".join(text.split())
-    text = re.sub(r"\b(?:U\.S\.|U\.K\.|Mr\.|Ms\.|Dr\.)", lambda m: m[0].replace(".", "∯"), text)
-    return [s.replace("∯", ".").strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    lines = [p.strip() for p in re.split(r"\n+", text) if p.strip()]
+    result = []
+    for line in lines:
+        cleaned = " ".join(line.split())
+        cleaned = re.sub(r"\b(?:U\.S\.|U\.K\.|Mr\.|Ms\.|Dr\.)", lambda m: m[0].replace(".", "∯"), cleaned)
+        for s in re.split(r"(?<=[.!?])\s+", cleaned):
+            s = s.replace("∯", ".").strip()
+            if s:
+                result.append(s)
+    return result
 
 
 @dataclass(frozen=True)

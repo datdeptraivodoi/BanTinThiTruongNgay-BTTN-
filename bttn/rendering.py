@@ -329,7 +329,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         p1 = r3[2].add_paragraph()
         p1.paragraph_format.space_before = Pt(0)
         p1.paragraph_format.space_after = Pt(0)
-        p1.add_run().add_picture(str(chart1_path), width=Cm(10.34), height=Cm(5.41))
+        p1.add_run().add_picture(str(chart1_path), width=Cm(10.0), height=Cm(4.2))
     else:
         plot_cell(r3[2], "Lãi suất liên ngân hàng theo kỳ hạn", snapshot,
                   [("VND_", "VND"), ("USD_", "USD")], output.parent,
@@ -343,7 +343,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         p2 = r4[2].add_paragraph()
         p2.paragraph_format.space_before = Pt(0)
         p2.paragraph_format.space_after = Pt(0)
-        p2.add_run().add_picture(str(chart2_path), width=Cm(10.34), height=Cm(4.81))
+        p2.add_run().add_picture(str(chart2_path), width=Cm(10.0), height=Cm(3.8))
     else:
         plot_trader_fx(r4[2], snapshot, output.parent)
 
@@ -380,7 +380,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         p3 = r5[2].add_paragraph()
         p3.paragraph_format.space_before = Pt(0)
         p3.paragraph_format.space_after = Pt(0)
-        p3.add_run().add_picture(str(chart3_path), width=Cm(10.34), height=Cm(4.81))
+        p3.add_run().add_picture(str(chart3_path), width=Cm(10.0), height=Cm(3.8))
     else:
         plot_bonds(r5[2], snapshot, output.parent)
     heading(r7[0], "VNIBOR và SOFR · VIRA Market Watch")
