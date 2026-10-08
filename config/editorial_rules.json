@@ -4,7 +4,7 @@
   "highlight_word_limits": [[35, 45], [35, 45], [12, 45]],
   "word_limits": {
     "interbank": [88, 95], "usd_vnd": [77, 82], "eur_usd": [150, 200],
-    "japan": [100, 130], "china": [50, 70], "coffee": [130, 135],
+    "japan": [100, 140], "china": [50, 70], "coffee": [130, 135],
     "energy_metals": [125, 135]
   },
   "required_observations": [

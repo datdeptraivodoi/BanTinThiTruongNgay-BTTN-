@@ -219,7 +219,9 @@ def check_translation(original, translated):
         scale_text = re.sub(r"nghìn tỷ", "", translated, flags=re.I) if "billions" in english_scale else translated
         if expected_scales and expected_scales != len(re.findall(vietnamese_scale, scale_text, re.I)):
             raise TranslationError("TRANSLATION_SCALE_UNITS")
-    if original.count("%") != translated.count("%"):
+    orig_pct = original.count("%") + len(re.findall(r"\bper\s*cent\b", original, re.I))
+    trans_pct = translated.count("%") + len(re.findall(r"\bphần\s+trăm\b", translated, re.I))
+    if orig_pct != trans_pct:
         raise TranslationError("TRANSLATION_PERCENT_UNITS")
     for symbol, alternatives in [("$", r"\$|\bUSD\b|đô la(?: Mỹ)?"),
                                  ("€", r"€|\bEUR\b|\beuro\b"), ("¥", r"¥|\bJPY\b|\byên\b")]:
@@ -252,6 +254,14 @@ def normalize_calendar_numbers(original, translated):
     """
     # Order matters: matching totals alone could accept Tuesday/Monday swapped
     # between two sentences. Never infer a weekday from the article's timestamp.
+    # Protect ordinal expressions such as "tháng thứ năm", "lần thứ năm", "phiên thứ năm"
+    # so that "thứ năm" (fifth) is not mistaken for Thursday (thứ Năm).
+    translated = re.sub(
+        r"\b(?:tháng|lần|năm|tuần|quý|phiên)\s+thứ\s+(?:Hai|Ba|Tư|Bốn|Năm|Sáu|Bảy|[2-7]|\d+)\b",
+        " BTTNPROTECTORDINAL ",
+        translated,
+        flags=re.I,
+    )
     source_days = re.findall(r"\b(?:" + "|".join(WEEKDAYS) + r")\b", original, re.I)
     target_days = []
     days = {"hai": "monday", "ba": "tuesday", "tư": "wednesday", "bốn": "wednesday",

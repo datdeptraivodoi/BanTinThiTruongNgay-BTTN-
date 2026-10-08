@@ -6,6 +6,7 @@ substitute search-result headlines for article bodies.
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -19,6 +20,15 @@ COUNTRIES = {"euro area": "EUR", "united states": "USD", "japan": "JPY", "china"
 PATHS = {"euro-area": "EUR", "united-states": "USD", "japan": "JPY", "china": "China"}
 NEWS_PAGES = {topic: f"https://tradingeconomics.com/{path}/news" for path, topic in PATHS.items()}
 MAX_ARTICLES_PER_COUNTRY = 3
+
+
+def is_stock_market_article(title: str, url: str) -> bool:
+    """Detect equity, stock index or single share articles."""
+    url_lower = url.lower()
+    if "/stock-market" in url_lower or re.search(r"/\d{4}:jp", url_lower):
+        return True
+    pattern = r"\b(?:shares?|stocks?|nikkei(?:\s*225)?|topix|equit(?:y|ies))\b"
+    return bool(re.search(pattern, title, re.I))
 
 
 def topic_for(source):
@@ -84,6 +94,13 @@ def parse_news(records, as_of, *, allow_stale=False):
     selected = {}
     for topic in COUNTRIES.values():
         matching = [s for s in accepted.values() if topic_for(s) == topic]
+        if topic == "JPY":
+            macro_matching = [
+                s for s in matching
+                if not is_stock_market_article(s.text.split("\n\n")[0], s.url)
+            ]
+            if macro_matching:
+                matching = macro_matching
         seen = set()
         for source in sorted(matching, key=lambda s: (s.published_at, s.id), reverse=True):
             if source.sha256 in seen:

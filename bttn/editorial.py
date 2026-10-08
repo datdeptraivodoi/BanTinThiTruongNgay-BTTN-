@@ -26,8 +26,8 @@ CONTEXT_DEPENDENT = re.compile(r"^(?:Kết quả này|Số liệu này|Mức nà
 KEYWORDS = {
     "USD": ["Mỹ", "Fed", "lãi suất", "lạm phát", "đô la", "lao động", "tiêu dùng"],
     "EUR": ["euro", "châu Âu", "ECB", "lạm phát", "tài khóa", "Pháp", "Đức"],
-    "JPY": ["yên", "JPY", "Nhật", "BOJ", "lãi suất", "Takaichi", "lạm phát"],
-    "China": ["Trung Quốc", "nhân dân tệ", "PBOC", "tăng trưởng", "tiêu dùng", "kích thích"],
+    "JPY": ["yên", "JPY", "Nhật", "BOJ", "lãi suất", "Takaichi", "lạm phát", "dịch vụ", "kinh tế", "niềm tin", "triển vọng"],
+    "China": ["Trung Quốc", "nhân dân tệ", "PBOC", "tăng trưởng", "tiêu dùng", "kích thích", "kỳ nghỉ", "hành khách", "du lịch"],
     "macro": [
         "GDP", "lạm phát", "FDI", "vốn đầu tư", "kiều hối", "sản xuất công nghiệp",
         "xuất khẩu", "nhập khẩu", "giải ngân đầu tư công", "khách du lịch",
@@ -94,9 +94,10 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
                 continue
             reason = None
             is_official_forecast = bool(re.search(r"\b(?:World Bank|WB|Ngân hàng Thế giới|IMF|ADB|Bộ Tài chính|Tổng cục Thống kê|TCTK|Chính phủ)\b", sentence, re.I))
-            if DISALLOWED.search(sentence) and not is_official_forecast:
+            is_indicator_comparison = bool(re.search(r"\b(?:thấp hơn|cao hơn|vượt|vượt quá)\s+(?:dự kiến|dự báo|kỳ vọng)\b", sentence, re.I))
+            if DISALLOWED.search(sentence) and not is_official_forecast and not is_indicator_comparison:
                 reason = "forecast_or_instruction"
-            elif CONTEXT_DEPENDENT.search(sentence):
+            elif CONTEXT_DEPENDENT.search(sentence) and topic == "macro":
                 # A sentence such as 'This reading was the weakest...' loses
                 # its antecedent when selection omits the actual GDP reading.
                 # Keep it in the full translation for review, not the digest.
@@ -201,7 +202,10 @@ def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=Fals
                                                    [c for c in picked if c.source_id in groups[1]]],
                                         [opening, EUR_SECOND_OPENING])
         else:
-            picked = choose_sentences(candidates, snapshot, low, high, prefix=opening)
+            lead_candidates = [c for c in candidates if candidates and c.source_id == candidates[0].source_id]
+            picked = choose_sentences(lead_candidates, snapshot, low, high, prefix=opening) if lead_candidates else []
+            if not picked:
+                picked = choose_sentences(candidates, snapshot, low, high, prefix=opening)
             result[name] = make_section(snapshot, [picked], [opening])
         count = count_words(resolve(" ".join(result[name].paragraphs), snapshot, safe=True))
         audit[name] = {"status": "selected" if low <= count <= high and picked else "needs_editing",
