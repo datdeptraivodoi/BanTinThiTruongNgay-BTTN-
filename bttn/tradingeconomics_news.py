@@ -177,7 +177,7 @@ def collect_tradingeconomics(http, snapshot, *, import_file=None, allow_stale=Fa
             return
     selected, rejected = parse_news(records, snapshot.as_of, allow_stale=allow_stale)
     snapshot.sources.update(selected)
-    present = {topic_for(s) for s in selected.values()}
+    present = {topic_for(s) for s in snapshot.sources.values() if getattr(s, "kind", None) == "news"}
     for topic in COUNTRIES.values():
         if topic not in present:
             snapshot.add_issue("TE_NEWS_MISSING", f"{topic}: không có toàn văn tin đủ điều kiện trước giờ chốt.")

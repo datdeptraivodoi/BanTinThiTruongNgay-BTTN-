@@ -56,6 +56,7 @@ jobs:
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           TRADINGECONOMICS_API_KEY: ${{ secrets.TRADINGECONOMICS_API_KEY }}
+          SWAP_DATA_URL: ${{ secrets.SWAP_DATA_URL || vars.SWAP_DATA_URL }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn' }}

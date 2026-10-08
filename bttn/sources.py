@@ -623,31 +623,59 @@ def collect_china_news(http, snapshot):
     }
 
     # 1. South China Morning Post (SCMP) Economy
+    scmp_urls = [
+        "https://www.scmp.com/economy?module=oneline_menu_section_int&pgtype=homepage",
+        "https://www.scmp.com/economy",
+    ]
     try:
-        r = http.get("https://www.scmp.com/economy", headers=headers)
-        soup = BeautifulSoup(r.text, "html.parser")
         links = []
-        for a in soup.find_all("a", href=True):
-            href = a["href"].split("?")[0]
-            if "/economy/" in href and "/article/" in href:
-                full = urljoin("https://www.scmp.com", href)
-                if full not in links:
-                    links.append(full)
-        for link in links[:6]:
+        for surl in scmp_urls:
+            try:
+                r = http.get(surl, headers=headers)
+                soup = BeautifulSoup(r.text, "html.parser")
+                for a in soup.find_all("a", href=True):
+                    href = a["href"].split("?")[0]
+                    if "/economy/" in href and "/article/" in href:
+                        full = urljoin("https://www.scmp.com", href)
+                        if full not in links:
+                            links.append(full)
+                if len(links) >= 6:
+                    break
+            except Exception as exc:
+                LOG.debug("SCMP index fetch %s failed: %s", surl, exc)
+        for link in links[:8]:
             try:
                 r2 = http.get(link, headers=headers)
                 s2 = BeautifulSoup(r2.text, "html.parser")
-                m_time = s2.find("meta", property="article:published_time")
-                if not m_time or not m_time.get("content"):
+                at = None
+                m_time = (s2.find("meta", property="article:published_time") or
+                          s2.find("meta", attrs={"name": "article:published_time"}) or
+                          s2.find("time", attrs={"datetime": True}))
+                if m_time:
+                    val = m_time.get("content") or m_time.get("datetime")
+                    if val:
+                        try:
+                            at = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                        except Exception:
+                            pass
+                if not at:
+                    for sc in s2.find_all("script", type="application/ld+json"):
+                        try:
+                            data = json.loads(sc.string or "")
+                            if isinstance(data, dict) and "datePublished" in data:
+                                at = datetime.fromisoformat(data["datePublished"].replace("Z", "+00:00"))
+                                break
+                        except Exception:
+                            pass
+                if not at:
                     continue
-                at = datetime.fromisoformat(m_time["content"].replace("Z", "+00:00"))
                 if at.tzinfo is None:
                     at = at.replace(tzinfo=timezone.utc)
                 age = snapshot.as_of - at
                 if not timedelta(0) <= age <= timedelta(hours=48):
                     continue
-                title_elem = s2.find("meta", property="og:title")
-                title = title_elem["content"].strip() if title_elem and title_elem.get("content") else ""
+                title_elem = s2.find("meta", property="og:title") or s2.find("h1")
+                title = title_elem["content"].strip() if (title_elem and title_elem.get("content")) else (title_elem.get_text(" ", strip=True) if title_elem else "")
                 paras = [p.get_text(" ", strip=True) for p in s2.find_all("p") if len(p.get_text(" ", strip=True).split()) >= 8]
                 body = "\n\n".join(paras)
                 if len(body.split()) < 30 or not title:
@@ -732,8 +760,8 @@ def collect_snapshot(http, as_of):
         ("YAHOO", collect_yahoo),
         ("COFFEE", collect_vietnambiz_coffee),
         ("NEWS", collect_news),
-        ("TE_NEWS", collect_tradingeconomics),
         ("CHINA_NEWS", collect_china_news),
+        ("TE_NEWS", collect_tradingeconomics),
         ("MACRO_NEWS", collect_vietnam_macro_news),
         ("SJC_GOLD", collect_sjc_gold),
         ("VIRA_DAILY", collect_vira_daily),

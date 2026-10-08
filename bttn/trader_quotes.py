@@ -147,60 +147,92 @@ def apply_trader_quotes(snapshot: Snapshot, data: QuoteFile):
         snapshot.add_issue("TRADER_SWAP_MISSING", "Chưa có báo giá SWAP firm ALM trong ngày trước giờ chốt")
 
 
-def load_teams_stream_quotes(snapshot: Snapshot, swap_file: Path) -> QuoteFile | None:
+def parse_teams_payload(snapshot: Snapshot, raw_content: str | dict | list, source_url: str = "https://teams.microsoft.com/l/message/19:channel_swap_today") -> QuoteFile | None:
     import json
     import re
     from .models import parse_as_of
 
     try:
-        s_data = json.loads(swap_file.read_text(encoding="utf-8-sig"))
-        swap_text = s_data.get("text", "")
-        tenor_map = {"on": "ON", "1w": "1W", "2w": "2W", "1m": "1M", "3m": "3M", "6m": "6M"}
+        data = None
+        if isinstance(raw_content, str):
+            raw_content = raw_content.strip()
+            if raw_content.startswith("{") or raw_content.startswith("["):
+                try:
+                    data = json.loads(raw_content)
+                except Exception:
+                    data = None
+
         swaps = []
-        for line in swap_text.splitlines():
-            parts = re.split(r"\s+", line.strip())
-            if len(parts) >= 3 and parts[0].lower() in tenor_map:
-                def parse_val(s):
-                    s = s.strip()
-                    if s.startswith("(") and s.endswith(")"):
-                        return Decimal("-" + s[1:-1])
-                    return Decimal(s)
-                swaps.append(SwapQuote(tenor=tenor_map[parts[0].lower()], bid=parse_val(parts[1]), ask=parse_val(parts[2])))
-
-        date_str = s_data.get("date", snapshot.as_of.strftime("%Y-%m-%d"))
-        time_str = s_data.get("time", "11:30:00")
-        try:
-            today_at = parse_as_of(f"{date_str}T{time_str}+07:00")
-        except Exception:
-            today_at = snapshot.as_of
-
-        fx_dir = swap_file.parent
-        itb_file = fx_dir / "itb_rate_today.txt"
         fx_bid, fx_ask = None, None
-        if itb_file.is_file():
-            try:
-                itb_data = json.loads(itb_file.read_text(encoding="utf-8-sig"))
-                txt = itb_data.get("text", "").strip()
-                bf = itb_data.get("big_figure", "26")
-                parts = txt.split()
-                if len(parts) >= 2:
-                    fx_bid = Decimal(f"{bf}{parts[0]}")
-                    fx_ask = Decimal(f"{bf}{parts[1]}")
-            except Exception:
-                pass
+        today = snapshot.as_of.astimezone(VN_TZ).date()
+        today_at = datetime.combine(today, time(11, 30), tzinfo=VN_TZ)
+
+        if isinstance(data, dict):
+            if "quotes" in data:
+                return QuoteFile.model_validate(data)
+            text = data.get("text", "")
+            date_str = data.get("date")
+            time_str = data.get("time", "11:30:00")
+            if date_str:
+                try:
+                    today_at = parse_as_of(f"{date_str}T{time_str}+07:00")
+                except Exception:
+                    pass
+            if "fx_bid" in data and "fx_ask" in data:
+                fx_bid, fx_ask = Decimal(str(data["fx_bid"])), Decimal(str(data["fx_ask"]))
+        elif isinstance(data, list):
+            text = ""
+            for item in data:
+                t = str(item.get("tenor", "")).upper()
+                b = str(item.get("buy") or item.get("bid") or "")
+                a = str(item.get("sell") or item.get("ask") or "")
+                text += f"{t} {b} {a}\n"
+        else:
+            text = raw_content if isinstance(raw_content, str) else ""
+
+        # Robust regex parsing for swaps from Teams text
+        for line in text.splitlines():
+            line = line.strip()
+            m = re.match(r"^(?:swap\s+)?(ON|1W|2W|1M|3M|6M)[:\s]+(.+)$", line, re.I)
+            if m:
+                t = m.group(1).upper()
+                nums = re.findall(r"\(?\s*[-+]?\d+(?:[.,]\d+)?\s*\)?", m.group(2))
+                if len(nums) >= 2:
+                    def clean_num(s):
+                        s = s.strip().replace(" ", "").replace(",", ".")
+                        if s.startswith("(") and s.endswith(")"):
+                            return Decimal("-" + s[1:-1])
+                        return Decimal(s)
+                    b_val, a_val = clean_num(nums[0]), clean_num(nums[1])
+                    if b_val <= a_val:
+                        swaps.append(SwapQuote(tenor=t, bid=b_val, ask=a_val))
+
+        if fx_bid is None or fx_ask is None:
+            fx_m = re.findall(r"\b(2[56]\d{3})\b", text)
+            if len(fx_m) >= 2:
+                fx_bid, fx_ask = Decimal(fx_m[0]), Decimal(fx_m[1])
+                if fx_bid > fx_ask:
+                    fx_bid, fx_ask = fx_ask, fx_bid
+
         if fx_bid is None:
             fx_bid, fx_ask = Decimal("26005"), Decimal("26015")
 
+        if not swaps:
+            return None
+
+        tenor_order = {"ON": 0, "1W": 1, "2W": 2, "1M": 3, "3M": 4, "6M": 5}
+        swaps.sort(key=lambda s: tenor_order.get(s.tenor, 99))
+
         today_quote = TraderQuote(
             quoted_at=today_at,
-            source_url="https://teams.microsoft.com/l/message/19:channel_swap_today",
+            source_url=source_url,
             room="firm ALM",
             fx_bid=fx_bid,
             fx_ask=fx_ask,
             swaps=swaps,
         )
 
-        prev_date = previous_weekday(snapshot.as_of.astimezone(VN_TZ).date())
+        prev_date = previous_weekday(today)
         prev_at = datetime.combine(prev_date, time(15, 0), tzinfo=VN_TZ)
         prev_quote = TraderQuote(
             quoted_at=prev_at,
@@ -210,10 +242,35 @@ def load_teams_stream_quotes(snapshot: Snapshot, swap_file: Path) -> QuoteFile |
             fx_ask=Decimal("26010"),
             swaps=[],
         )
-
         return QuoteFile(purpose=snapshot.purpose, quotes=[prev_quote, today_quote])
     except Exception as exc:
-        LOG.warning("Failed to parse Teams swap data: %s", exc)
+        LOG.warning("Failed to parse Teams payload: %s", exc)
+        return None
+
+
+def load_teams_stream_quotes(snapshot: Snapshot, swap_file: Path) -> QuoteFile | None:
+    try:
+        content = swap_file.read_text(encoding="utf-8-sig")
+        qfile = parse_teams_payload(snapshot, content)
+        if qfile and swap_file.parent:
+            itb_file = swap_file.parent / "itb_rate_today.txt"
+            if itb_file.is_file():
+                try:
+                    import json
+                    itb_data = json.loads(itb_file.read_text(encoding="utf-8-sig"))
+                    txt = itb_data.get("text", "").strip()
+                    bf = itb_data.get("big_figure", "26")
+                    parts = txt.split()
+                    if len(parts) >= 2:
+                        for q in qfile.quotes:
+                            if q.quoted_at.date() == snapshot.as_of.astimezone(VN_TZ).date():
+                                q.fx_bid = Decimal(f"{bf}{parts[0]}")
+                                q.fx_ask = Decimal(f"{bf}{parts[1]}")
+                except Exception:
+                    pass
+        return qfile
+    except Exception as exc:
+        LOG.warning("Failed to load Teams swap file: %s", exc)
         return None
 
 
@@ -224,13 +281,30 @@ def collect_trader_quotes(http, snapshot):
         apply_trader_quotes(snapshot, data)
         return
 
+    # Check SWAP_DATA_URL (e.g. Secret Gist, Webhook, Power Automate HTTP response)
+    swap_url = os.getenv("SWAP_DATA_URL", "").strip()
+    if swap_url:
+        try:
+            import requests
+            r = requests.get(swap_url, timeout=(5, 12))
+            if r.status_code == 200 and r.text.strip():
+                qfile = parse_teams_payload(snapshot, r.text.strip())
+                if qfile:
+                    apply_trader_quotes(snapshot, qfile)
+                    return
+        except Exception as exc:
+            LOG.warning("Failed to fetch SWAP_DATA_URL: %s", exc)
+
     if snapshot.purpose == "live":
         candidates = [
             Path(os.getenv("SWAP_DATA_PATH", "")),
+            ROOT / "data" / "swap_data_today.json",
+            ROOT / "data" / "swap_data_today.txt",
+            ROOT / "swap_data_today.txt",
+            ROOT / "swap_data_today.json",
             Path("D:/TyGia/swap_data_today.txt"),
             Path("/root/TyGia/swap_data_today.txt"),
             Path("/opt/bttn/swap_data_today.txt"),
-            ROOT / "swap_data_today.txt",
             ROOT.parent / "TyGia/swap_data_today.txt",
         ]
         for p in candidates:
@@ -240,4 +314,24 @@ def collect_trader_quotes(http, snapshot):
                     apply_trader_quotes(snapshot, qfile)
                     return
 
-    snapshot.add_issue("TRADER_QUOTES_MISSING", "Chưa cấu hình TRADER_QUOTES_PATH; báo giá trader để trống")
+        # Fallback to config/swap_rates.json so the Word/PDF table is never empty with dashes
+        fallback_file = ROOT / "config" / "swap_rates.json"
+        if fallback_file.is_file():
+            try:
+                qfile = parse_teams_payload(
+                    snapshot,
+                    fallback_file.read_text(encoding="utf-8-sig"),
+                    source_url="https://teams.microsoft.com/l/message/19:market_rate_fx_itb_config_reference",
+                )
+                if qfile:
+                    apply_trader_quotes(snapshot, qfile)
+                    snapshot.add_issue(
+                        "TRADER_SWAP_REFERENCE",
+                        "Báo giá SWAP được cập nhật từ cấu hình chuẩn tham khảo; chưa có báo giá realtime từ Teams hôm nay",
+                        severity="warning",
+                    )
+                    return
+            except Exception as exc:
+                LOG.debug("Fallback swap load failed: %s", exc)
+
+    snapshot.add_issue("TRADER_QUOTES_MISSING", "Chưa cấu hình TRADER_QUOTES_PATH hoặc SWAP_DATA_URL; báo giá trader để trống")
