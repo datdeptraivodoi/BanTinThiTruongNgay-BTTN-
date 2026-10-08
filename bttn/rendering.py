@@ -97,6 +97,76 @@ def value(snapshot, key):
     return format_value(obs) if obs else "—"
 
 
+def render_swap_table(cell, snapshot):
+    title = paragraph(cell, "Lãi suất SWAP", bold=True, color=NAVY)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    headers = ["Kỳ hạn", "Mua %", "Bán %"]
+    rows = [
+        [t, value(snapshot, f"ALM_SWAP_{t}_BID"), value(snapshot, f"ALM_SWAP_{t}_ASK")]
+        for t in TENORS
+    ]
+    width = int((cell.width or Inches(3.5)) - Inches(.08))
+    table = cell.add_table(rows=len(rows) + 1, cols=3)
+    table.autofit = False
+    col_width = int(width / 3)
+    for column in table.columns:
+        column.width = col_width
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+    for j, label in enumerate(headers):
+        c = table.cell(0, j)
+        c.width = col_width
+        p = c.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.keep_together = True
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        r = p.add_run(label)
+        style_run(r)
+        r.bold = True
+        r.font.color.rgb = RGBColor.from_string("FFFFFF")
+        shade = OxmlElement("w:shd")
+        shade.set(qn("w:fill"), "4F81BD")
+        c._tc.get_or_add_tcPr().append(shade)
+        margins = OxmlElement("w:tcMar")
+        for name in ("top", "bottom", "left", "right"):
+            edge = OxmlElement("w:" + name)
+            edge.set(qn("w:w"), "10")
+            edge.set(qn("w:type"), "dxa")
+            margins.append(edge)
+        c._tc.get_or_add_tcPr().append(margins)
+    for i, values in enumerate(rows, start=1):
+        table.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for j, val in enumerate(values):
+            c = table.cell(i, j)
+            c.width = col_width
+            p = c.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.keep_together = True
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            r = p.add_run(str(val))
+            style_run(r)
+            r.bold = (j == 0)
+            r.font.color.rgb = RGBColor.from_string("000000")
+            margins = OxmlElement("w:tcMar")
+            for name in ("top", "bottom", "left", "right"):
+                edge = OxmlElement("w:" + name)
+                edge.set(qn("w:w"), "10")
+                edge.set(qn("w:type"), "dxa")
+                margins.append(edge)
+            c._tc.get_or_add_tcPr().append(margins)
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+    tail = cell.paragraphs[-1]
+    tail.paragraph_format.space_after = Pt(0)
+    tail.paragraph_format.space_before = Pt(0)
+    if not tail.text:
+        tail.paragraph_format.line_spacing = Pt(1)
+        for run in tail.runs:
+            run.font.size = Pt(1)
+    return table
+
+
 def render_sbv_block(cell, snapshot):
     title = paragraph(cell, "Tỷ giá USD-VND của NHNN", bold=True, color=NAVY)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -106,7 +176,7 @@ def render_sbv_block(cell, snapshot):
         ["", "Mua", "Bán"],
         ["", value(snapshot, "SBV_BUY"), value(snapshot, "SBV_SELL")],
     ], [.44, .28, .28], blue_cells={(0, 0), (0, 1), (0, 2), (1, 0), (2, 1), (2, 2)})
-    title = paragraph(cell, "Tỷ giá USD-VND ngân hàng\n(tham khảo)", bold=True, color=NAVY)
+    title = paragraph(cell, "Tỷ giá USD-VND liên ngân hàng\n(tham khảo)", bold=True, color=NAVY)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     def pair(suffix):
         buy = snapshot.observations.get("MB_BUY" + suffix)
@@ -347,10 +417,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     else:
         plot_trader_fx(r4[2], snapshot, output.parent)
 
-    heading(r5[0], "Lãi suất SWAP · báo giá trader")
-    grid(r5[0], ["Kỳ hạn", "Mua %", "Bán %"], [
-        [t, value(snapshot, f"ALM_SWAP_{t}_BID"), value(snapshot, f"ALM_SWAP_{t}_ASK")]
-        for t in TENORS])
+    render_swap_table(r5[0], snapshot)
 
     # Row 6 Col 2 (r5[1]): Ý tưởng sản phẩm
     heading(r5[1], "Ý tưởng sản phẩm")

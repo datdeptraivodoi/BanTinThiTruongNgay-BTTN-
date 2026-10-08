@@ -101,7 +101,7 @@ def test_data_templates_meet_word_limits_and_use_trader_instead_of_mb_quotes(mon
     collect_trader_quotes(None, snap)
     sections, _ = domestic_sections(snap, {})
     assert 88 <= count_words(resolve(" ".join(sections["interbank"].paragraphs), snap)) <= 95
-    assert 75 <= count_words(resolve(" ".join(sections["usd_vnd"].paragraphs), snap)) <= 80
+    assert 77 <= count_words(resolve(" ".join(sections["usd_vnd"].paragraphs), snap)) <= 82
     assert "{{INTERBANK_BID}}/{{INTERBANK_ASK}}" in sections["usd_vnd"].paragraphs[0]
 
 

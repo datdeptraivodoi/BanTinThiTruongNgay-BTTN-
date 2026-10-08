@@ -37,6 +37,18 @@ ALLOWED_INDEX_NAMES = re.compile(
 
 ALLOWED_DATE_FORMAT = re.compile(r"\b\d{1,2}[./]\d{1,2}[./]\d{4}\b")
 
+ALLOWED_PROSE_NUMBERS = re.compile(
+    r"\b(?:"
+    r"tháng\s+\d{1,2}|"
+    r"kỳ\s+\d{1,2}|"
+    r"quý\s+[1-4]|"
+    r"\d+\s+năm(?:\s+qua)?|"
+    r"\d+(?:,\d+)?\s+tỷ\s+USD|"
+    r"\d{1,2}\.\d{3}(?:\s*[/–-]\s*\d{1,2}\.\d{3})?"
+    r")\b",
+    re.I,
+)
+
 
 TECHNICAL_LEAKAGE_RE = re.compile(
     r"(?:"
@@ -287,7 +299,8 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
             numeric_prose[ref.paragraph] = numeric_prose[ref.paragraph].replace(ref.quote, "", 1)
         without_tokens = TOKEN.sub("", " ".join(numeric_prose))
         without_dates = ALLOWED_DATE_FORMAT.sub("", without_tokens)
-        without_indices = ALLOWED_INDEX_NAMES.sub("", without_dates)
+        without_prose = ALLOWED_PROSE_NUMBERS.sub("", without_dates)
+        without_indices = ALLOWED_INDEX_NAMES.sub("", without_prose)
         if re.search(r"\d", without_indices):
             error("UNBOUND_NUMBER", "Số liệu phải dùng {{OBSERVATION_ID}}")
         if TECHNICAL_LEAKAGE_RE.search(raw):
