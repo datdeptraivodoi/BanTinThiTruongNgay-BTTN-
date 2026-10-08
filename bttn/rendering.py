@@ -13,6 +13,13 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Pt, RGBColor
 
 from .domestic_charts import render_bond_yield_chart, render_interbank_chart, render_usdvnd_chart
+from .forecasts import (
+    build_asia_forecast,
+    build_coffee_forecast,
+    build_energy_metals_forecast,
+    build_eurusd_forecast,
+    build_usdvnd_forecast,
+)
 from .layout import FONT, SIZE, normalize_typography, split_pages, style_run, styled_table
 from .trader_quotes import TENORS, trader_observation
 from .validation import format_value, resolve
@@ -217,7 +224,7 @@ def plot_bonds(cell, snapshot, directory):
     paragraph(cell, "Nguồn: VIRA Market Watch", color="666666")
 
 
-def narrative(cell, title, section, snapshot, show_source=True):
+def narrative(cell, title, section, snapshot, show_source=True, forecast=None):
     heading(cell, title)
     for p in section.paragraphs:
         paragraph(cell, resolve(p, snapshot, safe=True))
@@ -230,7 +237,9 @@ def narrative(cell, title, section, snapshot, show_source=True):
     labels = ", ".join(names.get(domain, domain.removeprefix("www.")) for domain in domains)
     if show_source:
         paragraph(cell, "Nguồn: " + labels + " · " + ", ".join(dates), color="666666")
-    paragraph(cell, "Dự kiến:", bold=True, color="C00000")
+    fc_text = forecast if forecast is not None else "Dự kiến:"
+    p_fc = paragraph(cell, fc_text, bold=True, color="C00000")
+    p_fc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
 def chart(path, series, ylabel, categorical=False, height=1.55):
@@ -406,7 +415,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
                   "vnibor", category=True, height=1.5)
 
     render_sbv_block(r4[0], snapshot)
-    narrative(r4[1], "Thị trường ngoại hối USD-VND", content.usd_vnd, snapshot, show_source=False)
+    narrative(r4[1], "Thị trường ngoại hối USD-VND", content.usd_vnd, snapshot, show_source=False, forecast=build_usdvnd_forecast(snapshot))
     heading(r4[2], "Diễn biến tỷ giá USD-VND thị trường liên ngân hàng")
     chart2_path = output.parent / "usdvnd_domestic.png"
     if render_usdvnd_chart(chart2_path):
@@ -458,12 +467,13 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         paragraph(r7[0], "Ngày VNIBOR VND: " + dated_vnd.trading_date.strftime("%d/%m/%Y") + ". USD/SOFR: Last theo ấn bản.")
     heading(r7[0], "Lịch sự kiện")
     paragraph(r7[0], "Chưa có nguồn lịch sự kiện đã kiểm chứng.")
-    narrative(r7[1], "Thị trường ngoại hối EU", content.eur_usd, snapshot, show_source=False)
+    narrative(r7[1], "Thị trường ngoại hối EU", content.eur_usd, snapshot, show_source=False, forecast=build_eurusd_forecast(snapshot, content))
     heading(r7[2], "Thị trường ngoại hối Châu Á")
     for section in [content.japan, content.china]:
         for p in section.paragraphs:
             paragraph(r7[2], resolve(p, snapshot, safe=True))
-    paragraph(r7[2], "Dự kiến:", bold=True, color="C00000")
+    p_asia = paragraph(r7[2], build_asia_forecast(snapshot), bold=True, color="C00000")
+    p_asia.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     heading(r8[0], "Thị trường chứng khoán thế giới")
     rows = []
     for key in ["DOW", "NIKKEI", "DAX"]:
@@ -472,7 +482,6 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     grid(r8[0], ["Chỉ số", "Giá trị", "Phiên trước"], rows)
     heading(r8[0], "Ghi chú dữ liệu")
     paragraph(r8[0], "Dấu —: chưa có dữ liệu được xác minh. Giá thị trường có thể thuộc các phiên khác nhau; ngày tham chiếu được lưu trong snapshot và nguồn đi kèm.")
-    paragraph(r8[0], "Các phần dự báo đang để trống theo yêu cầu biên tập.")
     plot_candlestick_cell(r8[1], "EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
     plot_candlestick_cell(r8[2], "USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
 
@@ -489,8 +498,8 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         rows.append([label, value(snapshot, key), f"{obs.daily_pct:+.2f}" if obs and obs.daily_pct is not None else "—", f"{obs.annual_pct:+.2f}" if obs and obs.annual_pct is not None else "—"])
     grid(r11[0], ["Chỉ tiêu", "Giá", "Ngày %", "YoY %"], rows, ratios=[.44, .24, .16, .16])
     paragraph(r11[0], "Nguồn Yahoo Finance (futures liên tục). —: thiếu nguồn phù hợp; không thay RON92 bằng RBOB. Biến động năm: so cùng kỳ năm trước.")
-    narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot, show_source=False)
-    narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot, show_source=False)
+    narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot, show_source=False, forecast=build_energy_metals_forecast(snapshot))
+    narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot, show_source=False, forecast=build_coffee_forecast(snapshot))
     plot_candlestick_cell(r12[1], "Dầu Brent futures · USD/thùng", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
     plot_candlestick_cell(r12[2], "Arabica futures · USc/lbs", snapshot, "ARABICA", output.parent, "arabica", chart_type="commodity", tv_cache=tv_cache)
     normalize_typography(doc)
