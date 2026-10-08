@@ -218,6 +218,7 @@ def normalize_coffee_section(section: Section, snapshot: Snapshot) -> None:
         paragraphs = [""]
 
     text = " ".join(paragraphs)
+    text = re.sub(r"\s*\(\s*Nguồn\s*:\s*giacaphe\.com\s*\)", "", text, flags=re.I)
 
     # Ensure coffee opening
     opening = "Cập nhật giá cà phê thế giới,"

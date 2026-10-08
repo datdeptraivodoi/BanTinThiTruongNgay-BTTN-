@@ -458,7 +458,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         paragraph(r7[0], "Ngày VNIBOR VND: " + dated_vnd.trading_date.strftime("%d/%m/%Y") + ". USD/SOFR: Last theo ấn bản.")
     heading(r7[0], "Lịch sự kiện")
     paragraph(r7[0], "Chưa có nguồn lịch sự kiện đã kiểm chứng.")
-    narrative(r7[1], "Thị trường ngoại hối EU", content.eur_usd, snapshot)
+    narrative(r7[1], "Thị trường ngoại hối EU", content.eur_usd, snapshot, show_source=False)
     heading(r7[2], "Thị trường ngoại hối Châu Á")
     for section in [content.japan, content.china]:
         for p in section.paragraphs:
@@ -489,8 +489,8 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         rows.append([label, value(snapshot, key), f"{obs.daily_pct:+.2f}" if obs and obs.daily_pct is not None else "—", f"{obs.annual_pct:+.2f}" if obs and obs.annual_pct is not None else "—"])
     grid(r11[0], ["Chỉ tiêu", "Giá", "Ngày %", "YoY %"], rows, ratios=[.44, .24, .16, .16])
     paragraph(r11[0], "Nguồn Yahoo Finance (futures liên tục). —: thiếu nguồn phù hợp; không thay RON92 bằng RBOB. Biến động năm: so cùng kỳ năm trước.")
-    narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot)
-    narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot)
+    narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot, show_source=False)
+    narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot, show_source=False)
     plot_candlestick_cell(r12[1], "Dầu Brent futures · USD/thùng", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
     plot_candlestick_cell(r12[2], "Arabica futures · USc/lbs", snapshot, "ARABICA", output.parent, "arabica", chart_type="commodity", tv_cache=tv_cache)
     normalize_typography(doc)

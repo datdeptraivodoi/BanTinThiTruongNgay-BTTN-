@@ -87,6 +87,7 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
             continue
         parts = text.split("\n\n", 1)
         body = parts[1] if len(parts) == 2 else text
+        body = re.sub(r"\s*\(\s*Nguồn\s*:\s*giacaphe\.com\s*\)", "", body, flags=re.I)
         for index, sentence in enumerate(sentences(body)):
             identity = " ".join(sentence.casefold().split())
             if identity in seen:

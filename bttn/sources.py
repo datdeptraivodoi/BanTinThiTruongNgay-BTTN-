@@ -266,7 +266,9 @@ def collect_news(http, snapshot):
                     continue
                 body = detail.select_one("#abody, .vnbcbc-body, .detail-content, .article__body, .cms-body")
                 if body:
-                    candidates.append((link, at, body.get_text(" ", strip=True)[:18000]))
+                    raw_body = body.get_text(" ", strip=True)[:18000]
+                    raw_body = re.sub(r"\s*\(\s*Nguồn\s*:\s*giacaphe\.com\s*\)", "", raw_body, flags=re.I)
+                    candidates.append((link, at, raw_body))
         except Exception as exc:
             snapshot.add_issue("NEWS_ARTICLE", f"{urlparse(url).hostname}: {type(exc).__name__}")
     for url, at, text in candidates:
@@ -291,6 +293,7 @@ def parse_vietnambiz_coffee(html: str, published_at: datetime):
     if not body:
         raise ValueError("Article body not found in VietnamBiz coffee page")
     text = body.get_text(" ", strip=True)
+    text = re.sub(r"\s*\(\s*Nguồn\s*:\s*giacaphe\.com\s*\)", "", text, flags=re.I)
 
     # 1. Trading date
     date_m = re.search(r"phiên giao dịch ngày\s*(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?", text, re.I)
