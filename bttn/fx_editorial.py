@@ -22,6 +22,12 @@ def fx_opening(snapshot: "Snapshot", section: str) -> str:
         elif observation.prev_value is None and len(observation.series) >= 2:
             # Match the point used to resolve the _prev placeholder, including holidays.
             previous_day = observation.series[-2].at.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+        # Prevent UTC date shift if series contains points for the previous weekday
+        if previous_day < previous_weekday(local_day) and any(
+            p.at.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date() == previous_weekday(local_day)
+            for p in observation.series
+        ):
+            previous_day = previous_weekday(local_day)
     today, previous = local_day.strftime("%d.%m.%Y"), previous_day.strftime("%d.%m.%Y")
     # A quote level alone cannot establish that the market is flat. Use neutral prose.
     if section == "eur_usd":

@@ -252,3 +252,8 @@ def main(argv=None):
         parser.error("--send cannot be combined with --collect-only")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     return run(args)
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

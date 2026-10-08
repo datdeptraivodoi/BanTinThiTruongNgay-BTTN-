@@ -106,20 +106,19 @@ def render_sbv_block(cell, snapshot):
         ["", "Mua", "Bán"],
         ["", value(snapshot, "SBV_BUY"), value(snapshot, "SBV_SELL")],
     ], [.44, .28, .28], blue_cells={(0, 0), (0, 1), (0, 2), (1, 0), (2, 1), (2, 2)})
-    title = paragraph(cell, "Tỷ giá USD-VND liên ngân hàng\n(tham khảo)", bold=True, color=NAVY)
+    title = paragraph(cell, "Tỷ giá USD-VND ngân hàng\n(tham khảo)", bold=True, color=NAVY)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     def pair(suffix):
+        buy = snapshot.observations.get("MB_BUY" + suffix)
+        sell = snapshot.observations.get("MB_SELL" + suffix)
+        if buy and sell:
+            return format_value(buy) + "/" + format_value(sell)
         bid, ask = [trader_observation(snapshot, "INTERBANK_" + side + suffix) for side in ("BID", "ASK")]
         if not bid or not ask or bid.value > ask.value or bid.source_id != ask.source_id:
             return "—"
         return format_value(bid) + "/" + format_value(ask)
     styled_table(cell, [["Hôm qua", "Hôm nay"], [pair("_PREV"), pair("")]], [.5, .5],
                  blue_cells={(0, 0), (0, 1)}, red_cells={(1, 1)})
-    dated = []
-    for suffix in ("_PREV", ""):
-        obs = snapshot.observations.get("INTERBANK_BID" + suffix)
-        dated.append(obs.trading_date.strftime("%d/%m") if obs else "—")
-    paragraph(cell, "firm ALM · phiên " + " / ".join(dated), color="666666")
 
 
 def plot_trader_fx(cell, snapshot, directory):
@@ -148,7 +147,7 @@ def plot_bonds(cell, snapshot, directory):
     paragraph(cell, "Nguồn: VIRA Market Watch", color="666666")
 
 
-def narrative(cell, title, section, snapshot):
+def narrative(cell, title, section, snapshot, show_source=True):
     heading(cell, title)
     for p in section.paragraphs:
         paragraph(cell, resolve(p, snapshot, safe=True))
@@ -159,7 +158,8 @@ def narrative(cell, title, section, snapshot):
              "www.mbbank.com.vn": "MBBank", "teams.microsoft.com": "firm ALM", "example.com": "Kiểm thử"}
     dates = sorted({s.published_at.strftime("%d/%m") for s in sources})
     labels = ", ".join(names.get(domain, domain.removeprefix("www.")) for domain in domains)
-    paragraph(cell, "Nguồn: " + labels + " · " + ", ".join(dates), color="666666")
+    if show_source:
+        paragraph(cell, "Nguồn: " + labels + " · " + ", ".join(dates), color="666666")
     paragraph(cell, "Dự kiến:", bold=True, color="C00000")
 
 
@@ -321,7 +321,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         prefix = f"{idx + 1}. " if not re.match(r"^\d+[.)]\s", txt) else ""
         paragraph(r3[0], prefix + txt)
 
-    narrative(r3[1], "Thị trường tiền tệ liên ngân hàng", content.interbank, snapshot)
+    narrative(r3[1], "Thị trường tiền tệ liên ngân hàng", content.interbank, snapshot, show_source=False)
     # Domestic charts use this issue's snapshot, never the undated legacy JSON.
     heading(r3[2], "Diễn biến lãi suất trên thị trường liên ngân hàng")
     chart1_path = output.parent / "interbank.png"
@@ -336,7 +336,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
                   "vnibor", category=True, height=1.5)
 
     render_sbv_block(r4[0], snapshot)
-    narrative(r4[1], "Thị trường ngoại hối USD-VND", content.usd_vnd, snapshot)
+    narrative(r4[1], "Thị trường ngoại hối USD-VND", content.usd_vnd, snapshot, show_source=False)
     heading(r4[2], "Diễn biến tỷ giá USD-VND thị trường liên ngân hàng")
     chart2_path = output.parent / "usdvnd_domestic.png"
     if render_usdvnd_chart(chart2_path):
@@ -351,7 +351,6 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     grid(r5[0], ["Kỳ hạn", "Mua %", "Bán %"], [
         [t, value(snapshot, f"ALM_SWAP_{t}_BID"), value(snapshot, f"ALM_SWAP_{t}_ASK")]
         for t in TENORS])
-    paragraph(r5[0], "Nguồn: firm ALM · báo giá trước giờ chốt", color="666666")
 
     # Row 6 Col 2 (r5[1]): Ý tưởng sản phẩm
     heading(r5[1], "Ý tưởng sản phẩm")

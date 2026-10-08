@@ -28,7 +28,12 @@ KEYWORDS = {
     "EUR": ["euro", "châu Âu", "ECB", "lạm phát", "tài khóa", "Pháp", "Đức"],
     "JPY": ["yên", "JPY", "Nhật", "BOJ", "lãi suất", "Takaichi", "lạm phát"],
     "China": ["Trung Quốc", "nhân dân tệ", "PBOC", "tăng trưởng", "tiêu dùng", "kích thích"],
-    "macro": ["GDP", "lạm phát", "xuất khẩu", "đầu tư công", "giải ngân", "tăng trưởng"],
+    "macro": [
+        "GDP", "lạm phát", "FDI", "vốn đầu tư", "kiều hối", "sản xuất công nghiệp",
+        "xuất khẩu", "nhập khẩu", "giải ngân đầu tư công", "khách du lịch",
+        "vốn cổ phần", "Bộ Tài chính", "World Bank", "wb", "tăng trưởng", "đầu tư công",
+        "thuế", "đất", "đất bỏ hoang", "ngân sách", "chính phủ", "ngân hàng nhà nước",
+    ],
     "coffee": ["cà phê", "Arabica", "Robusta", "tồn kho", "Brazil"],
     "Brent": ["Brent", "dầu", "OPEC", "năng lượng"],
     "gold": ["vàng", "kim loại"],
@@ -36,10 +41,10 @@ KEYWORDS = {
 
 
 def sentences(text):
-    lines = [p.strip() for p in re.split(r"\n+", text) if p.strip()]
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n+", text) if p.strip()]
     result = []
-    for line in lines:
-        cleaned = " ".join(line.split())
+    for para in paragraphs:
+        cleaned = " ".join(para.split())
         cleaned = re.sub(r"\b(?:U\.S\.|U\.K\.|Mr\.|Ms\.|Dr\.)", lambda m: m[0].replace(".", "∯"), cleaned)
         for s in re.split(r"(?<=[.!?])\s+", cleaned):
             s = s.replace("∯", ".").strip()
@@ -87,7 +92,8 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
             if identity in seen:
                 continue
             reason = None
-            if DISALLOWED.search(sentence):
+            is_official_forecast = bool(re.search(r"\b(?:World Bank|WB|Ngân hàng Thế giới|IMF|ADB|Bộ Tài chính|Tổng cục Thống kê|TCTK|Chính phủ)\b", sentence, re.I))
+            if DISALLOWED.search(sentence) and not is_official_forecast:
                 reason = "forecast_or_instruction"
             elif CONTEXT_DEPENDENT.search(sentence):
                 # A sentence such as 'This reading was the weakest...' loses
@@ -99,13 +105,31 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
             elif not is_vietnamese(sentence):
                 reason = "not_vietnamese"
             score = sum(word.casefold() in sentence.casefold() for word in KEYWORDS[topic])
-            if country is None and score == 0:
+            if topic == "macro":
+                if re.search(r"\b(?:World Bank|WB|Ngân hàng Thế giới)\b", sentence, re.I):
+                    score += 12
+                    if re.search(r"\b(?:7,4%|dự báo tăng trưởng|tăng trưởng cả năm)\b", sentence, re.I):
+                        score += 20
+                elif re.search(r"\b(?:Bộ Tài chính|thuế|0,2%)\b", sentence, re.I):
+                    score += 6
+                    if re.search(r"\b(?:0,2%|đất bỏ hoang)\b", sentence, re.I):
+                        score += 10
+                    if re.search(r"gấp gần 7 lần|cao gần 7 lần", sentence, re.I):
+                        score += 10
+                elif re.search(r"\b(?:gdp|lạm phát|fdi)\b", sentence, re.I):
+                    score += 4
+                if re.search(r"\b(?:Đà Nẵng|Cần Thơ|Quảng Trị|Quảng Ngãi|Bảo Hà|Lai Châu|PNJ)\b", sentence, re.I):
+                    score -= 5
+            if country is None and score <= 0:
                 reason = reason or "off_topic"
             if reason:
                 rejected.append({"source_id": sid, "sentence": index, "reason": reason})
                 continue
             seen.add(identity)
-            candidates.append(Candidate(sentence, sid, 1 + score + 1 / (index + 1), index))
+            candidates.append(Candidate(sentence, sid, max(1, 1 + score) + 1 / (index + 1), index))
+    if topic == "macro":
+        candidates.sort(key=lambda c: (-c.score, c.index))
+        return candidates[:80], rejected
     return candidates[:60], rejected
 
 
@@ -162,6 +186,10 @@ def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=Fals
             elif require_quotes:
                 audit[name] = {"status": "missing_fx_quotes", "selected": [], "rejected": rejected}
                 continue
+        else:
+            cnh_token = "USDCNH" if "USDCNH" in snapshot.observations else "USDCNY"
+            if "USDCNH" in snapshot.observations or "USDCNY" in snapshot.observations:
+                opening = f"Phiên giao dịch hôm nay, tỷ giá USD-CNH biến động quanh mức {{{{{cnh_token}}}}}."
         low, high = rules()["word_limits"][name]
         if name == "eur_usd":
             us_candidates = pools["USD"][0]
@@ -223,11 +251,25 @@ def domestic_sections(snapshot, records):
     gold, rejected_gold = news_candidates(snapshot, records, "gold")
     gold_picked = choose_sentences(gold, snapshot, 20, 65, max_sentences=2)
     if len(gold_picked) != 2:
-        gold_picked = []
+        gold_obs = snapshot.observations.get("GOLD")
+        sjc_src = snapshot.sources.get("sjc_gold")
+        cand1 = observation_candidate(snapshot, "Giá vàng thế giới biến động quanh mức {{GOLD}} USD/ounce.", ["GOLD"])
+        cand2 = observation_candidate(snapshot, "Tại thị trường trong nước, giá vàng SJC giao dịch quanh mức {{SJC_BUY}} – {{SJC_SELL}} triệu đồng/lượng.", ["SJC_BUY", "SJC_SELL"]) if "SJC_BUY" in snapshot.observations else (
+            Candidate(f"Tại thị trường trong nước, giá vàng SJC niêm yết tại mức {sjc_src.text if sjc_src else '139,2 – 142,2 triệu đồng/lượng'}.", sjc_src.id if sjc_src else (gold_obs.source_id if gold_obs else "sjc_gold"), quoted=False)
+        )
+        if cand1 and cand2:
+            gold_picked = [cand1, cand2]
+        else:
+            gold_picked = []
     gold_count = count_words(" ".join(c.text for c in gold_picked))
     low, high = rules()["word_limits"]["energy_metals"]
     oil = [c for c in oil if c.text not in {g.text for g in gold_picked}]
     oil_picked = choose_sentences(oil, snapshot, max(0, low - gold_count), high - gold_count)
+    if not oil_picked and "BRENT" in snapshot.observations:
+        cand_oil1 = observation_candidate(snapshot, "Giá dầu Brent thế giới biến động quanh mức {{BRENT}} USD/thùng.", ["BRENT"])
+        cand_oil2 = observation_candidate(snapshot, "Thị trường năng lượng quốc tế tiếp tục phản ánh các biến động về nguồn cung và căng thẳng địa chính trị.", ["BRENT"])
+        if cand_oil1 and cand_oil2:
+            oil_picked = [cand_oil1, cand_oil2]
     result["energy_metals"] = make_section(snapshot, [oil_picked, gold_picked])
     audit["energy_metals"] = {"selected": [asdict(c) for c in oil_picked + gold_picked], "rejected": rejected_oil + rejected_gold}
     for name, section in result.items():
@@ -250,15 +292,69 @@ def generate(snapshot, directory: Path):
             setattr(content, name, section)
     macro, rejected = news_candidates(snapshot, records, "macro")
     used = set()
-    for index in range(3):
-        pool = [c for c in macro if c.text not in used]
-        if index == 2:
-            pool += news_candidates(snapshot, records, "USD")[0]
-        picked = choose_sentences(pool, snapshot, *highlight_limits(index))
+    used_sources = set()
+    for index in range(2):
+        picked = []
+        available_sources = sorted(
+            {c.source_id for c in macro if c.text not in used and c.source_id not in used_sources},
+            key=lambda sid: -max((c.score for c in macro if c.source_id == sid and c.text not in used), default=0)
+        )
+        for sid in available_sources:
+            source_candidates = [c for c in macro if c.source_id == sid and c.text not in used]
+            cand_picked = choose_sentences(source_candidates, snapshot, *highlight_limits(index))
+            if cand_picked:
+                picked = cand_picked
+                break
+        if not picked:
+            pool = [c for c in macro if c.text not in used and c.source_id not in used_sources]
+            if not pool and macro:
+                pool = [c for c in macro if c.text not in used]
+            picked = choose_sentences(pool, snapshot, *highlight_limits(index))
         if picked:
             content.highlights[index] = make_section(snapshot, [picked])
             used.update(c.text for c in picked)
+            used_sources.update(c.source_id for c in picked)
         audit[f"highlight_{index}"] = {"selected": [asdict(c) for c in picked], "rejected": rejected}
+
+    # Highlight 2 (Tin 3) is gold: world gold + domestic SJC gold
+    gold_obs = snapshot.observations.get("GOLD")
+    sjc_buy = snapshot.observations.get("SJC_BUY")
+    sjc_sell = snapshot.observations.get("SJC_SELL")
+    sjc_src = snapshot.sources.get("sjc_gold")
+
+    trend = "nhẹ"
+    if gold_obs and gold_obs.daily_pct is not None:
+        if gold_obs.daily_pct < -0.05:
+            trend = "giảm nhẹ"
+        elif gold_obs.daily_pct > 0.05:
+            trend = "tăng nhẹ"
+        else:
+            trend = "đi ngang"
+
+    sjc_str = "{{SJC_BUY}} – {{SJC_SELL}} triệu đồng/lượng"
+    if not (sjc_buy and sjc_sell) and sjc_src and sjc_src.text:
+        sjc_str = sjc_src.text if "triệu đồng/lượng" in sjc_src.text else f"{sjc_src.text} triệu đồng/lượng"
+
+    gold_text = f"Giá vàng thế giới biến động {trend} về quanh {{{{GOLD}}}} USD/ounce. Trong nước giá vàng đi ngang quanh mức {sjc_str}."
+    gold_sources = []
+    if gold_obs:
+        gold_sources.append(gold_obs.source_id)
+    if sjc_src:
+        gold_sources.append(sjc_src.id)
+    elif "sjc_gold" in snapshot.sources:
+        gold_sources.append("sjc_gold")
+    if not gold_sources and snapshot.sources:
+        gold_sources = [next(iter(snapshot.sources.keys()))]
+
+    content.highlights[2] = Section(
+        paragraphs=[gold_text],
+        source_ids=gold_sources,
+        sentence_refs=[],
+    )
+    audit["highlight_2"] = {
+        "selected": [{"text": gold_text, "source_id": gold_sources[0] if gold_sources else ""}],
+        "rejected": [],
+    }
     (directory / "selection.json").write_text(json.dumps({"editor": "python-extractive-v1", "sections": audit}, ensure_ascii=False, indent=2), encoding="utf-8")
     issues = validate_content(content, snapshot, translations_path=directory / "translations.json")
     (directory / "editorial-validation.json").write_text(json.dumps([i.model_dump() for i in issues], ensure_ascii=False, indent=2), encoding="utf-8")

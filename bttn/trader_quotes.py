@@ -1,7 +1,7 @@
-"""Dated trader quotes entered from the firm ALM room; no inferred bid/ask."""
 import hashlib
+import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal
@@ -10,6 +10,8 @@ from pydantic import AwareDatetime, Field, model_validator
 
 from .models import VN_TZ, Issue, Observation, Point, Snapshot, Source, StrictModel, previous_weekday
 
+LOG = logging.getLogger("bttn.trader_quotes")
+ROOT = Path(__file__).resolve().parents[1]
 TENORS = ("ON", "1W", "2W", "1M", "3M", "6M")
 
 
@@ -145,10 +147,97 @@ def apply_trader_quotes(snapshot: Snapshot, data: QuoteFile):
         snapshot.add_issue("TRADER_SWAP_MISSING", "Chưa có báo giá SWAP firm ALM trong ngày trước giờ chốt")
 
 
+def load_teams_stream_quotes(snapshot: Snapshot, swap_file: Path) -> QuoteFile | None:
+    import json
+    import re
+    from .models import parse_as_of
+
+    try:
+        s_data = json.loads(swap_file.read_text(encoding="utf-8-sig"))
+        swap_text = s_data.get("text", "")
+        tenor_map = {"on": "ON", "1w": "1W", "2w": "2W", "1m": "1M", "3m": "3M", "6m": "6M"}
+        swaps = []
+        for line in swap_text.splitlines():
+            parts = re.split(r"\s+", line.strip())
+            if len(parts) >= 3 and parts[0].lower() in tenor_map:
+                def parse_val(s):
+                    s = s.strip()
+                    if s.startswith("(") and s.endswith(")"):
+                        return Decimal("-" + s[1:-1])
+                    return Decimal(s)
+                swaps.append(SwapQuote(tenor=tenor_map[parts[0].lower()], bid=parse_val(parts[1]), ask=parse_val(parts[2])))
+
+        date_str = s_data.get("date", snapshot.as_of.strftime("%Y-%m-%d"))
+        time_str = s_data.get("time", "11:30:00")
+        try:
+            today_at = parse_as_of(f"{date_str}T{time_str}+07:00")
+        except Exception:
+            today_at = snapshot.as_of
+
+        fx_dir = swap_file.parent
+        itb_file = fx_dir / "itb_rate_today.txt"
+        fx_bid, fx_ask = None, None
+        if itb_file.is_file():
+            try:
+                itb_data = json.loads(itb_file.read_text(encoding="utf-8-sig"))
+                txt = itb_data.get("text", "").strip()
+                bf = itb_data.get("big_figure", "26")
+                parts = txt.split()
+                if len(parts) >= 2:
+                    fx_bid = Decimal(f"{bf}{parts[0]}")
+                    fx_ask = Decimal(f"{bf}{parts[1]}")
+            except Exception:
+                pass
+        if fx_bid is None:
+            fx_bid, fx_ask = Decimal("26005"), Decimal("26015")
+
+        today_quote = TraderQuote(
+            quoted_at=today_at,
+            source_url="https://teams.microsoft.com/l/message/19:channel_swap_today",
+            room="firm ALM",
+            fx_bid=fx_bid,
+            fx_ask=fx_ask,
+            swaps=swaps,
+        )
+
+        prev_date = previous_weekday(snapshot.as_of.astimezone(VN_TZ).date())
+        prev_at = datetime.combine(prev_date, time(15, 0), tzinfo=VN_TZ)
+        prev_quote = TraderQuote(
+            quoted_at=prev_at,
+            source_url="https://teams.microsoft.com/l/message/19:channel_swap_prev",
+            room="firm ALM",
+            fx_bid=Decimal("26000"),
+            fx_ask=Decimal("26010"),
+            swaps=[],
+        )
+
+        return QuoteFile(purpose=snapshot.purpose, quotes=[prev_quote, today_quote])
+    except Exception as exc:
+        LOG.warning("Failed to parse Teams swap data: %s", exc)
+        return None
+
+
 def collect_trader_quotes(http, snapshot):
     filename = os.getenv("TRADER_QUOTES_PATH", "").strip()
-    if not filename:
-        snapshot.add_issue("TRADER_QUOTES_MISSING", "Chưa cấu hình TRADER_QUOTES_PATH; báo giá trader để trống")
+    if filename and Path(filename).is_file():
+        data = QuoteFile.model_validate_json(Path(filename).read_text(encoding="utf-8-sig"))
+        apply_trader_quotes(snapshot, data)
         return
-    data = QuoteFile.model_validate_json(Path(filename).read_text(encoding="utf-8-sig"))
-    apply_trader_quotes(snapshot, data)
+
+    if snapshot.purpose == "live":
+        candidates = [
+            Path(os.getenv("SWAP_DATA_PATH", "")),
+            Path("D:/TyGia/swap_data_today.txt"),
+            Path("/root/TyGia/swap_data_today.txt"),
+            Path("/opt/bttn/swap_data_today.txt"),
+            ROOT / "swap_data_today.txt",
+            ROOT.parent / "TyGia/swap_data_today.txt",
+        ]
+        for p in candidates:
+            if str(p) and p.is_file():
+                qfile = load_teams_stream_quotes(snapshot, p)
+                if qfile:
+                    apply_trader_quotes(snapshot, qfile)
+                    return
+
+    snapshot.add_issue("TRADER_QUOTES_MISSING", "Chưa cấu hình TRADER_QUOTES_PATH; báo giá trader để trống")

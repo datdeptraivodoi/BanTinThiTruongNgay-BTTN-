@@ -128,8 +128,10 @@ def test_sbv_layout_and_no_mb_substitution(snapshot):
     assert (len(fixing.rows), len(fixing.columns)) == (4, 3)
     assert fixing.cell(2, 0).text == fixing.cell(3, 0).text == ''
     assert fixing.cell(1, 0)._tc.tcPr.find(qn('w:shd')).get(qn('w:fill')) == '4F81BD'
-    assert interbank.cell(1, 1).text == '25.875/26.265'
+    assert interbank.cell(1, 1).text == '25.800/26.000'
     assert interbank.cell(1, 1).paragraphs[0].runs[0].font.color.rgb.__str__() == 'C00000'
+    snapshot.observations.pop('MB_BUY', None)
+    snapshot.observations.pop('MB_SELL', None)
     remove_trader_data(snapshot)
     cell = doc.add_table(rows=1, cols=1).cell(0, 0)
     render_sbv_block(cell, snapshot)

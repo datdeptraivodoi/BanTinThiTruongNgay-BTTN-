@@ -67,8 +67,8 @@ YEAR_REPLACEMENTS = [
 ]
 
 FORECAST_REPLACEMENTS = [
-    (re.compile(r"\bdự kiến\b", re.I), "ước tính"),
-    (re.compile(r"\bdự báo\b", re.I), "ước tính"),
+    (re.compile(r"(?<!World Bank\s)(?<!WB\s)(?<!IMF\s)(?<!Bộ Tài chính\s)\bdự kiến\b", re.I), "ước tính"),
+    (re.compile(r"(?<!World Bank\s)(?<!WB\s)(?<!IMF\s)(?<!Bộ Tài chính\s)\bdự báo\b", re.I), "ước tính"),
     (re.compile(r"\bkhuyến nghị\b", re.I), "nhận định"),
     (re.compile(r"\bmục tiêu giá\b", re.I), "mức tham chiếu"),
 ]
@@ -368,9 +368,14 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
         adjust_word_count(content.japan, *word_limits["japan"], snapshot)
 
     # 6. China
-    content.china.paragraphs = [
+    cnh_token = "USDCNH" if "USDCNH" in snapshot.observations else "USDCNY"
+    cnh_opening = f"Phiên giao dịch hôm nay, tỷ giá USD-CNH biến động quanh mức {{{{{cnh_token}}}}}."
+    china_paras = [
         normalize_text_prose(p, snapshot) for p in content.china.paragraphs if p.strip()
     ]
+    if china_paras and re.match(r"^Phiên giao dịch hôm nay,\s*tỷ giá USD-CN[HY]\b", china_paras[0], re.I):
+        china_paras[0] = re.sub(r"^Phiên giao dịch hôm nay,\s*tỷ giá USD-CN[HY][^.]*\.\s*", f"{cnh_opening} ", china_paras[0]).strip()
+    content.china.paragraphs = china_paras
     ensure_section_provenance(content.china, snapshot)
     if "china" in word_limits:
         adjust_word_count(content.china, *word_limits["china"], snapshot)

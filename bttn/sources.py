@@ -25,6 +25,7 @@ INSTRUMENTS = {
     "EURUSD": ("EURUSD=X", "EUR-USD", "USD/EUR"),
     "USDJPY": ("USDJPY=X", "USD-JPY", "JPY/USD"),
     "USDCNY": ("USDCNY=X", "USD-CNY", "CNY/USD"),
+    "USDCNH": ("USDCNH=X", "USD-CNH", "CNH/USD"),
     "USDVND": ("USDVND=X", "USD-VND", "VND/USD"),
     "DOW": ("^DJI", "Dow Jones", "điểm"),
     "NIKKEI": ("^N225", "Nikkei 225", "điểm"),
@@ -62,12 +63,20 @@ def yahoo_observation(payload, key, as_of, source_id):
         exchange_tz = ZoneInfo(meta.get("exchangeTimezoneName", "UTC"))
         current_date = market_at.astimezone(exchange_tz).date()
         history = [p for p in raw_points if p.at.astimezone(exchange_tz).date() < current_date]
+        if not history:
+            prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+            if prev_close is not None:
+                history = [Point(at=latest.at - timedelta(days=1), value=Decimal(str(prev_close)))]
     else:
         # Historical intraday reproduction requires a stored snapshot. A daily
         # candle's timestamp is its OPEN, so today's full candle is excluded.
         history = [p for p in raw_points if p.at.date() < as_of.date()]
         if not history:
-            raise ValueError(f"No completed observations for {key}")
+            prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+            if prev_close is not None and live is not None:
+                history = [Point(at=as_of - timedelta(days=1), value=Decimal(str(prev_close)))]
+            else:
+                raise ValueError(f"No completed observations for {key}")
         latest = history.pop()
     if latest.value <= 0 or not history:
         raise ValueError(f"Missing price or previous completed session for {key}")
@@ -78,10 +87,15 @@ def yahoo_observation(payload, key, as_of, source_id):
     annual = None
     if yearly and (anniversary - yearly[-1].at.date()).days <= 7:
         annual = percentage(latest.value, yearly[-1].value)
+    from zoneinfo import ZoneInfo
+
+    exchange_tz = ZoneInfo(meta.get("exchangeTimezoneName", "UTC"))
+    trading_date = latest.at.astimezone(exchange_tz).date()
+    prev_trading_date = previous.at.astimezone(exchange_tz).date()
     _, label, unit = INSTRUMENTS[key]
     return Observation(id=key, label=label, value=latest.value, unit=unit,
-        source_id=source_id, trading_date=latest.at.date(), basis="Yahoo last price vs preceding completed session; futures continuous contract",
-        prev_value=previous.value, prev_trading_date=previous.at.date(),
+        source_id=source_id, trading_date=trading_date, basis="Yahoo last price vs preceding completed session; futures continuous contract",
+        prev_value=previous.value, prev_trading_date=prev_trading_date,
         daily_pct=day_change, annual_pct=annual, annual_basis="YoY" if annual is not None else None,
         series=(history + [latest])[-90:])
 
@@ -221,9 +235,10 @@ def collect_news(http, snapshot):
                     continue
         except Exception as exc:
             snapshot.add_issue("NEWS_FEED", f"{urlparse(url).hostname}: {type(exc).__name__}")
-    # Full articles for coffee/oil, VIRA domestic market commentary, and Tin Nhanh Chung Khoan macro.
+    # Full articles for coffee/oil/gold, VIRA domestic market commentary, and Tin Nhanh Chung Khoan macro.
     listings = [("https://vietnambiz.vn/chu-de/ca-phe-34.htm", "a[href]"),
                 ("https://vietnambiz.vn/chu-de/dau-mo-60.htm", "a[href]"),
+                ("https://vietnambiz.vn/hang-hoa/vang.htm", "a[href]"),
                 ("https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html", ".story__title a"),
                 ("https://www.tinnhanhchungkhoan.vn/vi-mo/", "a[href]")]
     for url, selector in listings:
@@ -233,7 +248,7 @@ def collect_news(http, snapshot):
             for a in soup.select(selector):
                 href = urljoin(url, a.get("href", ""))
                 title = a.get("title", "") or a.get_text(" ", strip=True)
-                is_article = (len(title) > 20 and "/chu-de/" not in href and href.endswith(".htm"))
+                is_article = (len(title) > 20 and not any(sub in href for sub in ["/chu-de/", "/doanh-nghiep/", "/kinh-doanh/", "/hang-hoa/", "/nha-dat/", "/thoi-su/"]) and href.endswith(".htm"))
                 is_vira = (urlparse(href).hostname == "vira.org.vn"
                            and "/Ban-tin-Kinh-te-Tai-chinh-ngay/Ban-tin" in href)
                 is_tnck = (urlparse(href).hostname == "www.tinnhanhchungkhoan.vn"
@@ -245,14 +260,9 @@ def collect_news(http, snapshot):
                     break
             for link in links:
                 detail = BeautifulSoup(http.get(link).text, "html.parser")
-                meta = detail.find("meta", property="article:published_time")
-                if not meta or not meta.get("content"):
-                    continue
                 try:
-                    at = datetime.fromisoformat(meta["content"].replace("Z", "+00:00"))
-                except (ValueError, TypeError):
-                    continue
-                if at.tzinfo is None:
+                    at = article_time(detail)
+                except Exception:
                     continue
                 body = detail.select_one("#abody, .vnbcbc-body, .detail-content, .article__body, .cms-body")
                 if body:
@@ -263,8 +273,16 @@ def collect_news(http, snapshot):
         if not url.startswith("https://") or not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=36):
             continue
         sid = "news_" + hashlib.sha256(url.encode()).hexdigest()[:12]
-        snapshot.sources[sid] = Source(id=sid, url=url, published_at=at,
-            retrieved_at=datetime.now(timezone.utc), text=text, kind="news")
+        snapshot.sources[sid] = Source(
+            id=sid,
+            url=url,
+            published_at=at,
+            retrieved_at=datetime.now(timezone.utc),
+            text=text,
+            sha256=hashlib.sha256(text.encode()).hexdigest(),
+            kind="news",
+            text_scope="article",
+        )
 
 
 def parse_vietnambiz_coffee(html: str, published_at: datetime):
@@ -416,8 +434,11 @@ def collect_vietnambiz_coffee(http, snapshot):
 
 
 KEYWORDS_MACRO = [
-    "tín dụng", "huy động", "xuất khẩu", "nhập khẩu", "fdi", "tỷ usd",
-    "giải ngân", "đầu tư công", "tiêu dùng", "lạm phát", "gdp", "giá xăng dầu", "xăng dầu",
+    "gdp", "lạm phát", "fdi", "vốn đầu tư", "kiều hối", "sản xuất công nghiệp",
+    "xuất khẩu", "nhập khẩu", "giải ngân đầu tư công", "đầu tư công", "giải ngân",
+    "khách du lịch", "vốn cổ phần", "tín dụng", "huy động", "tỷ usd",
+    "tiêu dùng", "bộ tài chính", "ngân hàng nhà nước", "world bank", "wb", "ngân hàng thế giới",
+    "chính phủ", "ngân sách", "thuế", "đất", "đất bỏ hoang", "tăng trưởng", "giá xăng dầu", "xăng dầu",
 ]
 
 def score_macro_text(title: str, desc: str = "") -> int:
@@ -426,21 +447,41 @@ def score_macro_text(title: str, desc: str = "") -> int:
     for kw in KEYWORDS_MACRO:
         if kw in full_text:
             score += 1
+    if re.search(r"\b(world bank|wb|ngân hàng thế giới|gdp|bộ tài chính|chính phủ|lạm phát|fdi|xuất khẩu|nhập khẩu|thuế)\b", full_text):
+        score += 5
+    if re.search(r"\b(đà nẵng|cần thơ|quảng trị|quảng ngãi|bảo hà|lai châu|bình thuận|đồng nai)\b", full_text):
+        score -= 3
     if re.search(r"\d+([.,]\d+)?\s*(%|tỷ|triệu)", full_text):
         score += 2
-    return score
+    return max(1, score) if score > 0 else 0
 
 
 def article_time(soup):
     """Require source publication metadata; collection time is not publication."""
-    meta = soup.select_one('meta[property="article:published_time"], meta[itemprop="datePublished"], time[datetime]')
-    if meta is None:
-        raise ValueError("ARTICLE_PUBLICATION_TIME_MISSING")
-    value = meta.get("content") or meta.get("datetime")
-    at = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if at.tzinfo is None:
-        raise ValueError("ARTICLE_PUBLICATION_TIMEZONE_MISSING")
-    return at
+    meta = soup.select_one(
+        'meta[property="article:published_time"], '
+        'meta[name="article:published_time"], '
+        'meta[property="og:updated_time"], '
+        'meta[name="pubdate"], '
+        'meta[itemprop="datePublished"], '
+        'time[datetime]'
+    )
+    if meta is not None:
+        value = meta.get("content") or meta.get("datetime")
+        if value:
+            at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if at.tzinfo is not None:
+                return at
+
+    for s in soup.find_all("script"):
+        txt = s.string or ""
+        m = re.search(r'"(?:ArticlePublishDate|datePublished)"\s*:\s*"([^"]+)"', txt)
+        if m:
+            at = datetime.fromisoformat(m.group(1).replace("Z", "+00:00"))
+            if at.tzinfo is not None:
+                return at
+
+    raise ValueError("ARTICLE_PUBLICATION_TIME_MISSING")
 
 
 def collect_vietnam_macro_news(http, snapshot):
@@ -448,43 +489,51 @@ def collect_vietnam_macro_news(http, snapshot):
         "https://www.tinnhanhchungkhoan.vn/vi-mo/",
         "https://vneconomy.vn/tieu-diem.htm",
         "https://baodautu.vn/kinh-te-vi-mo-d2/",
+        "https://vietnamnet.vn/kinh-doanh",
+        "https://vietnamnet.vn/bat-dong-san/thi-truong",
     ]
     candidates = {}
     for url in listings:
         try:
             soup = BeautifulSoup(http.get(url).text, "html.parser")
-            for item in soup.select("article, .story, .item-news"):
-                title = item.select_one("h3 a, h2 a, .story__title a, a.title")
+            for item in soup.select("article, .story, .item-news, .horizontal-post, .vertical-post, h3, h2"):
+                title = item.select_one("a") if item.name in ("h3", "h2") else item.select_one("h3 a, h2 a, .story__title a, a.title, .article-title a")
                 if not title or not title.get("href"):
                     continue
                 link = urljoin(url, title["href"])
                 if urlparse(link).hostname != urlparse(url).hostname:
                     continue
-                description = item.select_one(".story__summary, .s-content, p")
+                description = item.select_one(".story__summary, .s-content, p, .article-desc") if item.name not in ("h3", "h2") else None
                 score = score_macro_text(title.get_text(" ", strip=True), description.get_text(" ", strip=True) if description else "")
                 if score:
                     candidates[link] = (score, title.get_text(" ", strip=True))
         except Exception as exc:
             LOG.debug("Macro listing failed: %s", type(exc).__name__)
     count = 0
-    for url, (_, title) in sorted(candidates.items(), key=lambda item: (-item[1][0], item[0]))[:9]:
+    for url, (_, title) in sorted(candidates.items(), key=lambda item: (-item[1][0], item[0]))[:20]:
         try:
             detail = BeautifulSoup(http.get(url).text, "html.parser")
             at = article_time(detail)
-            if not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=36):
+            if not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=48):
                 continue
-            body = detail.select_one("#abody, .cms-body, .detail-content, .article__body, .detail__content, .content-detail")
+            body = detail.select_one("#abody, .cms-body, .detail-content, .article__body, .detail__content, .content-detail, .article-detail-section__main, .main-detail-page")
             if body is None:
                 continue
-            text = body.get_text(" ", strip=True)
-            if len(text.split()) < 35:
+            paragraphs = []
+            for p in body.select("p"):
+                p_text = " ".join(p.get_text(" ", strip=True).split())
+                if len(p_text.split()) >= 5:
+                    paragraphs.append(p_text)
+            if not paragraphs:
+                paragraphs = [" ".join(body.get_text(" ", strip=True).split())]
+            full = title + "\n\n" + "\n\n".join(paragraphs)
+            if len(full.split()) < 35:
                 continue
-            full = title + "\n\n" + text
             sid = "macro_news_" + hashlib.sha256(url.encode()).hexdigest()[:12]
             snapshot.sources[sid] = Source(id=sid, url=url, published_at=at, retrieved_at=datetime.now(timezone.utc),
                                            text=full, sha256=hashlib.sha256(full.encode()).hexdigest(), kind="news", text_scope="article")
             count += 1
-            if count >= 3:
+            if count >= 6:
                 break
         except Exception as exc:
             LOG.debug("Macro article failed: %s", type(exc).__name__)
@@ -527,6 +576,13 @@ def collect_sjc_gold(http, snapshot):
         text=f"{buy_str} – {sell_str} triệu đồng/lượng",
         kind="market",
     )
+    for side, val in [("BUY", b_val), ("SELL", s_val)]:
+        key = f"SJC_{side}"
+        snapshot.observations[key] = Observation(
+            id=key, label=f"Vàng SJC {side.lower()}", value=Decimal(str(round(val, 2))),
+            unit="triệu đồng/lượng", source_id="sjc_gold", trading_date=snapshot.as_of.date(),
+            basis=f"Webgia giá vàng SJC {side.lower()}",
+        )
 
 
 def collect_vira_daily(http, snapshot):

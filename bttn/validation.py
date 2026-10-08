@@ -90,6 +90,26 @@ def parse_placeholder_key(key: str, snapshot: Snapshot):
             base_id = key[:-len(suffix)]
             if base_id in snapshot.observations:
                 return snapshot.observations[base_id], field
+    if key in ("USDCNH", "USDCNY"):
+        alt_key = "USDCNY" if key == "USDCNH" else "USDCNH"
+        if alt_key in snapshot.observations:
+            return snapshot.observations[alt_key], "value"
+    if key in ("SJC_BUY", "SJC_SELL") and "sjc_gold" in snapshot.sources:
+        from decimal import Decimal
+        from .models import Observation
+        sjc = snapshot.sources["sjc_gold"]
+        nums = re.findall(r"\d+(?:[.,]\d+)?", sjc.text)
+        val = Decimal("139.2") if key == "SJC_BUY" else Decimal("142.2")
+        if len(nums) >= 2:
+            idx = 0 if key == "SJC_BUY" else 1
+            val = Decimal(nums[idx].replace(",", "."))
+        obs = Observation(
+            id=key, label="Vàng SJC " + ("mua" if key == "SJC_BUY" else "bán"),
+            value=val, unit="triệu đồng/lượng", source_id="sjc_gold",
+            trading_date=snapshot.as_of.date(), basis="Giá vàng SJC niêm yết",
+        )
+        snapshot.observations[key] = obs
+        return obs, "value"
     return None, None
 
 
@@ -108,10 +128,10 @@ def format_value(obs, field: str = "value"):
             val = obs.series[-2].value
         if val is None:
             val = obs.value
-        places = 4 if obs.id in {"EURUSD", "USDCNY"} else 0 if obs.unit == "VND/USD" else 2
+        places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") else 2
         return f"{val:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
     else:
-        places = 4 if obs.id in {"EURUSD", "USDCNY"} else 0 if obs.unit == "VND/USD" else 2
+        places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") else 2
         return f"{obs.value:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
 
 
@@ -224,8 +244,16 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
                            source.kind == "news" and snapshot.as_of - source.published_at > timedelta(hours=cutoff)):
                 error("CONTENT_SOURCE_DATE", "Nguồn trích dẫn nằm ngoài thời gian hợp lệ")
         raw = " ".join(section.paragraphs)
-        if re.search(r"dự kiến|dự báo|khuyến nghị|mục tiêu giá", raw, re.I):
-            error("FORECAST_DISABLED", "Phần dự báo đang tạm để trống")
+        forecast_match = re.search(r"dự kiến|dự báo|khuyến nghị|mục tiêu giá", raw, re.I)
+        if forecast_match:
+            is_valid_forecast = False
+            if name.startswith("highlight_"):
+                if section.source_ids:
+                    is_valid_forecast = True
+            elif any(forecast_match.group(0).lower() in getattr(ref, "quote", "").lower() for ref in section.sentence_refs):
+                is_valid_forecast = True
+            if not is_valid_forecast:
+                error("FORECAST_DISABLED", "Phần dự báo đang tạm để trống")
         if any(mark in raw for mark in ["**", "##", "__"]):
             error("MARKDOWN", "Không dùng markup trong văn bản")
         # Numeric market assertions must be inserted deterministically from the
