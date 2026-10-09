@@ -156,3 +156,13 @@ def test_interbank_forecast():
     # Both 3.5% and 4.5% should be valid outputs
     assert len(results) >= 1
 
+    # Case 4: Standard new prose with "vùng 0,8%-5,0% tại các kỳ hạn ngắn ON-2W"
+    content.interbank.paragraphs = [
+        "Phiên ngày 08.10.2026, thị trường lãi suất interbank đi ngang trong vùng 0,8%-5,0% tại các kỳ hạn ngắn ON-2W. "
+        "Trong phiên hôm qua, có 1.546,74 tỷ đồng trúng thầu ở kỳ hạn 91 ngày, các kỳ hạn còn lại không có khối lượng trúng thầu. "
+        "Có 10.742,69 tỷ đồng đáo hạn. Như vậy, NHNN hút ròng 9.195,95 tỷ. Có 94.213,27 tỷ đồng lưu hành trên kênh cầm cố. "
+        "Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm đi ngang, quanh mức 4,2%-4,75%, thanh khoản vừa."
+    ]
+    text_std = build_interbank_forecast(s, content)
+    assert text_std == "Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh 1,5%, lãi suất trái phiếu đi ngang."
+

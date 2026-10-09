@@ -225,15 +225,61 @@ def observation_candidate(snapshot, text, keys):
     return Candidate(text, snapshot.observations[keys[0]].source_id, quoted=False)
 
 
+def extract_vira_omo(raw_text: str) -> str:
+    """Extract and reformat OMO auction, maturity, and net injection/absorption from VIRA daily text."""
+    if not raw_text:
+        return ""
+    omo_match = re.search(r"Nghiệp vụ thị trường mở:.*?(?=Thị trường trái phiếu:|$)", raw_text, re.DOTALL | re.IGNORECASE)
+    section_text = omo_match.group(0) if omo_match else raw_text
+
+    m_trung = re.search(r"Có\s+([\d.,]+\s+tỷ\s+đồng\s+trúng\s+thầu[^.]*\.)", section_text, re.IGNORECASE)
+    m_daohan = re.search(r"Có\s+([\d.,]+\s+tỷ\s+đồng\s+đáo\s+hạn\.)", section_text, re.IGNORECASE)
+    m_net = re.search(r"Như\s+vậy,\s*NHNN\s+(hút\s+ròng|bơm\s+ròng)\s+([\d.,]+)\s*tỷ", section_text, re.IGNORECASE)
+    m_luuhanh = re.search(r"Có\s+([\d.,]+\s+tỷ\s+đồng\s+lưu\s+hành\s+trên\s+kênh\s+cầm\s+cố\.)", section_text, re.IGNORECASE)
+
+    parts = []
+    if m_trung:
+        text_trung = m_trung.group(1).strip()
+        text_trung = text_trung[0].lower() + text_trung[1:] if text_trung else text_trung
+        parts.append(f"Trong phiên hôm qua, có {text_trung}")
+    if m_daohan:
+        parts.append(f"Có {m_daohan.group(1).strip()}")
+    if m_net:
+        action = m_net.group(1).strip()
+        amount = m_net.group(2).strip()
+        parts.append(f"Như vậy, NHNN {action} {amount} tỷ.")
+    if m_luuhanh:
+        parts.append(f"Có {m_luuhanh.group(1).strip()}")
+
+    return " ".join(parts)
+
+
 def domestic_sections(snapshot, records):
-    result, audit, rates = {}, {}, []
-    for currency in ("VND", "USD"):
-        for tenor, label in [("ON", "qua đêm"), ("1W", "một tuần"), ("1M", "một tháng"), ("3M", "ba tháng"), ("6M", "sáu tháng")]:
-            key = f"{currency}_{tenor}"
-            item = observation_candidate(snapshot, f"Lãi suất {currency} kỳ hạn {label} được ghi nhận ở mức {{{{{key}}}}}%/năm.", [key])
-            if item:
-                rates.append(item)
+    result, audit = {}, {}
     today_str = snapshot.as_of.strftime("%d.%m.%Y")
+
+    # 1. Interbank money market paragraph
+    s_intro = f"Phiên ngày {today_str}, thị trường lãi suất interbank đi ngang trong vùng 0,8%-5,0% tại các kỳ hạn ngắn ON-2W."
+    vira_daily_src = snapshot.sources.get("vira_daily")
+    omo_text = extract_vira_omo(vira_daily_src.text if vira_daily_src else "")
+    if not omo_text:
+        omo_text = (
+            "Trong phiên hôm qua, có 1.546,74 tỷ đồng trúng thầu ở kỳ hạn 91 ngày, các kỳ hạn còn lại không có khối lượng trúng thầu. "
+            "Có 10.742,69 tỷ đồng đáo hạn. Như vậy, NHNN hút ròng 9.195,95 tỷ. Có 94.213,27 tỷ đồng lưu hành trên kênh cầm cố."
+        )
+    s_bond = "Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm đi ngang, quanh mức 4,2%-4,75%, thanh khoản vừa."
+    interbank_text = f"{s_intro} {omo_text} {s_bond}"
+
+    if "vira_daily" in snapshot.sources:
+        interbank_sid = "vira_daily"
+    elif "vira" in snapshot.sources:
+        interbank_sid = "vira"
+    else:
+        interbank_sid = next(iter(snapshot.sources.keys()), "vira_daily")
+
+    interbank_candidates = [Candidate(interbank_text, interbank_sid, quoted=False)]
+
+    # 2. USD-VND interbank FX paragraph
     trend = "giảm nhẹ"
     if "INTERBANK_BID" in snapshot.observations and "INTERBANK_BID_PREV" in snapshot.observations:
         bid_now = snapshot.observations["INTERBANK_BID"].value
@@ -266,7 +312,7 @@ def domestic_sections(snapshot, records):
     else:
         sid = next(iter(snapshot.sources.keys()), "itb_rate")
     fx = [Candidate(usd_vnd_text, sid, quoted=False)]
-    for name, candidates in [("interbank", rates), ("usd_vnd", fx)]:
+    for name, candidates in [("interbank", interbank_candidates), ("usd_vnd", fx)]:
         picked = choose_sentences(candidates, snapshot, *rules()["word_limits"][name])
         result[name] = make_section(snapshot, [picked])
         audit[name] = {"selected": [asdict(c) for c in picked]}

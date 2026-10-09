@@ -28,6 +28,13 @@ def build_interbank_forecast(snapshot: Snapshot, content: ReportContent | None =
                 on_rate = float(m.group(1).replace(",", "."))
             except ValueError:
                 pass
+        if on_rate is None:
+            m = re.search(r"vùng\s*(\d+(?:[.,]\d+)?)\s*%", text, re.I)
+            if m:
+                try:
+                    on_rate = float(m.group(1).replace(",", "."))
+                except ValueError:
+                    pass
 
     if on_rate is None:
         obs = snapshot.observations.get("VND_ON")

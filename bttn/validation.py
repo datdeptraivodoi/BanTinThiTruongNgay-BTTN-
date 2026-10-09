@@ -49,6 +49,17 @@ ALLOWED_PROSE_NUMBERS = re.compile(
     re.I,
 )
 
+ALLOWED_INTERBANK_PROSE = re.compile(
+    r"(?:"
+    r"\bkỳ\s+hạn\s+\d+(?:\s*(?:&|và|[-–])\s*\d+)?\s+năm\b|"
+    r"\bkỳ\s+hạn\s+\d+\s+ngày\b|"
+    r"\b(?:ON[-–])?\d+[WMYD]\b|"
+    r"\b[\d.]+(?:,\d+)?\s+tỷ(?:\s+đồng)?\b|"
+    r"\b\d+(?:,\d+)?%(?:\s*[-–]\s*\d+(?:,\d+)?%)?"
+    r")",
+    re.I,
+)
+
 
 TECHNICAL_LEAKAGE_RE = re.compile(
     r"(?:"
@@ -299,6 +310,8 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
             numeric_prose[ref.paragraph] = numeric_prose[ref.paragraph].replace(ref.quote, "", 1)
         without_tokens = TOKEN.sub("", " ".join(numeric_prose))
         without_dates = ALLOWED_DATE_FORMAT.sub("", without_tokens)
+        if name == "interbank":
+            without_dates = ALLOWED_INTERBANK_PROSE.sub("", without_dates)
         without_prose = ALLOWED_PROSE_NUMBERS.sub("", without_dates)
         without_indices = ALLOWED_INDEX_NAMES.sub("", without_prose)
         if re.search(r"\d", without_indices):

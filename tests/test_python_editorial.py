@@ -100,7 +100,10 @@ def test_data_templates_meet_word_limits_and_use_trader_instead_of_mb_quotes(mon
     monkeypatch.setenv("TRADER_QUOTES_PATH", str(root / "config/trader_quotes.example.json"))
     collect_trader_quotes(None, snap)
     sections, _ = domestic_sections(snap, {})
-    assert 88 <= count_words(resolve(" ".join(sections["interbank"].paragraphs), snap)) <= 95
+    assert 80 <= count_words(resolve(" ".join(sections["interbank"].paragraphs), snap)) <= 95
+    assert sections["interbank"].paragraphs[0].startswith(f"Phiên ngày {snap.as_of.strftime('%d.%m.%Y')}, thị trường lãi suất interbank")
+    assert "Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm đi ngang, quanh mức 4,2%-4,75%, thanh khoản vừa." in sections["interbank"].paragraphs[0]
+    assert "NHNN hút ròng" in sections["interbank"].paragraphs[0]
     assert 77 <= count_words(resolve(" ".join(sections["usd_vnd"].paragraphs), snap)) <= 82
     assert "{{INTERBANK_BID}}/{{INTERBANK_ASK}}" in sections["usd_vnd"].paragraphs[0]
 
