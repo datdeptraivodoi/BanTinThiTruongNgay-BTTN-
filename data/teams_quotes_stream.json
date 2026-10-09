@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-09",
+  "last_updated": "2026-10-09 14:34:10",
+  "total_quotes": 10,
+  "liquidity": "thanh khoản kém",
+  "quotes": [
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:00:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25980,
+      "ask": 26000,
+      "spread": 20,
+      "raw_text": "25980 26000"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:01:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25980,
+      "ask": 26000,
+      "spread": 20,
+      "raw_text": "25980 26000"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:02:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25975,
+      "ask": 25985,
+      "spread": 10,
+      "raw_text": "25975 25985"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:03:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25975,
+      "ask": 25985,
+      "spread": 10,
+      "raw_text": "25975 25985"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:04:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25978,
+      "ask": 25988,
+      "spread": 10,
+      "raw_text": "25978 25988"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:05:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25978,
+      "ask": 25988,
+      "spread": 10,
+      "raw_text": "25978 25988"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:06:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25975,
+      "ask": 25985,
+      "spread": 10,
+      "raw_text": "25975 25985"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:07:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25975,
+      "ask": 25985,
+      "spread": 10,
+      "raw_text": "25975 25985"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:08:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25977,
+      "ask": 25987,
+      "spread": 10,
+      "raw_text": "25977 25987"
+    },
+    {
+      "quote_date": "2026-10-09",
+      "quote_time": "09:09:00",
+      "room": "MARKET RATE FX ITB",
+      "trader": "Trader",
+      "bid": 25977,
+      "ask": 25987,
+      "spread": 10,
+      "raw_text": "25977 25987"
+    }
+  ]
+}

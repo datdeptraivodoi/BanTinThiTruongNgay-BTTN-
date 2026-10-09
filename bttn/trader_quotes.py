@@ -253,6 +253,7 @@ def load_teams_stream_quotes(snapshot: Snapshot, swap_file: Path) -> QuoteFile |
         content = swap_file.read_text(encoding="utf-8-sig")
         qfile = parse_teams_payload(snapshot, content)
         if qfile and swap_file.parent:
+            # 1. Thử đọc từ itb_rate_today.txt
             itb_file = swap_file.parent / "itb_rate_today.txt"
             if itb_file.is_file():
                 try:
@@ -268,6 +269,32 @@ def load_teams_stream_quotes(snapshot: Snapshot, swap_file: Path) -> QuoteFile |
                                 q.fx_ask = Decimal(f"{bf}{parts[1]}")
                 except Exception:
                     pass
+
+            # 2. Thử đọc từ teams_quotes_stream.json
+            stream_candidates = [
+                swap_file.parent / "teams_quotes_stream.json",
+                ROOT / "data" / "teams_quotes_stream.json",
+                Path("D:/TyGia/teams_quotes_stream.json"),
+                Path("/root/TyGia/teams_quotes_stream.json"),
+            ]
+            for sc in stream_candidates:
+                if sc.is_file():
+                    try:
+                        import json
+                        s_data = json.loads(sc.read_text(encoding="utf-8-sig"))
+                        quotes_list = s_data.get("quotes", [])
+                        if quotes_list:
+                            latest_q = quotes_list[-1]
+                            b_val = latest_q.get("bid")
+                            a_val = latest_q.get("ask")
+                            if b_val and a_val:
+                                for q in qfile.quotes:
+                                    if q.quoted_at.date() == snapshot.as_of.astimezone(VN_TZ).date():
+                                        q.fx_bid = Decimal(str(b_val))
+                                        q.fx_ask = Decimal(str(a_val))
+                        break
+                    except Exception:
+                        pass
         return qfile
     except Exception as exc:
         LOG.warning("Failed to load Teams swap file: %s", exc)

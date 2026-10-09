@@ -301,7 +301,25 @@ def domestic_sections(snapshot, records):
         quote_token = "25.783/26.170"
         quote_keys = []
 
-    s1 = f"Phiên ngày {today_str}, tỷ giá USD-VND diễn biến {trend}, biên vừa, phiên chiều dao động quanh mức {quote_token}, thanh khoản vừa phải."
+    # Đánh giá thanh khoản từ stream quote nếu có
+    liquidity_phrase = "thanh khoản vừa phải"
+    stream_candidates = [
+        Path(__file__).resolve().parents[1] / "data" / "teams_quotes_stream.json",
+        Path("D:/TyGia/teams_quotes_stream.json"),
+        Path("/root/TyGia/teams_quotes_stream.json"),
+    ]
+    for sc in stream_candidates:
+        if sc.is_file():
+            try:
+                import json
+                s_data = json.loads(sc.read_text(encoding="utf-8"))
+                if s_data.get("liquidity"):
+                    liquidity_phrase = s_data.get("liquidity")
+                    break
+            except Exception:
+                pass
+
+    s1 = f"Phiên ngày {today_str}, tỷ giá USD-VND diễn biến {trend}, biên vừa, phiên chiều dao động quanh mức {quote_token}, {liquidity_phrase}."
     s2 = "Cán cân thương mại tháng 9 đã cải thiện rõ rệt với mức thặng dư 1,27 tỷ USD giúp giảm tình trạng nhập siêu."
     s3 = "Ngoài ra, vốn FDI thực hiện đạt mức cao nhất giai đoạn 5 năm qua."
     s4 = "Tỷ giá trên thị trường tự do dao động đi ngang trong khoảng 26.000 – 26.150."
