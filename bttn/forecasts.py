@@ -1,9 +1,52 @@
 """Market forecast generators for BTTN report sections."""
+import random
+import re
 from decimal import Decimal
 from typing import Any
 
 from .models import ReportContent, Snapshot
 from .trader_quotes import trader_observation
+
+
+def build_interbank_forecast(snapshot: Snapshot, content: ReportContent | None = None) -> str:
+    """Generate interbank money market forecast.
+
+    Standard format:
+    'Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh {rate}%, lãi suất trái phiếu đi ngang.'
+    Allowed rates: 1,5%; 2,5%; 3,5%; 4,5%; 5,5%; 6,5%
+    Selection rule: choose candidate closest to the current ON rate in the narrative.
+    If equidistant (e.g. 4.0% between 3.5% and 4.5%), choose randomly between them.
+    """
+    candidates = [1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+    on_rate = None
+
+    if content and hasattr(content, "interbank") and content.interbank and content.interbank.paragraphs:
+        text = " ".join(content.interbank.paragraphs)
+        m = re.search(r"qua\s+đêm[^\d]*(\d+(?:[.,]\d+)?)\s*%", text, re.I)
+        if m:
+            try:
+                on_rate = float(m.group(1).replace(",", "."))
+            except ValueError:
+                pass
+
+    if on_rate is None:
+        obs = snapshot.observations.get("VND_ON")
+        if obs and obs.value:
+            try:
+                on_rate = float(obs.value)
+            except (ValueError, TypeError):
+                pass
+
+    if on_rate is None:
+        on_rate = 2.5
+
+    min_dist = min(abs(c - on_rate) for c in candidates)
+    closest = [c for c in candidates if abs(abs(c - on_rate) - min_dist) < 1e-6]
+    selected = random.choice(closest)
+    selected_str = f"{selected:.1f}%".replace(".", ",")
+
+    return f"Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh {selected_str}, lãi suất trái phiếu đi ngang."
+
 
 
 def build_usdvnd_forecast(snapshot: Snapshot) -> str:

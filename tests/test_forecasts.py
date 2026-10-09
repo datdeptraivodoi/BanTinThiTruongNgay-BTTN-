@@ -6,6 +6,7 @@ from bttn.forecasts import (
     build_coffee_forecast,
     build_energy_metals_forecast,
     build_eurusd_forecast,
+    build_interbank_forecast,
     build_usdvnd_forecast,
 )
 from bttn.models import Observation, ReportContent, Section, Snapshot
@@ -113,3 +114,45 @@ def test_coffee_forecast_formula():
     s = make_dummy_snapshot()
     text = build_coffee_forecast(s)
     assert text == "Dự kiến: Giá Arabica giao dịch quanh 295,2 USc/lbs, giá Robusta dao động quanh ngưỡng 3.470 USD/T."
+
+
+def test_interbank_forecast():
+    s = make_dummy_snapshot()
+    # Case 1: VND_ON observation is 0.8% -> closest to 1.5%
+    s.observations["VND_ON"] = Observation(
+        id="VND_ON", label="VND ON", value=Decimal("0.80"), unit="%",
+        source_id="vira", trading_date=s.as_of.date(), basis="Niêm yết"
+    )
+    text = build_interbank_forecast(s)
+    assert text == "Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh 1,5%, lãi suất trái phiếu đi ngang."
+
+    # Case 2: From content paragraph containing 0,60% -> closest to 1.5%
+    content = ReportContent(
+        highlights=[
+            Section(paragraphs=["Tin 1"], source_ids=["s1"]),
+            Section(paragraphs=["Tin 2"], source_ids=["s1"]),
+            Section(paragraphs=["Tin 3"], source_ids=["s1"]),
+        ],
+        interbank=Section(
+            paragraphs=["Lãi suất VND kỳ hạn qua đêm được ghi nhận ở mức 0,60%/năm. Lãi suất kỳ hạn 1 tuần là 2,30%."],
+            source_ids=["s1"]
+        ),
+        usd_vnd=Section(paragraphs=["USD text"], source_ids=["s1"]),
+        eur_usd=Section(paragraphs=["EUR text"], source_ids=["s1"]),
+        japan=Section(paragraphs=["Japan text"], source_ids=["s1"]),
+        china=Section(paragraphs=["China text"], source_ids=["s1"]),
+        coffee=Section(paragraphs=["Coffee text"], source_ids=["s1"]),
+        energy_metals=Section(paragraphs=["Metals text"], source_ids=["s1"]),
+    )
+    text_content = build_interbank_forecast(s, content)
+    assert text_content == "Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh 1,5%, lãi suất trái phiếu đi ngang."
+
+    # Case 3: Rate is 4.0% -> randomly 3.5% or 4.5%
+    s.observations["VND_ON"].value = Decimal("4.00")
+    results = {build_interbank_forecast(s) for _ in range(30)}
+    expected_35 = "Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh 3,5%, lãi suất trái phiếu đi ngang."
+    expected_45 = "Dự kiến: lãi suất ON nhiều khả năng đi ngang quanh 4,5%, lãi suất trái phiếu đi ngang."
+    assert results.issubset({expected_35, expected_45})
+    # Both 3.5% and 4.5% should be valid outputs
+    assert len(results) >= 1
+

@@ -149,7 +149,7 @@ def test_renderer_uses_normal_prose_and_applies_font(snapshot, content, tmp_path
     xml_text = '\n'.join(node.text or '' for node in doc.element.iter(qn('w:t')))
     assert content.highlights[0].paragraphs[0] in xml_text
     assert content.interbank.paragraphs[0] in xml_text
-    assert 'quanh 2,5%' not in xml_text
+    assert 'lãi suất ON nhiều khả năng đi ngang' in xml_text
     assert 'Sử dụng sản phẩm' in xml_text
     assert 'MBBank · chuyển khoản' not in xml_text
     for run in doc.element.iter(qn('w:r')):

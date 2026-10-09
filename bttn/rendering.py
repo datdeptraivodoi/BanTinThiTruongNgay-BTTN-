@@ -18,6 +18,7 @@ from .forecasts import (
     build_coffee_forecast,
     build_energy_metals_forecast,
     build_eurusd_forecast,
+    build_interbank_forecast,
     build_usdvnd_forecast,
 )
 from .layout import FONT, SIZE, normalize_typography, split_pages, style_run, styled_table
@@ -400,7 +401,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         prefix = f"{idx + 1}. " if not re.match(r"^\d+[.)]\s", txt) else ""
         paragraph(r3[0], prefix + txt)
 
-    narrative(r3[1], "Thị trường tiền tệ liên ngân hàng", content.interbank, snapshot, show_source=False)
+    narrative(r3[1], "Thị trường tiền tệ liên ngân hàng", content.interbank, snapshot, show_source=False, forecast=build_interbank_forecast(snapshot, content))
     # Domestic charts use this issue's snapshot, never the undated legacy JSON.
     heading(r3[2], "Diễn biến lãi suất trên thị trường liên ngân hàng")
     chart1_path = output.parent / "interbank.png"
