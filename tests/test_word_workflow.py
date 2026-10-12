@@ -125,3 +125,26 @@ def test_removed_smtp_sample_flag_is_rejected():
     with pytest.raises(SystemExit) as exc:
         pipeline.main(["--test-smtp"])
     assert exc.value.code == 2
+
+
+def test_word_layout_matches_benchmark_margins_and_no_header_reference(tmp_path, monkeypatch):
+    from docx.oxml.ns import qn
+
+    _, path = write_snapshot(tmp_path)
+    monkeypatch.setattr(rendering, "convert_and_validate", Mock())
+    monkeypatch.setattr(delivery, "send_report", Mock())
+    assert pipeline.main(["--create-only", *run_args(tmp_path, path)]) == 0
+    docx_file = next((tmp_path / "output").glob("*/*.docx"))
+    doc = Document(docx_file)
+    sec = doc.sections[0]
+    refs = [ref.tag for ref in sec._sectPr if "header" in ref.tag.lower() or "footer" in ref.tag.lower()]
+    assert not refs, f"Expected no header/footer references, found: {refs}"
+    assert sec.top_margin == Pt(4.3)
+    assert sec.bottom_margin == Pt(0)
+    assert sec.left_margin == Pt(4.3)
+    assert sec.right_margin == Pt(0)
+    tbl = doc.tables[0]._tbl
+    tbl_w = tbl.tblPr.find(qn("w:tblW"))
+    assert tbl_w is not None and tbl_w.get(qn("w:w")) == "15877"
+    tbl_ind = tbl.tblPr.find(qn("w:tblInd"))
+    assert tbl_ind is not None and tbl_ind.get(qn("w:w")) == "-34"

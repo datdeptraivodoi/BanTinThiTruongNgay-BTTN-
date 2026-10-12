@@ -74,7 +74,7 @@ def normalize_typography(doc):
         if style.type in (1, 2):
             style.font.name = FONT
             style.font.size = Pt(SIZE)
-    for part in [doc.part] + [s.header.part for s in doc.sections] + [s.footer.part for s in doc.sections]:
+    for part in [doc.part]:
         for node in part.element.iter(qn("w:p")):
             compact_paragraph(Paragraph(node, part))
     for node in list(doc.element.iter(qn("w:trHeight"))):
@@ -88,6 +88,10 @@ def normalize_typography(doc):
     for node in doc.element.iter(qn("w:tcMar")):
         for edge in node:
             edge.set(qn("w:w"), "10")
+    for s in doc.sections:
+        for ref in list(s._sectPr):
+            if ref.tag in {qn("w:headerReference"), qn("w:footerReference")}:
+                s._sectPr.remove(ref)
 
 
 def styled_table(cell, rows, ratios, blue_cells=(), red_cells=()):

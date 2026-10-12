@@ -894,20 +894,33 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         raise ValueError("Template columns changed")
     # The legacy grid extends beyond the physical page and contains inconsistent
     # column spans. Normalize it while preserving the branded cells and merges.
-    section = doc.sections[0]
-    section.left_margin = section.right_margin = Inches(.10)
     for s in doc.sections:
+        s.top_margin = Pt(4.3)
         s.bottom_margin = Pt(0)
+        s.left_margin = Pt(4.3)
+        s.right_margin = Pt(0)
+        s.header_distance = Pt(0)
         s.footer_distance = Pt(0)
-    total = section.page_width - section.left_margin - section.right_margin
+    total = 15877 * 635
     for child in list(table._tbl.tblGrid):
         table._tbl.tblGrid.remove(child)
     for _ in range(6):
         col = OxmlElement("w:gridCol")
-        col.set(qn("w:w"), str(round(total / 635 / 6)))
+        col.set(qn("w:w"), str(round(15877 / 6)))
         table._tbl.tblGrid.append(col)
-    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(total / 635)))
-    table._tbl.tblPr.find(qn("w:tblInd")).set(qn("w:w"), "0")
+    tbl_w = table._tbl.tblPr.find(qn("w:tblW"))
+    if tbl_w is not None:
+        tbl_w.set(qn("w:w"), "15877")
+        tbl_w.set(qn("w:type"), "dxa")
+    tbl_ind = table._tbl.tblPr.find(qn("w:tblInd"))
+    if tbl_ind is not None:
+        tbl_ind.set(qn("w:w"), "-34")
+        tbl_ind.set(qn("w:type"), "dxa")
+    else:
+        tbl_ind = OxmlElement("w:tblInd")
+        tbl_ind.set(qn("w:w"), "-34")
+        tbl_ind.set(qn("w:type"), "dxa")
+        table._tbl.tblPr.append(tbl_ind)
     for index, row in enumerate(table.rows):
         if index != 13:
             row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
@@ -1070,6 +1083,10 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
             p.paragraph_format.page_break_before = False
             for r in p.runs:
                 r.font.size = Pt(1)
+    for s in doc.sections:
+        for ref in list(s._sectPr):
+            if ref.tag in {qn("w:headerReference"), qn("w:footerReference")}:
+                s._sectPr.remove(ref)
     output.parent.mkdir(parents=True, exist_ok=True)
     doc.save(output)
 
@@ -1094,7 +1111,7 @@ def validate_docx(docx_path: Path):
         text = " ".join(node.text or "" for node in table._tbl.iter(qn("w:t")))
         if not any(h in text for h in heading_options) or "{{" in text or "}}" in text:
             raise ValueError("Word report has a missing section or unresolved placeholder")
-    parts = [doc.part] + [s.header.part for s in doc.sections] + [s.footer.part for s in doc.sections]
+    parts = [doc.part]
     for part in parts:
         for run in part.element.iter(qn("w:r")):
             text = "".join(node.text or "" for node in run.iter(qn("w:t")))
