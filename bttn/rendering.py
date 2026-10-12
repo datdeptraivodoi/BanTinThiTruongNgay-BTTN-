@@ -1048,7 +1048,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     for c in cells(table.rows[13]):
         for p in c.paragraphs:
             for r in p.runs:
-                style_run(r, size=8)
+                style_run(r, size=10)
 
     normalize_typography(doc)
     split_pages(doc, table)
