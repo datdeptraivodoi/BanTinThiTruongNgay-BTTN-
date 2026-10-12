@@ -48,6 +48,8 @@ def compact_paragraph(p):
             style_run(run, font="Verdana", size=size)
         elif val == "20":
             style_run(run, size=10)
+        elif val == "18":
+            style_run(run, size=9)
         elif val == "16":
             style_run(run, size=8)
         else:

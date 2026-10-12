@@ -212,12 +212,12 @@ def render_commodities_table(cell, snapshot):
         p.paragraph_format.line_spacing = 1
         if label:
             r = p.add_run(label)
-            style_run(r, size=10)
+            style_run(r, size=8)
             r.bold = True
             r.font.color.rgb = RGBColor.from_string("000000")
         else:
             r = p.add_run("")
-            style_run(r, size=10)
+            style_run(r, size=8)
         margins = OxmlElement("w:tcMar")
         for name in ("top", "bottom", "left", "right"):
             edge = OxmlElement("w:" + name)
@@ -240,12 +240,12 @@ def render_commodities_table(cell, snapshot):
                 if j == 0:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                     r = p.add_run(row_item["label"])
-                    style_run(r, size=10)
+                    style_run(r, size=8)
                     r.bold = True
                     r.font.color.rgb = RGBColor.from_string("000000")
                 else:
                     r = p.add_run("")
-                    style_run(r, size=10)
+                    style_run(r, size=8)
                 shade = OxmlElement("w:shd")
                 shade.set(qn("w:fill"), "99CCFF")
                 c._tc.get_or_add_tcPr().append(shade)
@@ -271,7 +271,7 @@ def render_commodities_table(cell, snapshot):
                 p.paragraph_format.space_after = Pt(0)
                 p.paragraph_format.line_spacing = Pt(5)
                 r = p.add_run("")
-                style_run(r, size=10)
+                style_run(r, size=8)
                 shade = OxmlElement("w:shd")
                 shade.set(qn("w:fill"), "99CCFF")
                 c._tc.get_or_add_tcPr().append(shade)
@@ -286,7 +286,7 @@ def render_commodities_table(cell, snapshot):
                 p.paragraph_format.space_before = Pt(0)
                 p.paragraph_format.space_after = Pt(0)
                 r = p.add_run(str(val))
-                style_run(r, size=10)
+                style_run(r, size=8)
                 r.bold = True
                 val_str = str(val).strip()
                 if j >= 2:
@@ -322,8 +322,8 @@ def render_contact_info(cell):
     """Render Contact Information 2-column table below commodities table on Page 3."""
     p_title = cell.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    p_title.paragraph_format.space_before = Pt(6)
-    p_title.paragraph_format.space_after = Pt(2)
+    p_title.paragraph_format.space_before = Pt(2)
+    p_title.paragraph_format.space_after = Pt(1)
     p_title.paragraph_format.line_spacing = 1
     r_title = p_title.add_run("Thông tin liên hệ")
     style_run(r_title, size=11)
@@ -347,12 +347,12 @@ def render_contact_info(cell):
         c = table.cell(0, j)
         c.width = col_w
         lines = [
-            (name, True, "0070C0"),
-            (role, False, "000000"),
-            (phone, False, "000000"),
-            (email, False, "000000"),
+            (name, True, "0070C0", 10),
+            (role, False, "000000", 9),
+            (phone, False, "000000", 9),
+            (email, False, "000000", 8),
         ]
-        for idx, (text_val, is_bold, color_hex) in enumerate(lines):
+        for idx, (text_val, is_bold, color_hex, font_size) in enumerate(lines):
             p = c.paragraphs[0] if idx == 0 and not c.paragraphs[0].text else c.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             p.paragraph_format.keep_together = True
@@ -360,7 +360,7 @@ def render_contact_info(cell):
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing = 1
             r = p.add_run(text_val)
-            style_run(r, size=10)
+            style_run(r, size=font_size)
             r.bold = is_bold
             r.font.color.rgb = RGBColor.from_string(color_hex)
         margins = OxmlElement("w:tcMar")
@@ -896,6 +896,9 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     # column spans. Normalize it while preserving the branded cells and merges.
     section = doc.sections[0]
     section.left_margin = section.right_margin = Inches(.10)
+    for s in doc.sections:
+        s.bottom_margin = Pt(0)
+        s.footer_distance = Pt(0)
     total = section.page_width - section.left_margin - section.right_margin
     for child in list(table._tbl.tblGrid):
         table._tbl.tblGrid.remove(child)
