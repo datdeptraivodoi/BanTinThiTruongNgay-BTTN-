@@ -12,8 +12,8 @@ NAVY = "245794"
 FILL = "4F81BD"
 
 
-def style_run(run, size=SIZE):
-    run.font.name = FONT
+def style_run(run, font=FONT, size=SIZE):
+    run.font.name = font
     run.font.size = Pt(size)
     properties = run._r.get_or_add_rPr()
     fonts = properties.get_or_add_rFonts()
@@ -21,7 +21,7 @@ def style_run(run, size=SIZE):
         if name.endswith("Theme"):
             del fonts.attrib[name]
     for name in ("ascii", "hAnsi", "eastAsia", "cs"):
-        fonts.set(qn("w:" + name), FONT)
+        fonts.set(qn("w:" + name), font)
     val_sz = str(int(size * 2))
     properties.get_or_add_sz().set(qn("w:val"), val_sz)
     size_cs = properties.find(qn("w:szCs"))
@@ -41,14 +41,28 @@ def compact_paragraph(p):
     for run in p.runs:
         sz_node = run._r.find(qn("w:rPr"))
         val = sz_node.find(qn("w:sz")).get(qn("w:val")) if sz_node is not None and sz_node.find(qn("w:sz")) is not None else None
-        if val == "16":
+        r_fonts = sz_node.find(qn("w:rFonts")) if sz_node is not None else None
+        font_name = r_fonts.get(qn("w:ascii")) if r_fonts is not None else run.font.name
+        if font_name == "Verdana":
+            size = 18 if val == "36" else 12
+            style_run(run, font="Verdana", size=size)
+        elif val == "20":
+            style_run(run, size=10)
+        elif val == "16":
             style_run(run, size=8)
         else:
             style_run(run, size=SIZE)
     if not p.text and not p._p.findall(".//" + qn("w:drawing")):
-        # Required empty paragraphs after nested tables are not visible text.
-        fmt.line_spacing = Pt(1)
-        fmt.space_before = fmt.space_after = Pt(0)
+        tr = p._p
+        while tr is not None and tr.tag != qn("w:tr"):
+            tr = tr.getparent()
+        if tr is not None and any(shd.get(qn("w:fill")) == "4F81BD" for shd in tr.iter(qn("w:shd"))):
+            fmt.line_spacing = Pt(12)
+            fmt.space_before = fmt.space_after = Pt(0)
+        else:
+            # Required empty paragraphs after nested tables are not visible text.
+            fmt.line_spacing = Pt(1)
+            fmt.space_before = fmt.space_after = Pt(0)
 
 
 def normalize_typography(doc):
@@ -61,8 +75,12 @@ def normalize_typography(doc):
     for part in [doc.part] + [s.header.part for s in doc.sections] + [s.footer.part for s in doc.sections]:
         for node in part.element.iter(qn("w:p")):
             compact_paragraph(Paragraph(node, part))
-    for node in doc.element.iter(qn("w:trHeight")):
-        node.getparent().remove(node)
+    for node in list(doc.element.iter(qn("w:trHeight"))):
+        tr = node.getparent()
+        if tr is not None and any(shd.get(qn("w:fill")) == "4F81BD" for shd in tr.iter(qn("w:shd"))):
+            continue
+        if tr is not None:
+            tr.remove(node)
     for node in doc.element.iter(qn("w:tblHeader")):
         node.getparent().remove(node)
     for node in doc.element.iter(qn("w:tcMar")):
@@ -109,7 +127,7 @@ def split_pages(doc, table):
     """Explicit page boundaries; separator rows cannot drift across pages."""
     parent = table._tbl.getparent()
     position = parent.index(table._tbl)
-    for indexes in [range(0, 6), range(7, 10), range(11, 14)]:
+    for indexes in [range(0, 6), range(6, 10), range(10, 14)]:
         if indexes.start:
             p = OxmlElement("w:p")
             pr = OxmlElement("w:pPr")

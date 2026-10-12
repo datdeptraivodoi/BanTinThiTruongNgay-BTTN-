@@ -42,3 +42,4 @@ output/
 .ruff_cache/
 node_modules/
 trader_quotes.json
+scratch/

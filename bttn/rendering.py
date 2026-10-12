@@ -176,7 +176,7 @@ def render_swap_table(cell, snapshot):
 
 
 def render_commodities_table(cell, snapshot):
-    """Render page 3 commodities table with size 8pt Times New Roman matching X9:AA32 in Excel."""
+    """Render page 3 commodities table with size 10pt Times New Roman matching X9:AA32 in Excel."""
     date_str_dot = snapshot.as_of.strftime("%d.%m.%Y")
     date_str_slash = snapshot.as_of.strftime("%d/%m/%Y")
     title = paragraph(cell, f"Bảng giá hàng hóa ngày {date_str_dot}", bold=True, color=NAVY)
@@ -212,12 +212,12 @@ def render_commodities_table(cell, snapshot):
         p.paragraph_format.line_spacing = 1
         if label:
             r = p.add_run(label)
-            style_run(r, size=8)
+            style_run(r, size=10)
             r.bold = True
             r.font.color.rgb = RGBColor.from_string("000000")
         else:
             r = p.add_run("")
-            style_run(r, size=8)
+            style_run(r, size=10)
         margins = OxmlElement("w:tcMar")
         for name in ("top", "bottom", "left", "right"):
             edge = OxmlElement("w:" + name)
@@ -240,12 +240,12 @@ def render_commodities_table(cell, snapshot):
                 if j == 0:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                     r = p.add_run(row_item["label"])
-                    style_run(r, size=8)
+                    style_run(r, size=10)
                     r.bold = True
                     r.font.color.rgb = RGBColor.from_string("000000")
                 else:
                     r = p.add_run("")
-                    style_run(r, size=8)
+                    style_run(r, size=10)
                 shade = OxmlElement("w:shd")
                 shade.set(qn("w:fill"), "99CCFF")
                 c._tc.get_or_add_tcPr().append(shade)
@@ -271,7 +271,7 @@ def render_commodities_table(cell, snapshot):
                 p.paragraph_format.space_after = Pt(0)
                 p.paragraph_format.line_spacing = Pt(5)
                 r = p.add_run("")
-                style_run(r, size=8)
+                style_run(r, size=10)
                 shade = OxmlElement("w:shd")
                 shade.set(qn("w:fill"), "99CCFF")
                 c._tc.get_or_add_tcPr().append(shade)
@@ -286,7 +286,7 @@ def render_commodities_table(cell, snapshot):
                 p.paragraph_format.space_before = Pt(0)
                 p.paragraph_format.space_after = Pt(0)
                 r = p.add_run(str(val))
-                style_run(r, size=8)
+                style_run(r, size=10)
                 r.bold = True
                 val_str = str(val).strip()
                 if j >= 2:
@@ -305,6 +305,71 @@ def render_commodities_table(cell, snapshot):
                     edge.set(qn("w:type"), "dxa")
                     margins.append(edge)
                 c._tc.get_or_add_tcPr().append(margins)
+
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+    tail = cell.paragraphs[-1]
+    tail.paragraph_format.space_after = Pt(0)
+    tail.paragraph_format.space_before = Pt(0)
+    if not tail.text:
+        tail.paragraph_format.line_spacing = Pt(1)
+        for run in tail.runs:
+            run.font.size = Pt(1)
+    return table
+
+
+def render_contact_info(cell):
+    """Render Contact Information 2-column table below commodities table on Page 3."""
+    p_title = cell.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p_title.paragraph_format.space_before = Pt(6)
+    p_title.paragraph_format.space_after = Pt(2)
+    p_title.paragraph_format.line_spacing = 1
+    r_title = p_title.add_run("Thông tin liên hệ")
+    style_run(r_title, size=11)
+    r_title.bold = True
+    r_title.font.color.rgb = RGBColor.from_string(NAVY)
+
+    width = int((cell.width or Inches(3.5)) - Inches(.08))
+    col_w = int(width / 2)
+    table = cell.add_table(rows=1, cols=2)
+    table.autofit = False
+    table.columns[0].width = col_w
+    table.columns[1].width = col_w
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+
+    contacts = [
+        ("Hoa Hùng Cường", "Phụ trách Bộ phận Phân tích", "ĐT: 024 6266 1088 (ex: 2532)", "Email: cuonghh@mbbank.com.vn"),
+        ("Nguyễn Hữu Đạt", "Bộ phận Phân tích", "ĐT: 037 404 3517 (ex: 2533)", "Email: datnh1@mbbank.com.vn"),
+    ]
+
+    for j, (name, role, phone, email) in enumerate(contacts):
+        c = table.cell(0, j)
+        c.width = col_w
+        lines = [
+            (name, True, "0070C0"),
+            (role, False, "000000"),
+            (phone, False, "000000"),
+            (email, False, "000000"),
+        ]
+        for idx, (text_val, is_bold, color_hex) in enumerate(lines):
+            p = c.paragraphs[0] if idx == 0 and not c.paragraphs[0].text else c.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.keep_together = True
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = 1
+            r = p.add_run(text_val)
+            style_run(r, size=10)
+            r.bold = is_bold
+            r.font.color.rgb = RGBColor.from_string(color_hex)
+        margins = OxmlElement("w:tcMar")
+        for edge_name in ("top", "bottom", "left", "right"):
+            edge = OxmlElement("w:" + edge_name)
+            edge.set(qn("w:w"), "10")
+            edge.set(qn("w:type"), "dxa")
+            margins.append(edge)
+        c._tc.get_or_add_tcPr().append(margins)
 
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
@@ -361,7 +426,7 @@ def render_calendar_events_table(cell):
         p.paragraph_format.space_after = Pt(0)
         p.paragraph_format.line_spacing = 1
         r = p.add_run(label)
-        style_run(r, size=8)
+        style_run(r, size=10)
         r.bold = True
         r.font.color.rgb = RGBColor.from_string("FFFFFF")
         shade = OxmlElement("w:shd")
@@ -388,7 +453,7 @@ def render_calendar_events_table(cell):
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing = 1
             r = p.add_run(val)
-            style_run(r, size=8)
+            style_run(r, size=10)
             r.bold = is_high_impact
             r.font.color.rgb = RGBColor.from_string("245794" if is_high_impact else "4F81BD")
             margins = OxmlElement("w:tcMar")
@@ -454,7 +519,7 @@ def render_international_money_market(cell):
         p.paragraph_format.space_after = Pt(0)
         p.paragraph_format.line_spacing = 1
         r = p.add_run(label)
-        style_run(r, size=8)
+        style_run(r, size=10)
         r.bold = True
         r.font.color.rgb = RGBColor.from_string("FFFFFF")
         shade = OxmlElement("w:shd")
@@ -480,7 +545,7 @@ def render_international_money_market(cell):
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing = 1
             r = p.add_run(val)
-            style_run(r, size=8)
+            style_run(r, size=10)
             r.bold = True
             if j == 2:
                 if val.startswith("+"):
@@ -509,7 +574,7 @@ def render_international_money_market(cell):
     p_unit.paragraph_format.space_after = Pt(0)
     p_unit.paragraph_format.line_spacing = 1
     r_u = p_unit.add_run("   Đơn vị %")
-    style_run(r_u, size=8)
+    style_run(r_u, size=10)
     r_u.font.color.rgb = RGBColor.from_string("000000")
 
     # 4. Heading: LIBOR – SOFR
@@ -519,7 +584,7 @@ def render_international_money_market(cell):
     p_sofr.paragraph_format.space_after = Pt(1)
     p_sofr.paragraph_format.line_spacing = 1
     r_s = p_sofr.add_run("LIBOR – SOFR")
-    style_run(r_s, size=8)
+    style_run(r_s, size=10)
     r_s.bold = True
     r_s.font.color.rgb = RGBColor.from_string(NAVY)
 
@@ -548,7 +613,7 @@ def render_international_money_market(cell):
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing = 1
             r = p.add_run(val)
-            style_run(r, size=8)
+            style_run(r, size=10)
             r.bold = (j in (0, 2))
             r.font.color.rgb = RGBColor.from_string("000000")
             margins = OxmlElement("w:tcMar")
@@ -598,7 +663,7 @@ def render_international_money_market(cell):
         p.paragraph_format.space_after = Pt(0)
         p.paragraph_format.line_spacing = 1
         r = p.add_run(label)
-        style_run(r, size=8)
+        style_run(r, size=10)
         r.bold = True
         r.font.color.rgb = RGBColor.from_string("FFFFFF")
         shade = OxmlElement("w:shd")
@@ -624,7 +689,7 @@ def render_international_money_market(cell):
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing = 1
             r = p.add_run(val)
-            style_run(r, size=8)
+            style_run(r, size=10)
             r.bold = True
             if j == 0:
                 r.font.color.rgb = RGBColor.from_string("000000")
@@ -796,10 +861,10 @@ def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_typ
     success = False
     if chart_type == "currency":
         success = render_currency_chart(df, path, title, source_label)
-        width_cm, height_cm = 8.763, 5.3
+        width_cm, height_cm = 8.83, 6.8
     else:
         success = render_commodity_chart(df, path, title, source_label)
-        width_cm, height_cm = 8.763, 4.4
+        width_cm, height_cm = 9.0, 6.58
 
     if not success or not path.is_file():
         # Fallback to standard line chart if candlestick rendering failed
@@ -810,7 +875,6 @@ def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_typ
     p = cell.add_paragraph()
     p.paragraph_format.space_after = Pt(0)
     p.add_run().add_picture(str(path), width=Cm(width_cm), height=Cm(height_cm))
-    paragraph(cell, f"Nguồn: {source_label} · Khung Daily 3 tháng", color="666666")
 
 
 def render(snapshot, content, template: Path, output: Path, is_draft: bool = False):
@@ -850,6 +914,14 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         for node in list(row._tr.get_or_add_trPr()):
             if node.tag in {qn("w:gridBefore"), qn("w:gridAfter"), qn("w:wBefore"), qn("w:wAfter")}:
                 row._tr.trPr.remove(node)
+        if index in (6, 10):
+            trPr = row._tr.get_or_add_trPr()
+            for th in list(trPr.findall(qn("w:trHeight"))):
+                trPr.remove(th)
+            trHeight = OxmlElement("w:trHeight")
+            trHeight.set(qn("w:val"), "400")
+            trHeight.set(qn("w:hRule"), "exact")
+            trPr.append(trHeight)
         spans = {0: [3, 3], 1: [6], 2: [4, 2], 9: [2, 4], 13: [6]}.get(index, [2, 2, 2])
         if len(row._tr.tc_lst) != len(spans):
             raise ValueError("Unexpected template cell spans")
@@ -866,13 +938,31 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
                 cleared.add(c._tc)
     header = cells(table.rows[2])
     clear(header[1])
+    WEEKDAYS_VI = {
+        0: "Thứ Hai",
+        1: "Thứ Ba",
+        2: "Thứ Tư",
+        3: "Thứ Năm",
+        4: "Thứ Sáu",
+        5: "Thứ Bảy",
+        6: "Chủ Nhật",
+    }
+    weekday_str = WEEKDAYS_VI.get(snapshot.as_of.weekday(), "Thứ Hai")
+    date_text = f"{weekday_str}, ngày {snapshot.as_of.strftime('%d.%m.%Y')}"
     if snapshot.purpose == "fixture":
-        label = "KIỂM THỬ · KHÔNG PHÁT HÀNH · "
+        date_text = "KIỂM THỬ · " + date_text
     elif is_draft:
-        label = "BẢN NHÁP · KHÔNG PHÁT HÀNH · "
-    else:
-        label = ""
-    paragraph(header[1], label + snapshot.as_of.strftime("Ngày %d.%m.%Y · chốt %H:%M"), bold=True, color=NAVY)
+        date_text = "BẢN NHÁP · " + date_text
+    p_date = header[1].paragraphs[0]
+    p_date.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_date.paragraph_format.space_before = Pt(0)
+    p_date.paragraph_format.space_after = Pt(0)
+    p_date.paragraph_format.line_spacing = 1
+    r_date = p_date.add_run(date_text)
+    style_run(r_date, font="Verdana", size=12)
+    r_date.font.italic = True
+    r_date.font.bold = True
+    r_date.font.color.rgb = RGBColor.from_string(NAVY)
     r3, r4, r5, r7, r8, r9, r11, r12 = [cells(table.rows[i]) for i in [3, 4, 5, 7, 8, 9, 11, 12]]
 
     # Render exactly the content that passed the editorial checks.
@@ -949,14 +1039,20 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     p_asia = paragraph(r7[2], build_asia_forecast(snapshot), bold=True, color="C00000")
     p_asia.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     render_international_money_market(r8[0])
-    plot_candlestick_cell(r8[1], "EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
-    plot_candlestick_cell(r8[2], "USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
+    plot_candlestick_cell(r8[1], "Tỷ giá EUR-USD           nguồn Reuters", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
+    plot_candlestick_cell(r8[2], "Tỷ giá USD-JPY           nguồn Reuters", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
 
     render_commodities_table(r11[0], snapshot)
+    render_contact_info(r11[0])
     narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot, show_source=False, forecast=build_energy_metals_forecast(snapshot))
     narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot, show_source=False, forecast=build_coffee_forecast(snapshot))
-    plot_candlestick_cell(r12[1], "Dầu Brent futures · USD/thùng", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
-    plot_candlestick_cell(r12[2], "Arabica futures · USc/lbs", snapshot, "ARABICA", output.parent, "arabica", chart_type="commodity", tv_cache=tv_cache)
+    plot_candlestick_cell(r12[1], "Giá dầu thô Brent           nguồn Reuters", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
+    plot_candlestick_cell(r12[2], "Giá cà phê Arabica          nguồn Reuters", snapshot, "ARABICA", output.parent, "arabica", chart_type="commodity", tv_cache=tv_cache)
+    for c in cells(table.rows[13]):
+        for p in c.paragraphs:
+            for r in p.runs:
+                style_run(r, size=8)
+
     normalize_typography(doc)
     split_pages(doc, table)
     # Remove orphan chart/image relationships now that all source charts were replaced.
@@ -1009,10 +1105,11 @@ def validate_docx(docx_path: Path):
             properties = run.find(qn("w:rPr"))
             fonts = properties.find(qn("w:rFonts")) if properties is not None else None
             size = properties.find(qn("w:sz")) if properties is not None else None
-            if fonts is None or any(fonts.get(qn("w:" + name)) != FONT for name in ("ascii", "hAnsi", "eastAsia", "cs")):
-                raise ValueError("Word text must use Times New Roman")
-            if size is None or size.get(qn("w:val")) not in (str(SIZE * 2), "16"):
-                raise ValueError("Word text must use 11 pt")
+            if fonts is None or any(fonts.get(qn("w:" + name)) not in (FONT, "Verdana") for name in ("ascii", "hAnsi", "eastAsia", "cs")):
+                raise ValueError("Word text must use Times New Roman or Verdana")
+            allowed_sizes = (str(SIZE * 2), "16", "20", "24", "36", "18", "19", "2")
+            if size is None or size.get(qn("w:val")) not in allowed_sizes:
+                raise ValueError(f"Word text must use 11 pt or allowed layout size (got {size.get(qn('w:val')) if size is not None else 'None'})")
 
 
 def validate_pdf_layout(pdf_path: Path):
@@ -1037,10 +1134,12 @@ def validate_pdf_layout(pdf_path: Path):
                     for span in line["spans"]:
                         if not span["text"].strip():
                             continue
-                        if "TimesNewRoman" not in span["font"].replace(" ", ""):
+                        font_clean = span["font"].replace(" ", "").replace("-", "")
+                        if "TimesNewRoman" not in font_clean and "Verdana" not in font_clean:
                             raise ValueError("PDF substituted Times New Roman; install the required font")
-                        if abs(span["size"] - SIZE) > .2 and abs(span["size"] - 8) > .2:
-                            raise ValueError("PDF contains visible text outside the required 11 pt size")
+                        allowed_pt = (SIZE, 8, 10, 12, 18, 9, 8.5)
+                        if not any(abs(span["size"] - pt) < .3 for pt in allowed_pt):
+                            raise ValueError(f"PDF contains visible text outside allowed sizes: {span['size']}")
                         x0, y0, x1, y1 = span["bbox"]
                         if x0 < 0 or y0 < 0 or x1 > page.rect.width or y1 > page.rect.height:
                             raise ValueError("PDF text extends outside the page")

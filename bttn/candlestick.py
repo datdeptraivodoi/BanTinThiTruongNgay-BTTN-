@@ -193,7 +193,7 @@ def render_currency_chart(df: pd.DataFrame, output_path: Path, title: str, sourc
         type="candle",
         addplot=ap,
         style=s,
-        figsize=(3.45, 5.3 / 2.54),
+        figsize=(8.83 / 2.54, 6.8 / 2.54),
         returnfig=True,
         volume=False,
         tight_layout=True,
@@ -233,8 +233,7 @@ def render_currency_chart(df: pd.DataFrame, output_path: Path, title: str, sourc
 def render_commodity_chart(df: pd.DataFrame, output_path: Path, title: str, source_label: str = "TradingView") -> bool:
     """Renders Candlestick + simplified Ichimoku Cloud (9, 26, 52).
     
-    Target shape size in Word: width = 9.0 cm, height = 6.5 cm.
-    Aspect ratio: 9.0 / 6.5 ~= 1.385.
+    Target shape size in Word: width = 9.0 cm, height = 6.58 cm.
     """
     if df.empty or len(df) < 5:
         return False
@@ -258,7 +257,7 @@ def render_commodity_chart(df: pd.DataFrame, output_path: Path, title: str, sour
         type="candle",
         addplot=ap,
         style=s,
-        figsize=(3.45, 4.4 / 2.54),
+        figsize=(9.0 / 2.54, 6.58 / 2.54),
         returnfig=True,
         volume=False,
         tight_layout=True,

@@ -223,8 +223,9 @@ def parse_teams_payload(snapshot: Snapshot, raw_content: str | dict | list, sour
         tenor_order = {"ON": 0, "1W": 1, "2W": 2, "1M": 3, "3M": 4, "6M": 5}
         swaps.sort(key=lambda s: tenor_order.get(s.tenor, 99))
 
+        quoted_at_clamped = min(today_at, snapshot.as_of)
         today_quote = TraderQuote(
-            quoted_at=today_at,
+            quoted_at=quoted_at_clamped,
             source_url=source_url,
             room="firm ALM",
             fx_bid=fx_bid,
