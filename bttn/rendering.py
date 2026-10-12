@@ -756,7 +756,6 @@ def plot_trader_fx(cell, snapshot, directory):
     chart(path, data, "", height=1.25)
     p = cell.add_paragraph()
     p.add_run().add_picture(str(path), width=Inches(3.45), height=Inches(1.25))
-    paragraph(cell, "Nguồn: trader · firm ALM", color="666666")
 
 
 def plot_bonds(cell, snapshot, directory):
@@ -768,7 +767,6 @@ def plot_bonds(cell, snapshot, directory):
     data = [("10Y", [label for label, obs in points], [float(obs.value) for label, obs in points])] if points else []
     chart(path, data, "%/năm", categorical=True, height=1.25)
     cell.add_paragraph().add_run().add_picture(str(path), width=Inches(3.45), height=Inches(1.25))
-    paragraph(cell, "Nguồn: VIRA Market Watch", color="666666")
 
 
 def narrative(cell, title, section, snapshot, show_source=True, forecast=None):
@@ -845,7 +843,6 @@ def plot_cell(cell, title, snapshot, keys, directory, name, height=1.55, categor
     p = cell.add_paragraph()
     p.paragraph_format.space_after = Pt(0)
     p.add_run().add_picture(str(path), width=Inches(3.45), height=Inches(height))
-    paragraph(cell, "Nguồn: VIRA Market Watch" if category else "Nguồn: Yahoo Finance · các phiên có dữ liệu", color="666666")
 
 
 def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_type="currency", tv_cache=None):
@@ -1039,15 +1036,15 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     p_asia = paragraph(r7[2], build_asia_forecast(snapshot), bold=True, color="C00000")
     p_asia.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     render_international_money_market(r8[0])
-    plot_candlestick_cell(r8[1], "Tỷ giá EUR-USD           nguồn Reuters", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
-    plot_candlestick_cell(r8[2], "Tỷ giá USD-JPY           nguồn Reuters", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
+    plot_candlestick_cell(r8[1], "Tỷ giá EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
+    plot_candlestick_cell(r8[2], "Tỷ giá USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
 
     render_commodities_table(r11[0], snapshot)
     render_contact_info(r11[0])
     narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot, show_source=False, forecast=build_energy_metals_forecast(snapshot))
     narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot, show_source=False, forecast=build_coffee_forecast(snapshot))
-    plot_candlestick_cell(r12[1], "Giá dầu thô Brent           nguồn Reuters", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
-    plot_candlestick_cell(r12[2], "Giá cà phê Arabica          nguồn Reuters", snapshot, "ARABICA", output.parent, "arabica", chart_type="commodity", tv_cache=tv_cache)
+    plot_candlestick_cell(r12[1], "Giá dầu thô Brent", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
+    plot_candlestick_cell(r12[2], "Giá cà phê Arabica", snapshot, "ARABICA", output.parent, "arabica", chart_type="commodity", tv_cache=tv_cache)
     for c in cells(table.rows[13]):
         for p in c.paragraphs:
             for r in p.runs:
