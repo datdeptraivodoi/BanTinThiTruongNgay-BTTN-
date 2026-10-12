@@ -150,6 +150,7 @@ def apply_trader_quotes(snapshot: Snapshot, data: QuoteFile):
 def parse_teams_payload(snapshot: Snapshot, raw_content: str | dict | list, source_url: str = "https://teams.microsoft.com/l/message/19:channel_swap_today") -> QuoteFile | None:
     import json
     import re
+
     from .models import parse_as_of
 
     try:

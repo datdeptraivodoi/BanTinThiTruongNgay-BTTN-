@@ -7,6 +7,7 @@ Phân tích toàn bộ quote của trader trên room MARKET RATE FX ITB:
 
 import re
 
+
 def normalize_quote(bid_str, ask_str, base_prev=25900):
     """
     Chuẩn hóa quote (e.g. '800', '890' -> 25800, 25890; '982', '992' -> 25982, 25992; '005', '015' -> 26005, 26015; '77', '87' -> 25977, 25987).
@@ -14,7 +15,7 @@ def normalize_quote(bid_str, ask_str, base_prev=25900):
     try:
         b_val = int(bid_str)
         a_val = int(ask_str)
-    except:
+    except Exception:
         return None, None
         
     # Case 5 chữ số đầy đủ: 25800, 25890, 25980, 26000
@@ -68,7 +69,7 @@ def parse_itb_full_text(text):
     """
     Phân tích nội dung chat Teams ITB thành dữ liệu phiên hôm trước và phiên hôm nay.
     """
-    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    lines = [line_text.strip() for line_text in text.split('\n') if line_text.strip()]
     
     current_section = None
     yesterday_quotes = []
@@ -94,10 +95,13 @@ def parse_itb_full_text(text):
             b = int(m_mix.group(1))
             a_tail = int(m_mix.group(2))
             a = (b // 100) * 100 + a_tail
-            if a < b: a += 100
+            if a < b:
+                a += 100
             q = (b, a)
-            if current_section == 'yesterday': yesterday_quotes.append(q)
-            elif current_section == 'today': today_quotes.append(q)
+            if current_section == 'yesterday':
+                yesterday_quotes.append(q)
+            elif current_section == 'today':
+                today_quotes.append(q)
             continue
             
         # 2. '25980 26000'
@@ -107,8 +111,10 @@ def parse_itb_full_text(text):
             a_f = int(m_full.group(2))
             if 25700 <= b_f <= 26300:
                 q = (b_f, a_f)
-                if current_section == 'yesterday': yesterday_quotes.append(q)
-                elif current_section == 'today': today_quotes.append(q)
+                if current_section == 'yesterday':
+                    yesterday_quotes.append(q)
+                elif current_section == 'today':
+                    today_quotes.append(q)
                 continue
             
         # 3. '982 992' hoặc '003 013' hoặc '77 87' hoặc '800 890'
@@ -117,8 +123,10 @@ def parse_itb_full_text(text):
             b_norm, a_norm = normalize_quote(m_short.group(1), m_short.group(2))
             if b_norm and a_norm and 25700 <= b_norm <= 26300:
                 q = (b_norm, a_norm)
-                if current_section == 'yesterday': yesterday_quotes.append(q)
-                elif current_section == 'today': today_quotes.append(q)
+                if current_section == 'yesterday':
+                    yesterday_quotes.append(q)
+                elif current_section == 'today':
+                    today_quotes.append(q)
                 continue
 
     # Tổng hợp phân tích
@@ -126,7 +134,6 @@ def parse_itb_full_text(text):
     
     # --- PHIÊN HÔM TRƯỚC ---
     y_close_b = None
-    y_close_a = None
     if yesterday_quotes:
         bids = [q[0] for q in yesterday_quotes]
         asks = [q[1] for q in yesterday_quotes]
@@ -135,7 +142,6 @@ def parse_itb_full_text(text):
         spread = max_rate - min_rate
         close_bid, close_ask = yesterday_quotes[-1]
         y_close_b = close_bid
-        y_close_a = close_ask
         q_count = len(yesterday_quotes)
         liq = evaluate_liquidity(q_count)
         

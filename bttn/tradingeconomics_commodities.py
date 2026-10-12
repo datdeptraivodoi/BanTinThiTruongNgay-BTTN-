@@ -10,9 +10,7 @@ import io
 import logging
 import re
 import sys
-from datetime import datetime
-from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests

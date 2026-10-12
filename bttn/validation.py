@@ -119,6 +119,7 @@ def parse_placeholder_key(key: str, snapshot: Snapshot):
             return snapshot.observations[alt_key], "value"
     if key in ("SJC_BUY", "SJC_SELL") and "sjc_gold" in snapshot.sources:
         from decimal import Decimal
+
         from .models import Observation
         sjc = snapshot.sources["sjc_gold"]
         nums = re.findall(r"\d+(?:[.,]\d+)?", sjc.text)

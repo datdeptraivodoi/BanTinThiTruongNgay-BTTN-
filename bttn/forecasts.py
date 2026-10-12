@@ -1,8 +1,6 @@
 """Market forecast generators for BTTN report sections."""
 import random
 import re
-from decimal import Decimal
-from typing import Any
 
 from .models import ReportContent, Snapshot
 from .trader_quotes import trader_observation

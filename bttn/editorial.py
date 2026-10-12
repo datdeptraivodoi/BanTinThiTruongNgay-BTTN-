@@ -8,7 +8,6 @@ from pathlib import Path
 from .fx_editorial import EUR_SECOND_OPENING, fx_opening
 from .models import Section, SentenceReference, create_draft_placeholder_content
 from .nvidia_translation import is_vietnamese
-from .trader_quotes import trader_observation
 from .tradingeconomics_news import topic_for
 from .translation_service import load_verified_translations
 from .validation import (
