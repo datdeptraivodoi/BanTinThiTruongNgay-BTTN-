@@ -156,5 +156,5 @@ def test_renderer_uses_normal_prose_and_applies_font(snapshot, content, tmp_path
         if not list(run.iter(qn('w:t'))):
             continue
         props = run.find(qn('w:rPr'))
-        assert props.find(qn('w:sz')).get(qn('w:val')) == '22'
+        assert props.find(qn('w:sz')).get(qn('w:val')) in ('22', '16')
         assert props.find(qn('w:rFonts')).get(qn('w:ascii')) == 'Times New Roman'

@@ -175,6 +175,102 @@ def render_swap_table(cell, snapshot):
     return table
 
 
+def render_commodities_table(cell, snapshot):
+    """Render page 3 commodities table with size 8pt Times New Roman matching X9:AA32 in Excel."""
+    date_str_dot = snapshot.as_of.strftime("%d.%m.%Y")
+    date_str_slash = snapshot.as_of.strftime("%d/%m/%Y")
+    title = paragraph(cell, f"Bảng giá hàng hóa ngày {date_str_dot}", bold=True, color=NAVY)
+    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    from .tradingeconomics_commodities import get_commodities_table_data
+    rows_data = get_commodities_table_data(snapshot)
+
+    headers = ["Các chỉ số tổng hợp", f"Giá ngày {date_str_slash}", "Thay đổi ngày (%)", "Thay đổi năm (%)"]
+    ratios = [0.42, 0.24, 0.17, 0.17]
+    width = int((cell.width or Inches(3.5)) - Inches(.08))
+    widths = [int(width * r) for r in ratios]
+
+    table = cell.add_table(rows=len(rows_data) + 1, cols=4)
+    table.autofit = False
+    for col, w in zip(table.columns, widths):
+        col.width = w
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+    for j, label in enumerate(headers):
+        c = table.cell(0, j)
+        c.width = widths[j]
+        p = c.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j == 0 else WD_ALIGN_PARAGRAPH.RIGHT
+        p.paragraph_format.keep_together = True
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        r = p.add_run(label)
+        style_run(r, size=8)
+        r.bold = True
+        r.font.color.rgb = RGBColor.from_string("FFFFFF")
+        shade = OxmlElement("w:shd")
+        shade.set(qn("w:fill"), "4F81BD")
+        c._tc.get_or_add_tcPr().append(shade)
+        margins = OxmlElement("w:tcMar")
+        for name in ("top", "bottom", "left", "right"):
+            edge = OxmlElement("w:" + name)
+            edge.set(qn("w:w"), "10")
+            edge.set(qn("w:type"), "dxa")
+            margins.append(edge)
+        c._tc.get_or_add_tcPr().append(margins)
+
+    for i, row_item in enumerate(rows_data, start=1):
+        table.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        if row_item.get("separator"):
+            for j in range(4):
+                c = table.cell(i, j)
+                c.width = widths[j]
+                p = c.paragraphs[0]
+                p.paragraph_format.keep_together = True
+                p.paragraph_format.space_before = Pt(0)
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.line_spacing = Pt(2)
+                r = p.add_run("")
+                style_run(r, size=8)
+                shade = OxmlElement("w:shd")
+                shade.set(qn("w:fill"), "F2F2F2")
+                c._tc.get_or_add_tcPr().append(shade)
+        else:
+            values = [row_item["label"], row_item["price"], row_item["pct_day"], row_item["pct_yoy"]]
+            for j, val in enumerate(values):
+                c = table.cell(i, j)
+                c.width = widths[j]
+                p = c.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j == 0 else WD_ALIGN_PARAGRAPH.RIGHT
+                p.paragraph_format.keep_together = True
+                p.paragraph_format.space_before = Pt(0)
+                p.paragraph_format.space_after = Pt(0)
+                r = p.add_run(str(val))
+                style_run(r, size=8)
+                val_str = str(val)
+                if j >= 2 and val_str.startswith("-"):
+                    r.font.color.rgb = RGBColor.from_string("C00000")
+                else:
+                    r.font.color.rgb = RGBColor.from_string(NAVY)
+                margins = OxmlElement("w:tcMar")
+                for name in ("top", "bottom", "left", "right"):
+                    edge = OxmlElement("w:" + name)
+                    edge.set(qn("w:w"), "10")
+                    edge.set(qn("w:type"), "dxa")
+                    margins.append(edge)
+                c._tc.get_or_add_tcPr().append(margins)
+
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+    tail = cell.paragraphs[-1]
+    tail.paragraph_format.space_after = Pt(0)
+    tail.paragraph_format.space_before = Pt(0)
+    if not tail.text:
+        tail.paragraph_format.line_spacing = Pt(1)
+        for run in tail.runs:
+            run.font.size = Pt(1)
+    return table
+
+
 def render_sbv_block(cell, snapshot):
     title = paragraph(cell, "Tỷ giá USD-VND của NHNN", bold=True, color=NAVY)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -486,19 +582,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     plot_candlestick_cell(r8[1], "EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
     plot_candlestick_cell(r8[2], "USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
 
-    heading(r11[0], "Bảng giá hàng hóa · " + snapshot.as_of.strftime("%d.%m.%Y"))
-    commodities = [("CRB", "CRB Spot"), ("DXY", "USD Index"), ("LME", "LME Index"),
-        ("ROBUSTA", "Robusta USD/tấn"), ("ARABICA", "Arabica USc/lbs"), ("CORN", "Ngô USc/bsh"),
-        ("SOY", "Đậu tương USc/bsh"), ("RUBBER", "Cao su JPY/kg"), ("COTTON", "Cotton USc/lb"),
-        ("BRENT", "Brent USD/thùng"), ("GAS", "Khí USD/MMBtu"), ("RON92", "RON92 USD/thùng"),
-        ("COPPER", "Đồng USD/tấn"), ("ALUMINUM", "Nhôm USD/tấn"), ("ZINC", "Kẽm USD/tấn"),
-        ("NICKEL", "Nickel USD/tấn"), ("GOLD", "Vàng USD/oz"), ("SILVER", "Bạc USD/oz")]
-    rows = []
-    for key, label in commodities:
-        obs = snapshot.observations.get(key)
-        rows.append([label, value(snapshot, key), f"{obs.daily_pct:+.2f}" if obs and obs.daily_pct is not None else "—", f"{obs.annual_pct:+.2f}" if obs and obs.annual_pct is not None else "—"])
-    grid(r11[0], ["Chỉ tiêu", "Giá", "Ngày %", "YoY %"], rows, ratios=[.44, .24, .16, .16])
-    paragraph(r11[0], "Nguồn Yahoo Finance (futures liên tục). —: thiếu nguồn phù hợp; không thay RON92 bằng RBOB. Biến động năm: so cùng kỳ năm trước.")
+    render_commodities_table(r11[0], snapshot)
     narrative(r11[1], "Thị trường năng lượng & kim loại", content.energy_metals, snapshot, show_source=False, forecast=build_energy_metals_forecast(snapshot))
     narrative(r11[2], "Thị trường cà phê", content.coffee, snapshot, show_source=False, forecast=build_coffee_forecast(snapshot))
     plot_candlestick_cell(r12[1], "Dầu Brent futures · USD/thùng", snapshot, "BRENT", output.parent, "brent", chart_type="commodity", tv_cache=tv_cache)
@@ -553,7 +637,7 @@ def validate_docx(docx_path: Path):
             size = properties.find(qn("w:sz")) if properties is not None else None
             if fonts is None or any(fonts.get(qn("w:" + name)) != FONT for name in ("ascii", "hAnsi", "eastAsia", "cs")):
                 raise ValueError("Word text must use Times New Roman")
-            if size is None or size.get(qn("w:val")) != str(SIZE * 2):
+            if size is None or size.get(qn("w:val")) not in (str(SIZE * 2), "16"):
                 raise ValueError("Word text must use 11 pt")
 
 
@@ -577,7 +661,7 @@ def validate_pdf_layout(pdf_path: Path):
                             continue
                         if "TimesNewRoman" not in span["font"].replace(" ", ""):
                             raise ValueError("PDF substituted Times New Roman; install the required font")
-                        if abs(span["size"] - SIZE) > .2:
+                        if abs(span["size"] - SIZE) > .2 and abs(span["size"] - 8) > .2:
                             raise ValueError("PDF contains visible text outside the required 11 pt size")
                         x0, y0, x1, y1 = span["bbox"]
                         if x0 < 0 or y0 < 0 or x1 > page.rect.width or y1 > page.rect.height:

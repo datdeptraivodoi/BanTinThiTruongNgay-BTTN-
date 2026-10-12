@@ -12,9 +12,9 @@ NAVY = "245794"
 FILL = "4F81BD"
 
 
-def style_run(run):
+def style_run(run, size=SIZE):
     run.font.name = FONT
-    run.font.size = Pt(SIZE)
+    run.font.size = Pt(size)
     properties = run._r.get_or_add_rPr()
     fonts = properties.get_or_add_rFonts()
     for name in list(fonts.attrib):
@@ -22,12 +22,13 @@ def style_run(run):
             del fonts.attrib[name]
     for name in ("ascii", "hAnsi", "eastAsia", "cs"):
         fonts.set(qn("w:" + name), FONT)
-    properties.get_or_add_sz().set(qn("w:val"), "22")
+    val_sz = str(int(size * 2))
+    properties.get_or_add_sz().set(qn("w:val"), val_sz)
     size_cs = properties.find(qn("w:szCs"))
     if size_cs is None:
         size_cs = OxmlElement("w:szCs")
         properties.append(size_cs)
-    size_cs.set(qn("w:val"), "22")
+    size_cs.set(qn("w:val"), val_sz)
 
 
 def compact_paragraph(p):
@@ -38,7 +39,12 @@ def compact_paragraph(p):
     fmt.keep_with_next = False
     fmt.widow_control = False
     for run in p.runs:
-        style_run(run)
+        sz_node = run._r.find(qn("w:rPr"))
+        val = sz_node.find(qn("w:sz")).get(qn("w:val")) if sz_node is not None and sz_node.find(qn("w:sz")) is not None else None
+        if val == "16":
+            style_run(run, size=8)
+        else:
+            style_run(run, size=SIZE)
     if not p.text and not p._p.findall(".//" + qn("w:drawing")):
         # Required empty paragraphs after nested tables are not visible text.
         fmt.line_spacing = Pt(1)
