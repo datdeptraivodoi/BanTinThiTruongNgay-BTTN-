@@ -181,12 +181,18 @@ def render_commodities_table(cell, snapshot):
     date_str_slash = snapshot.as_of.strftime("%d/%m/%Y")
     title = paragraph(cell, f"Bảng giá hàng hóa ngày {date_str_dot}", bold=True, color=NAVY)
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    title.paragraph_format.space_after = Pt(2)
 
     from .tradingeconomics_commodities import get_commodities_table_data
     rows_data = get_commodities_table_data(snapshot)
 
-    headers = ["Các chỉ số tổng hợp", f"Giá ngày {date_str_slash}", "Thay đổi ngày (%)", "Thay đổi năm (%)"]
-    ratios = [0.42, 0.24, 0.17, 0.17]
+    headers = [
+        "",
+        f"Giá ngày\n{date_str_slash}",
+        "Thay đổi\nngày (%)",
+        "Thay đổi\nnăm (%)",
+    ]
+    ratios = [0.44, 0.22, 0.17, 0.17]
     width = int((cell.width or Inches(3.5)) - Inches(.08))
     widths = [int(width * r) for r in ratios]
 
@@ -203,13 +209,15 @@ def render_commodities_table(cell, snapshot):
         p.paragraph_format.keep_together = True
         p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(0)
-        r = p.add_run(label)
-        style_run(r, size=8)
-        r.bold = True
-        r.font.color.rgb = RGBColor.from_string("FFFFFF")
-        shade = OxmlElement("w:shd")
-        shade.set(qn("w:fill"), "4F81BD")
-        c._tc.get_or_add_tcPr().append(shade)
+        p.paragraph_format.line_spacing = 1
+        if label:
+            r = p.add_run(label)
+            style_run(r, size=8)
+            r.bold = True
+            r.font.color.rgb = RGBColor.from_string("000000")
+        else:
+            r = p.add_run("")
+            style_run(r, size=8)
         margins = OxmlElement("w:tcMar")
         for name in ("top", "bottom", "left", "right"):
             edge = OxmlElement("w:" + name)
@@ -220,7 +228,7 @@ def render_commodities_table(cell, snapshot):
 
     for i, row_item in enumerate(rows_data, start=1):
         table.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
-        if row_item.get("separator"):
+        if row_item.get("category"):
             for j in range(4):
                 c = table.cell(i, j)
                 c.width = widths[j]
@@ -228,11 +236,44 @@ def render_commodities_table(cell, snapshot):
                 p.paragraph_format.keep_together = True
                 p.paragraph_format.space_before = Pt(0)
                 p.paragraph_format.space_after = Pt(0)
-                p.paragraph_format.line_spacing = Pt(2)
+                p.paragraph_format.line_spacing = 1
+                if j == 0:
+                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    r = p.add_run(row_item["label"])
+                    style_run(r, size=8)
+                    r.bold = True
+                    r.font.color.rgb = RGBColor.from_string("000000")
+                else:
+                    r = p.add_run("")
+                    style_run(r, size=8)
+                shade = OxmlElement("w:shd")
+                shade.set(qn("w:fill"), "99CCFF")
+                c._tc.get_or_add_tcPr().append(shade)
+                margins = OxmlElement("w:tcMar")
+                for name in ("top", "bottom", "left", "right"):
+                    edge = OxmlElement("w:" + name)
+                    edge.set(qn("w:w"), "10")
+                    edge.set(qn("w:type"), "dxa")
+                    margins.append(edge)
+                c._tc.get_or_add_tcPr().append(margins)
+        elif row_item.get("separator"):
+            trPr = table.rows[i]._tr.get_or_add_trPr()
+            trHeight = OxmlElement("w:trHeight")
+            trHeight.set(qn("w:val"), "140")
+            trHeight.set(qn("w:hRule"), "exact")
+            trPr.append(trHeight)
+            for j in range(4):
+                c = table.cell(i, j)
+                c.width = widths[j]
+                p = c.paragraphs[0]
+                p.paragraph_format.keep_together = True
+                p.paragraph_format.space_before = Pt(0)
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.line_spacing = Pt(5)
                 r = p.add_run("")
                 style_run(r, size=8)
                 shade = OxmlElement("w:shd")
-                shade.set(qn("w:fill"), "F2F2F2")
+                shade.set(qn("w:fill"), "99CCFF")
                 c._tc.get_or_add_tcPr().append(shade)
         else:
             values = [row_item["label"], row_item["price"], row_item["pct_day"], row_item["pct_yoy"]]
@@ -246,11 +287,17 @@ def render_commodities_table(cell, snapshot):
                 p.paragraph_format.space_after = Pt(0)
                 r = p.add_run(str(val))
                 style_run(r, size=8)
-                val_str = str(val)
-                if j >= 2 and val_str.startswith("-"):
-                    r.font.color.rgb = RGBColor.from_string("C00000")
+                r.bold = True
+                val_str = str(val).strip()
+                if j >= 2:
+                    if val_str.startswith("-"):
+                        r.font.color.rgb = RGBColor.from_string("800000")
+                    elif val_str != "—" and val_str:
+                        r.font.color.rgb = RGBColor.from_string("008000")
+                    else:
+                        r.font.color.rgb = RGBColor.from_string("000000")
                 else:
-                    r.font.color.rgb = RGBColor.from_string(NAVY)
+                    r.font.color.rgb = RGBColor.from_string("000000")
                 margins = OxmlElement("w:tcMar")
                 for name in ("top", "bottom", "left", "right"):
                     edge = OxmlElement("w:" + name)

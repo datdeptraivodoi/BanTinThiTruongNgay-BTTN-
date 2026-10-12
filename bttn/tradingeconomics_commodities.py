@@ -22,6 +22,7 @@ LOG = logging.getLogger("bttn.commodities")
 # Mapping definitions for the 17 items in X9:AA32
 COMMODITY_MAPPINGS = [
     # Nhóm 1: Chỉ số tổng hợp
+    {"category": True, "label": "Các chỉ số tổng hợp"},
     {"id": "CRB", "label": "CRB Spot", "source": "te_commodities", "match": "crb index", "unit": "điểm"},
     {"id": "DXY", "label": "USD Index", "source": "te_currencies", "match": "dxy", "unit": "điểm"},
     {"separator": True},
@@ -42,7 +43,7 @@ COMMODITY_MAPPINGS = [
     {"id": "COPPER", "label": "Đồng (USD/T)", "source": "te_commodities", "match": "copper", "unit": "USD/T"},
     {"id": "ALUMINUM", "label": "Nhôm (USD/T)", "source": "te_commodities", "match": "aluminum", "unit": "USD/T"},
     {"id": "ZINC", "label": "Kẽm (USD/T)", "source": "te_commodities", "match": "zinc", "unit": "USD/T"},
-    {"id": "NICKEL", "label": "Niken (USD/T)", "source": "te_commodities", "match": "nickel", "unit": "USD/T"},
+    {"id": "NICKEL", "label": "Nikken (USD/T)", "source": "te_commodities", "match": "nickel", "unit": "USD/T"},
     {"separator": True},
     # Nhóm 5: Kim loại quý
     {"id": "GOLD", "label": "Vàng (USD/oz)", "source": "te_commodities", "match": "gold", "unit": "USD/oz"},
@@ -129,10 +130,10 @@ def format_rate_number(price_str: str) -> str:
 
 
 def format_pct_number(pct_str: str) -> str:
-    """Format percentage string (e.g. -1.83% -> -1,83%)."""
+    """Format percentage string (e.g. -1.83% -> -1,83%, 1.83% -> 1,83%)."""
     if not pct_str:
         return "—"
-    clean = pct_str.strip()
+    clean = pct_str.strip().lstrip("+")
     clean = clean.replace(".", ",")
     if not clean.endswith("%") and clean != "—":
         clean += "%"
@@ -146,8 +147,11 @@ def get_commodities_table_data(snapshot=None) -> List[Dict]:
     
     rows = []
     for item in COMMODITY_MAPPINGS:
+        if item.get("category"):
+            rows.append({"category": True, "separator": False, "label": item["label"], "price": "", "pct_day": "", "pct_yoy": ""})
+            continue
         if item.get("separator"):
-            rows.append({"separator": True, "label": "", "price": "", "pct_day": "", "pct_yoy": ""})
+            rows.append({"category": False, "separator": True, "label": "", "price": "", "pct_day": "", "pct_yoy": ""})
             continue
             
         c_id = item["id"]
@@ -169,8 +173,8 @@ def get_commodities_table_data(snapshot=None) -> List[Dict]:
             obs = snapshot.observations.get("ROBUSTA") if snapshot else None
             if obs and obs.value:
                 price = format_rate_number(str(obs.value))
-                pct_day = f"{obs.daily_pct:+.2f}%".replace(".", ",") if obs.daily_pct is not None else "—"
-                pct_yoy = f"{obs.annual_pct:+.2f}%".replace(".", ",") if obs.annual_pct is not None else "—"
+                pct_day = f"{obs.daily_pct:.2f}%".replace(".", ",") if obs.daily_pct is not None else "—"
+                pct_yoy = f"{obs.annual_pct:.2f}%".replace(".", ",") if obs.annual_pct is not None else "—"
             else:
                 # Fallback Robusta estimate or reference
                 price = "3.485,00"
