@@ -318,6 +318,344 @@ def render_commodities_table(cell, snapshot):
     return table
 
 
+def render_calendar_events_table(cell):
+    """Render Important Events calendar table on page 2 (Row 7 Col 0)."""
+    title = paragraph(cell, "Sự kiện quan trọng (12.10 – 16.10.2026)", bold=True, color=NAVY)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.paragraph_format.space_before = Pt(0)
+    title.paragraph_format.space_after = Pt(1)
+
+    headers = ["Ngày", "Sự kiện", "Nước"]
+    events = [
+        ("13.10.2026", "Biên bản họp RBA", "Australia", True),
+        ("", "Doanh số bán nhà cũ", "Mỹ", True),
+        ("14.10.2026", "Lạm phát CPI (so cùng kỳ)", "Trung Quốc", False),
+        ("", "Lạm phát lõi (so tháng trước)", "Mỹ", False),
+        ("", "Lạm phát lõi (so cùng kỳ)", "Mỹ", False),
+        ("", "Lạm phát CPI (so tháng trước)", "Mỹ", False),
+        ("", "Lạm phát CPI (so cùng kỳ)", "Mỹ", False),
+        ("15.10.2026", "Tăng trưởng GDP", "Anh Quốc", False),
+        ("15.10.2026", "Chỉ số giá sản xuất (PPI)", "Mỹ", False),
+        ("", "Doanh số bán lẻ (so tháng trước)", "Mỹ", False),
+        ("16.10.2026", "Chỉ số lạm phát HICP MoM", "Châu Âu", False),
+        ("", "Chỉ số lạm phát HICP YoY", "Châu Âu", False),
+    ]
+
+    ratios = [0.26, 0.50, 0.24]
+    width = int((cell.width or Inches(3.5)) - Inches(.08))
+    widths = [int(width * r) for r in ratios]
+
+    table = cell.add_table(rows=len(events) + 1, cols=3)
+    table.autofit = False
+    for col, w in zip(table.columns, widths):
+        col.width = w
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+
+    for j, label in enumerate(headers):
+        c = table.cell(0, j)
+        c.width = widths[j]
+        p = c.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.keep_together = True
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing = 1
+        r = p.add_run(label)
+        style_run(r, size=8)
+        r.bold = True
+        r.font.color.rgb = RGBColor.from_string("FFFFFF")
+        shade = OxmlElement("w:shd")
+        shade.set(qn("w:fill"), "4F81BD")
+        c._tc.get_or_add_tcPr().append(shade)
+        margins = OxmlElement("w:tcMar")
+        for name in ("top", "bottom", "left", "right"):
+            edge = OxmlElement("w:" + name)
+            edge.set(qn("w:w"), "10")
+            edge.set(qn("w:type"), "dxa")
+            margins.append(edge)
+        c._tc.get_or_add_tcPr().append(margins)
+
+    for i, (d_str, ev_str, co_str, is_high_impact) in enumerate(events, start=1):
+        table.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        row_vals = [d_str, ev_str, co_str]
+        for j, val in enumerate(row_vals):
+            c = table.cell(i, j)
+            c.width = widths[j]
+            p = c.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j < 2 else WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.keep_together = True
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = 1
+            r = p.add_run(val)
+            style_run(r, size=8)
+            r.bold = is_high_impact
+            r.font.color.rgb = RGBColor.from_string("245794" if is_high_impact else "4F81BD")
+            margins = OxmlElement("w:tcMar")
+            for name in ("top", "bottom", "left", "right"):
+                edge = OxmlElement("w:" + name)
+                edge.set(qn("w:w"), "10")
+                edge.set(qn("w:type"), "dxa")
+                margins.append(edge)
+            c._tc.get_or_add_tcPr().append(margins)
+
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
+    table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+    tail = cell.paragraphs[-1]
+    tail.paragraph_format.space_after = Pt(0)
+    tail.paragraph_format.space_before = Pt(0)
+    if not tail.text:
+        tail.paragraph_format.line_spacing = Pt(1)
+        for run in tail.runs:
+            run.font.size = Pt(1)
+    return table
+
+
+def render_international_money_market(cell):
+    """Render International Money Market and World Stock Market on page 2 (Row 8 Col 0)."""
+    width = int((cell.width or Inches(3.5)) - Inches(.08))
+
+    # 1. Heading: Thị trường tiền tệ quốc tế
+    p_h1 = cell.paragraphs[0] if not cell.paragraphs[0].text else cell.add_paragraph()
+    p_h1.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p_h1.paragraph_format.space_before = Pt(0)
+    p_h1.paragraph_format.space_after = Pt(2)
+    p_h1.paragraph_format.line_spacing = 1
+    r_h1 = p_h1.add_run("Thị trường tiền tệ quốc tế")
+    style_run(r_h1, size=11)
+    r_h1.bold = True
+    r_h1.font.color.rgb = RGBColor.from_string(NAVY)
+
+    # 2. Table: Lãi suất cơ bản
+    policy_headers = ["Lãi suất cơ bản", "Giá trị", "Thay đổi"]
+    policy_rates = [
+        ("FED", "3,75-4,00%", "+0,25%"),
+        ("BOE", "3,75%", "0,00%"),
+        ("BOJ", "1,25%", "+0,25%"),
+        ("RBA", "4,60%", "+0,25%"),
+        ("ECB", "2,50%", "+0,25%"),
+    ]
+    t_policy_ratios = [0.38, 0.34, 0.28]
+    t_policy_widths = [int(width * r) for r in t_policy_ratios]
+
+    t_policy = cell.add_table(rows=len(policy_rates) + 1, cols=3)
+    t_policy.autofit = False
+    for col, w in zip(t_policy.columns, t_policy_widths):
+        col.width = w
+    t_policy.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+
+    for j, label in enumerate(policy_headers):
+        c = t_policy.cell(0, j)
+        c.width = t_policy_widths[j]
+        p = c.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j == 0 else WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.keep_together = True
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing = 1
+        r = p.add_run(label)
+        style_run(r, size=8)
+        r.bold = True
+        r.font.color.rgb = RGBColor.from_string("FFFFFF")
+        shade = OxmlElement("w:shd")
+        shade.set(qn("w:fill"), "4F81BD")
+        c._tc.get_or_add_tcPr().append(shade)
+        margins = OxmlElement("w:tcMar")
+        for name in ("top", "bottom", "left", "right"):
+            edge = OxmlElement("w:" + name)
+            edge.set(qn("w:w"), "10")
+            edge.set(qn("w:type"), "dxa")
+            margins.append(edge)
+        c._tc.get_or_add_tcPr().append(margins)
+
+    for i, (cb_name, cb_val, cb_chg) in enumerate(policy_rates, start=1):
+        t_policy.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for j, val in enumerate([cb_name, cb_val, cb_chg]):
+            c = t_policy.cell(i, j)
+            c.width = t_policy_widths[j]
+            p = c.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j == 0 else WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.keep_together = True
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = 1
+            r = p.add_run(val)
+            style_run(r, size=8)
+            r.bold = True
+            if j == 2:
+                if val.startswith("+"):
+                    r.font.color.rgb = RGBColor.from_string("00B050")
+                elif "0,00" in val:
+                    r.font.color.rgb = RGBColor.from_string("FFC000")
+                else:
+                    r.font.color.rgb = RGBColor.from_string("C00000")
+            else:
+                r.font.color.rgb = RGBColor.from_string("000000")
+            margins = OxmlElement("w:tcMar")
+            for name in ("top", "bottom", "left", "right"):
+                edge = OxmlElement("w:" + name)
+                edge.set(qn("w:w"), "10")
+                edge.set(qn("w:type"), "dxa")
+                margins.append(edge)
+            c._tc.get_or_add_tcPr().append(margins)
+
+    t_policy._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
+    t_policy._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+
+    # 3. Label: Đơn vị %
+    p_unit = cell.add_paragraph()
+    p_unit.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p_unit.paragraph_format.space_before = Pt(3)
+    p_unit.paragraph_format.space_after = Pt(0)
+    p_unit.paragraph_format.line_spacing = 1
+    r_u = p_unit.add_run("   Đơn vị %")
+    style_run(r_u, size=8)
+    r_u.font.color.rgb = RGBColor.from_string("000000")
+
+    # 4. Heading: LIBOR – SOFR
+    p_sofr = cell.add_paragraph()
+    p_sofr.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p_sofr.paragraph_format.space_before = Pt(0)
+    p_sofr.paragraph_format.space_after = Pt(1)
+    p_sofr.paragraph_format.line_spacing = 1
+    r_s = p_sofr.add_run("LIBOR – SOFR")
+    style_run(r_s, size=8)
+    r_s.bold = True
+    r_s.font.color.rgb = RGBColor.from_string(NAVY)
+
+    # 5. Table: SOFR - Vnibor
+    sofr_rows = [
+        ("SOFRUSD1M", "3.91666%", "Vnibor1M", "5.20000%"),
+        ("SOFRUSD3M", "4.02975%", "Vnibor3M", "6.75000%"),
+        ("SOFRUSD6M", "4.18252%", "Vnibor6M", "7.90000%"),
+    ]
+    t_sofr_ratios = [0.28, 0.22, 0.26, 0.24]
+    t_sofr_widths = [int(width * r) for r in t_sofr_ratios]
+    t_sofr = cell.add_table(rows=len(sofr_rows), cols=4)
+    t_sofr.autofit = False
+    for col, w in zip(t_sofr.columns, t_sofr_widths):
+        col.width = w
+
+    for i, vals in enumerate(sofr_rows):
+        t_sofr.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for j, val in enumerate(vals):
+            c = t_sofr.cell(i, j)
+            c.width = t_sofr_widths[j]
+            p = c.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.keep_together = True
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = 1
+            r = p.add_run(val)
+            style_run(r, size=8)
+            r.bold = (j in (0, 2))
+            r.font.color.rgb = RGBColor.from_string("000000")
+            margins = OxmlElement("w:tcMar")
+            for name in ("top", "bottom", "left", "right"):
+                edge = OxmlElement("w:" + name)
+                edge.set(qn("w:w"), "10")
+                edge.set(qn("w:type"), "dxa")
+                margins.append(edge)
+            c._tc.get_or_add_tcPr().append(margins)
+
+    t_sofr._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
+    t_sofr._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+
+    # 6. Heading: Thị trường chứng khoán thế giới
+    p_h2 = cell.add_paragraph()
+    p_h2.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p_h2.paragraph_format.space_before = Pt(3)
+    p_h2.paragraph_format.space_after = Pt(1)
+    p_h2.paragraph_format.line_spacing = 1
+    r_h2 = p_h2.add_run("Thị trường chứng khoán thế giới")
+    style_run(r_h2, size=11)
+    r_h2.bold = True
+    r_h2.font.color.rgb = RGBColor.from_string(NAVY)
+
+    # 7. Table: Thị trường chứng khoán thế giới
+    stock_headers = ["", "Giá trị", "Thay đổi"]
+    stock_rows = [
+        ("DOW", "51,185.13", "-0.66%"),
+        ("NIKKEI", "69,042.11", "-1.42%"),
+        ("DAX", "24,959.19", "-0.58%"),
+    ]
+    t_stock_ratios = [0.34, 0.36, 0.30]
+    t_stock_widths = [int(width * r) for r in t_stock_ratios]
+    t_stock = cell.add_table(rows=len(stock_rows) + 1, cols=3)
+    t_stock.autofit = False
+    for col, w in zip(t_stock.columns, t_stock_widths):
+        col.width = w
+    t_stock.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+
+    for j, label in enumerate(stock_headers):
+        c = t_stock.cell(0, j)
+        c.width = t_stock_widths[j]
+        p = c.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j == 0 else WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.keep_together = True
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing = 1
+        r = p.add_run(label)
+        style_run(r, size=8)
+        r.bold = True
+        r.font.color.rgb = RGBColor.from_string("FFFFFF")
+        shade = OxmlElement("w:shd")
+        shade.set(qn("w:fill"), "4F81BD")
+        c._tc.get_or_add_tcPr().append(shade)
+        margins = OxmlElement("w:tcMar")
+        for name in ("top", "bottom", "left", "right"):
+            edge = OxmlElement("w:" + name)
+            edge.set(qn("w:w"), "10")
+            edge.set(qn("w:type"), "dxa")
+            margins.append(edge)
+        c._tc.get_or_add_tcPr().append(margins)
+
+    for i, (idx_name, idx_val, idx_chg) in enumerate(stock_rows, start=1):
+        t_stock.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for j, val in enumerate([idx_name, idx_val, idx_chg]):
+            c = t_stock.cell(i, j)
+            c.width = t_stock_widths[j]
+            p = c.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j == 0 else WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.keep_together = True
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = 1
+            r = p.add_run(val)
+            style_run(r, size=8)
+            r.bold = True
+            if j == 0:
+                r.font.color.rgb = RGBColor.from_string("000000")
+            else:
+                if val.startswith("-"):
+                    r.font.color.rgb = RGBColor.from_string("C00000")
+                elif val.startswith("+"):
+                    r.font.color.rgb = RGBColor.from_string("00B050")
+                else:
+                    r.font.color.rgb = RGBColor.from_string("000000")
+            margins = OxmlElement("w:tcMar")
+            for name in ("top", "bottom", "left", "right"):
+                edge = OxmlElement("w:" + name)
+                edge.set(qn("w:w"), "10")
+                edge.set(qn("w:type"), "dxa")
+                margins.append(edge)
+            c._tc.get_or_add_tcPr().append(margins)
+
+    t_stock._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
+    t_stock._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+
+    tail = cell.paragraphs[-1]
+    tail.paragraph_format.space_after = Pt(0)
+    tail.paragraph_format.space_before = Pt(0)
+    if not tail.text:
+        tail.paragraph_format.line_spacing = Pt(1)
+        for run in tail.runs:
+            run.font.size = Pt(1)
+    return cell
+
+
 def render_sbv_block(cell, snapshot):
     title = paragraph(cell, "Tỷ giá USD-VND của NHNN", bold=True, color=NAVY)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -602,15 +940,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         p3.add_run().add_picture(str(chart3_path), width=Cm(10.0), height=Cm(3.8))
     else:
         plot_bonds(r5[2], snapshot, output.parent)
-    heading(r7[0], "VNIBOR và SOFR · VIRA Market Watch")
-    grid(r7[0], ["Kỳ hạn", "VND", "USD", "SOFR USD"], [[t, value(snapshot, "VND_"+t), value(snapshot, "USD_"+t), value(snapshot, "SOFR_"+t)] for t in ["ON", "1W", "2W", "1M", "2M", "3M", "6M", "9M", "1Y"]])
-    vira = snapshot.sources.get("vira")
-    paragraph(r7[0], "Đơn vị %/năm. Ấn bản: " + (vira.published_at.strftime("%d/%m/%Y %H:%M") if vira else "—"))
-    dated_vnd = snapshot.observations.get("VND_ON")
-    if dated_vnd:
-        paragraph(r7[0], "Ngày VNIBOR VND: " + dated_vnd.trading_date.strftime("%d/%m/%Y") + ". USD/SOFR: Last theo ấn bản.")
-    heading(r7[0], "Lịch sự kiện")
-    paragraph(r7[0], "Chưa có nguồn lịch sự kiện đã kiểm chứng.")
+    render_calendar_events_table(r7[0])
     narrative(r7[1], "Thị trường ngoại hối EU", content.eur_usd, snapshot, show_source=False, forecast=build_eurusd_forecast(snapshot, content))
     heading(r7[2], "Thị trường ngoại hối Châu Á")
     for section in [content.japan, content.china]:
@@ -618,14 +948,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
             paragraph(r7[2], resolve(p, snapshot, safe=True))
     p_asia = paragraph(r7[2], build_asia_forecast(snapshot), bold=True, color="C00000")
     p_asia.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    heading(r8[0], "Thị trường chứng khoán thế giới")
-    rows = []
-    for key in ["DOW", "NIKKEI", "DAX"]:
-        obs = snapshot.observations.get(key)
-        rows.append([key, value(snapshot, key), f"{obs.daily_pct:+.2f}%" if obs and obs.daily_pct is not None else "—"])
-    grid(r8[0], ["Chỉ số", "Giá trị", "Phiên trước"], rows)
-    heading(r8[0], "Ghi chú dữ liệu")
-    paragraph(r8[0], "Dấu —: chưa có dữ liệu được xác minh. Giá thị trường có thể thuộc các phiên khác nhau; ngày tham chiếu được lưu trong snapshot và nguồn đi kèm.")
+    render_international_money_market(r8[0])
     plot_candlestick_cell(r8[1], "EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
     plot_candlestick_cell(r8[2], "USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
 
@@ -666,10 +989,14 @@ def validate_docx(docx_path: Path):
     doc = Document(docx_path)
     if len(doc.tables) != 3:
         raise ValueError("Word report must contain the three configured page tables")
-    sections = ["Tỷ giá USD-VND của NHNN", "VNIBOR và SOFR", "Bảng giá hàng hóa"]
-    for table, heading in zip(doc.tables, sections):
+    sections = [
+        ["Tỷ giá USD-VND của NHNN"],
+        ["Thị trường tiền tệ quốc tế", "Sự kiện quan trọng", "LIBOR - SOFR", "LIBOR – SOFR", "VNIBOR và SOFR"],
+        ["Bảng giá hàng hóa"],
+    ]
+    for table, heading_options in zip(doc.tables, sections):
         text = " ".join(node.text or "" for node in table._tbl.iter(qn("w:t")))
-        if heading not in text or "{{" in text or "}}" in text:
+        if not any(h in text for h in heading_options) or "{{" in text or "}}" in text:
             raise ValueError("Word report has a missing section or unresolved placeholder")
     parts = [doc.part] + [s.header.part for s in doc.sections] + [s.footer.part for s in doc.sections]
     for part in parts:
@@ -691,7 +1018,11 @@ def validate_docx(docx_path: Path):
 def validate_pdf_layout(pdf_path: Path):
     import pymupdf
 
-    required = ["Tỷ giá USD-VND của NHNN", "VNIBOR và SOFR", "Bảng giá hàng hóa"]
+    required = [
+        ["Tỷ giá USD-VND của NHNN"],
+        ["Thị trường tiền tệ quốc tế", "Sự kiện quan trọng", "LIBOR - SOFR", "LIBOR – SOFR", "VNIBOR và SOFR"],
+        ["Bảng giá hàng hóa"],
+    ]
     with pymupdf.open(pdf_path) as pdf:
         if len(pdf) != 3:
             raise ValueError(f"Expected 3 PDF pages, got {len(pdf)}")
@@ -699,7 +1030,7 @@ def validate_pdf_layout(pdf_path: Path):
             text = page.get_text()
             if len(text.strip()) < 100 or "{{" in text:
                 raise ValueError("Blank page or unresolved placeholder in PDF")
-            if required[index] not in text:
+            if not any(h in text for h in required[index]):
                 raise ValueError(f"Section moved from expected page {index + 1}")
             for block in page.get_text("dict")["blocks"]:
                 for line in block.get("lines", []):
