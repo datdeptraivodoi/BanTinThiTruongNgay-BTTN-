@@ -171,7 +171,7 @@ def get_commodities_table_data(snapshot=None) -> List[Dict]:
         elif c_id == "ROBUSTA":
             # Check snapshot if available
             obs = snapshot.observations.get("ROBUSTA") if snapshot else None
-            if obs and obs.value:
+            if obs and obs.value and float(obs.value) > 1000:
                 price = format_rate_number(str(obs.value))
                 pct_day = f"{obs.daily_pct:.2f}%".replace(".", ",") if obs.daily_pct is not None else "—"
                 pct_yoy = f"{obs.annual_pct:.2f}%".replace(".", ",") if obs.annual_pct is not None else "—"
