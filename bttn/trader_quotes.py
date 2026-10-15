@@ -165,6 +165,7 @@ def parse_teams_payload(snapshot: Snapshot, raw_content: str | dict | list, sour
 
         swaps = []
         fx_bid, fx_ask = None, None
+        prev_info = None
         today = snapshot.as_of.astimezone(VN_TZ).date()
         today_at = datetime.combine(today, time(11, 30), tzinfo=VN_TZ)
 
@@ -181,6 +182,10 @@ def parse_teams_payload(snapshot: Snapshot, raw_content: str | dict | list, sour
                     pass
             if "fx_bid" in data and "fx_ask" in data:
                 fx_bid, fx_ask = Decimal(str(data["fx_bid"])), Decimal(str(data["fx_ask"]))
+            prev_info = None
+            if data.get("prev_fx_bid") and data.get("prev_fx_ask") and data.get("prev_at"):
+                prev_info = (Decimal(str(data["prev_fx_bid"])), Decimal(str(data["prev_fx_ask"])),
+                             parse_as_of(data["prev_at"]))
         elif isinstance(data, list):
             text = ""
             for item in data:
@@ -215,9 +220,7 @@ def parse_teams_payload(snapshot: Snapshot, raw_content: str | dict | list, sour
                 if fx_bid > fx_ask:
                     fx_bid, fx_ask = fx_ask, fx_bid
 
-        if fx_bid is None:
-            fx_bid, fx_ask = Decimal("26005"), Decimal("26015")
-
+        # Không có quote USD-VND thì để trống (không điền số mặc định)
         if not swaps:
             return None
 
@@ -234,17 +237,18 @@ def parse_teams_payload(snapshot: Snapshot, raw_content: str | dict | list, sour
             swaps=swaps,
         )
 
-        prev_date = previous_weekday(today)
-        prev_at = datetime.combine(prev_date, time(15, 0), tzinfo=VN_TZ)
-        prev_quote = TraderQuote(
-            quoted_at=prev_at,
-            source_url="https://teams.microsoft.com/l/message/19:channel_swap_prev",
-            room="firm ALM",
-            fx_bid=Decimal("26000"),
-            fx_ask=Decimal("26010"),
-            swaps=[],
-        )
-        return QuoteFile(purpose=snapshot.purpose, quotes=[prev_quote, today_quote])
+        quotes = [today_quote]
+        # Phiên trước chỉ thêm khi có giá thật (không tự đặt số)
+        if prev_info:
+            quotes.insert(0, TraderQuote(
+                quoted_at=prev_info[2],
+                source_url=source_url,
+                room="firm ALM",
+                fx_bid=prev_info[0],
+                fx_ask=prev_info[1],
+                swaps=[],
+            ))
+        return QuoteFile(purpose=snapshot.purpose, quotes=quotes)
     except Exception as exc:
         LOG.warning("Failed to parse Teams payload: %s", exc)
         return None
@@ -303,6 +307,59 @@ def load_teams_stream_quotes(snapshot: Snapshot, swap_file: Path) -> QuoteFile |
         return None
 
 
+BTS_MARKET_DB = Path("/root/TyGia/MasterData/market_master.db")
+
+
+def load_bts_stream_payload(snapshot, db_path: Path | None = None) -> dict | None:
+    """
+    Bảng swap (Room Firm ALM) và quote USD-VND mới nhất (MARKET RATE FX ITB) trong ngày,
+    lấy từ database của streamer trên VPS. Chỉ dùng dữ liệu của chính ngày bản tin và
+    trước giờ chốt; không có thì trả None (không dùng số cũ).
+    """
+    import sqlite3
+
+    db = Path(db_path or os.getenv("BTS_MARKET_DB", "") or BTS_MARKET_DB)
+    if not db.is_file():
+        return None
+    as_of = snapshot.as_of.astimezone(VN_TZ)
+    day = as_of.strftime("%Y-%m-%d")
+    cutoff = as_of.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            swap = conn.execute(
+                "SELECT raw_text, timestamp FROM today_live_ticks WHERE quote_type = 'SWAP' "
+                "AND (status IS NULL OR status != 'REVOKED') AND substr(timestamp, 1, 10) = ? AND timestamp <= ? "
+                "ORDER BY timestamp DESC, tick_id DESC LIMIT 1", (day, cutoff)).fetchone()
+            itb = conn.execute(
+                "SELECT bid, ask, timestamp FROM today_live_ticks WHERE quote_type = 'ITB' AND bid IS NOT NULL "
+                "AND (status IS NULL OR status != 'REVOKED') AND substr(timestamp, 1, 10) = ? AND timestamp <= ? "
+                "ORDER BY timestamp DESC, tick_id DESC LIMIT 1", (day, cutoff)).fetchone()
+            prev_day = previous_weekday(as_of.date()).strftime("%Y-%m-%d")
+            prev = conn.execute(
+                "SELECT bid, ask, timestamp FROM today_live_ticks WHERE quote_type = 'ITB' AND bid IS NOT NULL "
+                "AND (status IS NULL OR status != 'REVOKED') AND substr(timestamp, 1, 10) = ? "
+                "ORDER BY timestamp DESC, tick_id DESC LIMIT 1", (prev_day,)).fetchone()
+        finally:
+            conn.close()
+    except Exception as exc:
+        LOG.warning("Không đọc được database streamer %s: %s", db, exc)
+        return None
+    if not swap and not itb:
+        return None
+    stamp = (swap or itb)[-1]
+    payload = {"date": day, "time": stamp[11:19], "text": swap[0] if swap else ""}
+    if itb and itb[1] and itb[0] and itb[1] > itb[0]:
+        payload["fx_bid"] = int(itb[0])
+        payload["fx_ask"] = int(itb[1])
+    if prev and prev[0] and prev[1] and prev[1] > prev[0]:
+        payload.update(prev_fx_bid=int(prev[0]), prev_fx_ask=int(prev[1]),
+                       prev_at=prev[2].replace(" ", "T") + "+07:00")
+    LOG.info("Báo giá trader từ streamer: swap=%s, ITB=%s, phiên trước=%s",
+             bool(swap), itb[:2] if itb else None, prev[:2] if prev else None)
+    return payload
+
+
 def collect_trader_quotes(http, snapshot):
     filename = os.getenv("TRADER_QUOTES_PATH", "").strip()
     if filename and Path(filename).is_file():
@@ -323,6 +380,17 @@ def collect_trader_quotes(http, snapshot):
                     return
         except Exception as exc:
             LOG.warning("Failed to fetch SWAP_DATA_URL: %s", exc)
+
+    # Nguồn sống trên VPS: database do streamer Teams (repo BTS) ghi liên tục
+    if snapshot.purpose == "live":
+        payload = load_bts_stream_payload(snapshot)
+        if payload:
+            import json
+            qfile = parse_teams_payload(snapshot, json.dumps(payload),
+                                        source_url="https://teams.microsoft.com/l/message/19:market_rate_fx_itb_live")
+            if qfile:
+                apply_trader_quotes(snapshot, qfile)
+                return
 
     if snapshot.purpose == "live":
         candidates = [

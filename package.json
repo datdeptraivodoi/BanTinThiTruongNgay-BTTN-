@@ -1,6 +1,8 @@
 {
   "type": "module",
   "dependencies": {
-    "@mathieuc/tradingview": "^4.0.0-rc.0"
+    "@mathieuc/tradingview": "^4.0.0-rc.0",
+    "lightweight-charts": "4.2.3",
+    "puppeteer-core": "23.11.1"
   }
 }

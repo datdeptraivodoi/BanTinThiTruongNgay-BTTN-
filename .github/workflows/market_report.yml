@@ -1,19 +1,18 @@
 name: BTTN midday
 
+# Bản tin hằng ngày do VPS tạo lúc 11:30 (deploy/run_bttn.sh). Workflow này chỉ chạy tay để dự phòng.
 on:
-  schedule:
-    # 12:00 Asia/Ho_Chi_Minh (UTC+7), Monday-Friday. GitHub may queue runs late.
-    - cron: '0 5 * * 1-5'
   workflow_dispatch:
     inputs:
       action:
         description: 'Chọn cách xuất bản tin Word'
         type: choice
         required: true
-        default: '1. Gửi file Word đến các email'
+        default: '3. Gửi bản review cho người duyệt'
         options:
           - '1. Gửi file Word đến các email'
           - '2. Chỉ tạo file Word'
+          - '3. Gửi bản review cho người duyệt'
 
 permissions:
   contents: read
@@ -60,7 +59,8 @@ jobs:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn' }}
-          REPORT_ACTION: ${{ inputs.action || '1. Gửi file Word đến các email' }}
+          REVIEW_RECIPIENTS: ${{ vars.REVIEW_RECIPIENTS || 'datnh1@mbbank.com.vn' }}
+          REPORT_ACTION: ${{ inputs.action || '3. Gửi bản review cho người duyệt' }}
         run: |
           case "$REPORT_ACTION" in
             '1. Gửi file Word đến các email')
@@ -68,6 +68,9 @@ jobs:
               ;;
             '2. Chỉ tạo file Word')
               python market_report.py --type midday --create-only
+              ;;
+            '3. Gửi bản review cho người duyệt')
+              python market_report.py --type midday --review
               ;;
             *)
               echo 'Lựa chọn xuất bản không hợp lệ' >&2

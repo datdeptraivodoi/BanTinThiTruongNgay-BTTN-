@@ -855,13 +855,16 @@ def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_typ
     path = directory / f"{name}.png"
     df, source_label = get_symbol_dataframe(key, snapshot, tv_cache)
 
-    success = False
-    if chart_type == "currency":
-        success = render_currency_chart(df, path, title, source_label)
-        width_cm, height_cm = 8.83, 6.8
-    else:
-        success = render_commodity_chart(df, path, title, source_label)
-        width_cm, height_cm = 9.0, 6.58
+    from .tv_charts import render_tv_chart
+
+    width_cm, height_cm = (8.83, 6.8) if chart_type == "currency" else (9.0, 6.58)
+    # Ưu tiên biểu đồ kiểu TradingView (Lightweight Charts); lỗi thì dùng mplfinance như cũ
+    success = render_tv_chart(df, path, width_cm, height_cm, chart_type)
+    if not success:
+        if chart_type == "currency":
+            success = render_currency_chart(df, path, title, source_label)
+        else:
+            success = render_commodity_chart(df, path, title, source_label)
 
     if not success or not path.is_file():
         # Fallback to standard line chart if candlestick rendering failed
