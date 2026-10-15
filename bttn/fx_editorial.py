@@ -9,6 +9,22 @@ if TYPE_CHECKING:
 EUR_SECOND_OPENING = "Về phía Châu Âu,"
 
 
+def spot_move(observation, flat_pct: float = 0.05) -> str:
+    """'ổn định' khi giá hiện tại lệch giá đóng cửa hôm qua dưới 0,05%; còn lại 'tăng lên'/'giảm xuống'."""
+    if observation is None:
+        return "ổn định"
+    prev = observation.prev_value
+    if prev is None and len(observation.series) >= 2:
+        prev = observation.series[-2].value
+    try:
+        change = (float(observation.value) - float(prev)) / float(prev) * 100
+    except (TypeError, ValueError, ZeroDivisionError):
+        return "ổn định"
+    if abs(change) < flat_pct:
+        return "ổn định"
+    return "tăng lên" if change > 0 else "giảm xuống"
+
+
 def fx_opening(snapshot: "Snapshot", section: str) -> str:
     from .models import previous_weekday
 
@@ -34,7 +50,7 @@ def fx_opening(snapshot: "Snapshot", section: str) -> str:
         return (
             f"Trong phiên giao dịch hôm qua, tính đến ngày {previous}, "
             "tỷ giá EUR-USD đóng cửa quanh mức {{EURUSD_prev}}. "
-            f"Trong phiên {today}, tỷ giá EUR-USD giao dịch quanh mức {{{{EURUSD}}}}."
+            f"Trong phiên {today}, tỷ giá EUR-USD {spot_move(observation)} quanh mức {{{{EURUSD}}}}."
         )
     return (
         f"Trong phiên hôm qua ngày {previous}, "
@@ -51,7 +67,7 @@ def replace_fx_opening(text: str, snapshot: "Snapshot", section: str) -> str:
     pair = {"eur_usd": "EUR-USD", "japan": "USD-JPY"}[section]
     quote_sentence = re.compile(
         rf"^(?:Trong phiên\b.*?tỷ giá {pair} "
-        r"(?:đóng cửa (?:quanh|ở)|(?:ổn định|đi ngang|giao dịch) quanh) mức|Tỷ giá) "
+        r"(?:đóng cửa (?:quanh|ở)|(?:ổn định|đi ngang|giao dịch|tăng lên|giảm xuống) quanh) mức|Tỷ giá) "
         r"\{\{[A-Za-z0-9_ ]+\}\}[.!?]$",
         re.I,
     )

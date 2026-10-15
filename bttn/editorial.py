@@ -127,7 +127,10 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
                 rejected.append({"source_id": sid, "sentence": index, "reason": reason})
                 continue
             seen.add(identity)
-            candidates.append(Candidate(sentence, sid, max(1, 1 + score) + 1 / (index + 1), index))
+            recency = 0.0
+            if topic in {"USD", "EUR"}:  # ưu tiên tin mới nhất trong cửa sổ 36 giờ
+                recency = 3 * max(0.0, 1 - age.total_seconds() / (36 * 3600))
+            candidates.append(Candidate(sentence, sid, max(1, 1 + score) + 1 / (index + 1) + recency, index))
     if topic == "macro":
         candidates.sort(key=lambda c: (-c.score, c.index))
         return candidates[:80], rejected
@@ -174,6 +177,23 @@ def make_section(snapshot, groups, prefixes=None):
     return Section(paragraphs=paragraphs, source_ids=sorted(source_ids) or ["missing_source"], sentence_refs=refs)
 
 
+def eur_usd_section(snapshot, opening, picked, eu_ids):
+    """Ghép thành một đoạn; câu trích dẫn giữ nguyên văn để kiểm tra nguồn."""
+    us = [c for c in picked if c.source_id not in eu_ids]
+    eu = [c for c in picked if c.source_id in eu_ids]
+    parts = [opening] + [c.text for c in us]
+    if eu:
+        parts += [EUR_SECOND_OPENING] + [c.text for c in eu]
+    text = " ".join(p for p in parts if p).strip()
+    refs = [SentenceReference(paragraph=0, source_id=c.source_id, quote=c.text) for c in us + eu if c.quoted]
+    source_ids = {c.source_id for c in picked}
+    for key in TOKEN.findall(text):
+        obs, _ = parse_placeholder_key(key, snapshot)
+        if obs:
+            source_ids.add(obs.source_id)
+    return Section(paragraphs=[text], source_ids=sorted(source_ids) or ["missing_source"], sentence_refs=refs)
+
+
 def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=False):
     pools = {t: news_candidates(snapshot, records, t, allow_stale=allow_stale) for t in ("USD", "EUR", "JPY", "China")}
     result, audit = {}, {}
@@ -193,13 +213,15 @@ def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=Fals
                 opening = f"Phiên giao dịch hôm nay, tỷ giá USD-CNH biến động quanh mức {{{{{cnh_token}}}}}."
         low, high = rules()["word_limits"][name]
         if name == "eur_usd":
+            # Một đoạn: câu mở đầu tỷ giá, tin Mỹ, rồi "Về phía Châu Âu," và tin khu vực euro/Đức.
             us_candidates = pools["USD"][0]
             groups = ({c.source_id for c in us_candidates}, {c.source_id for c in candidates})
+            prefix = opening + " " + EUR_SECOND_OPENING
             picked = choose_sentences(us_candidates + candidates, snapshot, low, high,
-                                      prefix=opening + " " + EUR_SECOND_OPENING, required_groups=groups)
-            result[name] = make_section(snapshot, [[c for c in picked if c.source_id in groups[0]],
-                                                   [c for c in picked if c.source_id in groups[1]]],
-                                        [opening, EUR_SECOND_OPENING])
+                                      prefix=prefix, required_groups=groups)
+            if not picked:  # thiếu hẳn một phía thì vẫn dùng tin phía còn lại
+                picked = choose_sentences(us_candidates + candidates, snapshot, low, high, prefix=opening)
+            result[name] = eur_usd_section(snapshot, opening, picked, groups[1])
         else:
             lead_candidates = [c for c in candidates if candidates and c.source_id == candidates[0].source_id]
             picked = choose_sentences(lead_candidates, snapshot, low, high, prefix=opening) if lead_candidates else []

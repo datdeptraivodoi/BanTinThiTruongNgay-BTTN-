@@ -342,19 +342,15 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
 
     # 4. EUR/USD
     eur_paras = [normalize_text_prose(p, snapshot) for p in content.eur_usd.paragraphs if p.strip()]
-    if len(eur_paras) == 1:
-        # Split into 2 paragraphs
-        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", eur_paras[0]) if s.strip()]
-        mid = max(1, len(sentences) // 2)
-        p1 = " ".join(sentences[:mid])
-        p2 = " ".join(sentences[mid:])
-        eur_paras = [p1, p2]
+    # Một đoạn duy nhất: đoạn châu Âu (nếu tách riêng) được nối sau tin Mỹ, mở đầu "Về phía Châu Âu,".
+    if len(eur_paras) >= 2:
+        second = " ".join(eur_paras[1:]).strip()
+        if not second.startswith(EUR_SECOND_OPENING):
+            second = f"{EUR_SECOND_OPENING} {second}"
+        eur_paras = [f"{eur_paras[0]} {second}"]
     if eur_paras:
         eur_paras[0] = replace_fx_opening(eur_paras[0], snapshot, "eur_usd")
-    if len(eur_paras) >= 2:
-        if not eur_paras[1].startswith(EUR_SECOND_OPENING):
-            eur_paras[1] = f"{EUR_SECOND_OPENING} {eur_paras[1].lstrip()}"
-    content.eur_usd.paragraphs = eur_paras[:2]
+    content.eur_usd.paragraphs = eur_paras[:1]
     ensure_section_provenance(content.eur_usd, snapshot)
     if "eur_usd" in word_limits:
         adjust_word_count(content.eur_usd, *word_limits["eur_usd"], snapshot)

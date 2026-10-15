@@ -147,8 +147,14 @@ def run(args):
                 manifest["translation_status"] = translated["status"]
                 manifest["editor"] = "python-extractive-v1"
                 if translated.get("missing_topics") or (translated["status"] != "checked" and not translated.get("failures")):
-                    translation_issues.append(Issue(severity="error", code="TRANSLATION_INCOMPLETE",
-                        message="Thiếu tin hoặc bản dịch NVIDIA đạt kiểm tra; xem translations.json."))
+                    from collections import Counter
+                    reasons = Counter(str(v).split(":")[0][:40] for v in translated.get("failures", {}).values())
+                    by_topic = Counter(a["topic"] for a in translated.get("articles", {}).values())
+                    detail = (f"đã dịch {dict(by_topic) or 0}; thiếu {translated.get('missing_topics') or 'không'}; "
+                              f"lỗi {dict(reasons) or 'không'}")
+                    translation_issues.append(Issue(
+                        severity="error",
+                        code="TRANSLATION_INCOMPLETE", message=f"Bản dịch NVIDIA chưa đủ: {detail}."))
                 content = generate(snapshot, directory)
                 used = {ref.source_id for name in content.__class__.model_fields
                         for section in (getattr(content, name) if name == "highlights" else [getattr(content, name)])

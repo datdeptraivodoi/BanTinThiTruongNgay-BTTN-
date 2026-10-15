@@ -16,10 +16,13 @@ from bs4 import BeautifulSoup
 
 from .models import Source
 
-COUNTRIES = {"euro area": "EUR", "united states": "USD", "japan": "JPY", "china": "China"}
-PATHS = {"euro-area": "EUR", "united-states": "USD", "japan": "JPY", "china": "China"}
+# Tin châu Âu lấy từ trang khu vực euro và trang Đức (cùng nhóm EUR).
+COUNTRIES = {"euro area": "EUR", "germany": "EUR", "united states": "USD", "japan": "JPY", "china": "China"}
+PATHS = {"euro-area": "EUR", "germany": "EUR", "united-states": "USD", "japan": "JPY", "china": "China"}
+TOPICS = list(dict.fromkeys(COUNTRIES.values()))
 NEWS_PAGES = {topic: f"https://tradingeconomics.com/{path}/news" for path, topic in PATHS.items()}
 MAX_ARTICLES_PER_COUNTRY = 3
+MAX_ARTICLES_PER_TOPIC = {"EUR": 5, "USD": 4}
 
 
 def is_stock_market_article(title: str, url: str) -> bool:
@@ -27,7 +30,8 @@ def is_stock_market_article(title: str, url: str) -> bool:
     url_lower = url.lower()
     if "/stock-market" in url_lower or re.search(r"/\d{4}:jp", url_lower):
         return True
-    pattern = r"\b(?:shares?|stocks?|nikkei(?:\s*225)?|topix|equit(?:y|ies))\b"
+    pattern = (r"\b(?:shares?|stocks?|nikkei(?:\s*225)?|topix|equit(?:y|ies)|futures|s&p\s*500|nasdaq|dow\s+jones|"
+               r"dax|stoxx|ftse|cac\s*40|wall\s+street)\b")
     return bool(re.search(pattern, title, re.I))
 
 
@@ -92,27 +96,22 @@ def parse_news(records, as_of, *, allow_stale=False):
     # A few distinct articles provide currency and macro context. Never translate
     # an unbounded country archive; keep the newest eligible bodies first.
     selected = {}
-    for topic in COUNTRIES.values():
-        matching = [s for s in accepted.values() if topic_for(s) == topic]
-        if topic == "JPY":
-            macro_matching = [
-                s for s in matching
-                if not is_stock_market_article(s.text.split("\n\n")[0], s.url)
-            ]
-            if macro_matching:
-                matching = macro_matching
+    for topic in TOPICS:
+        # Bỏ tin cổ phiếu/hợp đồng tương lai chứng khoán ở mọi khu vực.
+        matching = [s for s in accepted.values() if topic_for(s) == topic
+                    and not is_stock_market_article(s.text.split("\n\n")[0], s.url)]
         seen = set()
         for source in sorted(matching, key=lambda s: (s.published_at, s.id), reverse=True):
             if source.sha256 in seen:
                 continue
             seen.add(source.sha256)
             selected[source.id] = source
-            if len(seen) >= MAX_ARTICLES_PER_COUNTRY:
+            if len(seen) >= MAX_ARTICLES_PER_TOPIC.get(topic, MAX_ARTICLES_PER_COUNTRY):
                 break
     return selected, rejected
 
 
-def fetch_tradingeconomics_stream(countries=None, limit=15):
+def fetch_tradingeconomics_stream(countries=None, limit=30):
     """Fetch public economic news stream from Trading Economics using browser emulation."""
     headers_base = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -122,6 +121,7 @@ def fetch_tradingeconomics_stream(countries=None, limit=15):
     }
     stream_map = [
         ("euro area", "euro-area"),
+        ("germany", "germany"),
         ("united states", "united-states"),
         ("japan", "japan"),
     ]
@@ -156,7 +156,7 @@ def collect_tradingeconomics(http, snapshot, *, import_file=None, allow_stale=Fa
             start = snapshot.as_of - timedelta(hours=36)
             try:
                 response = requests.get(
-                    "https://api.tradingeconomics.com/news/country/euro%20area,united%20states,japan,china",
+                    "https://api.tradingeconomics.com/news/country/euro%20area,germany,united%20states,japan,china",
                     params={"c": key, "d1": start.date().isoformat(), "d2": snapshot.as_of.date().isoformat(),
                             "f": "json"}, timeout=(10, 25), allow_redirects=False,
                 )
@@ -178,7 +178,7 @@ def collect_tradingeconomics(http, snapshot, *, import_file=None, allow_stale=Fa
     selected, rejected = parse_news(records, snapshot.as_of, allow_stale=allow_stale)
     snapshot.sources.update(selected)
     present = {topic_for(s) for s in snapshot.sources.values() if getattr(s, "kind", None) == "news"}
-    for topic in COUNTRIES.values():
+    for topic in TOPICS:
         if topic not in present:
             snapshot.add_issue("TE_NEWS_MISSING", f"{topic}: không có toàn văn tin đủ điều kiện trước giờ chốt.")
     if rejected:

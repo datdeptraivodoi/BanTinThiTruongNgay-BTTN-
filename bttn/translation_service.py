@@ -13,7 +13,7 @@ from pydantic import AwareDatetime, Field
 
 from .models import Snapshot, StrictModel, parse_as_of
 from .nvidia_translation import MODEL, RULES_VERSION, NvidiaTranslator, TranslationError, check_translation
-from .tradingeconomics_news import COUNTRIES, collect_tradingeconomics, topic_for
+from .tradingeconomics_news import TOPICS, collect_tradingeconomics, topic_for
 
 RETENTION_DAYS = 7
 
@@ -214,7 +214,7 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
         except TranslationError as exc:
             result["failures"][sid] = str(exc)
     present = {a["topic"] for a in result["articles"].values()}
-    result["missing_topics"] = [t for t in COUNTRIES.values() if t not in present]
+    result["missing_topics"] = [t for t in TOPICS if t not in present]
     result["pending_review"] = [sid for sid, a in result["articles"].items()
                                 if a["record"]["review_status"] != "approved"]
     result["status"] = "checked" if not result["missing_topics"] and not result["failures"] else "incomplete"
