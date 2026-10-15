@@ -25,6 +25,13 @@ jobs:
           python -m pip install -r requirements-dev.txt
           npm install
       - run: python -m ruff check .
-      - run: python -m pytest -q
+      - name: Run tests
+        run: |
+          set -o pipefail
+          python -m pytest -q -rfE --tb=line 2>&1 | tee pytest.log || {
+            # Hiện từng test lỗi thành annotation trên PR
+            grep -E "^(FAILED|ERROR) |^/.*Error|^E " pytest.log | head -25 | sed 's/^/::error title=pytest::/'
+            exit 1
+          }
       - name: Render offline fixture through production pipeline
         run: python build_test_report.py
