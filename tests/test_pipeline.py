@@ -180,11 +180,15 @@ def test_renderer_uses_ai_output_removes_template_charts(snapshot, content, tmp_
         assert not any(name.startswith('word/charts/') for name in b.namelist())
         assert len([name for name in b.namelist() if name.startswith('word/media/')]) == 8
 
-def test_workflow_is_noon_weekdays():
+def test_workflow_manual_only_and_vps_runs_1130_weekdays():
     text=(ROOT/'.github/workflows/market_report.yml').read_text(encoding='utf-8')
-    assert "cron: '0 5 * * 1-5'" in text
+    assert 'schedule:' not in text and 'cron:' not in text          # GitHub không còn chạy theo lịch
     assert 'cancel-in-progress: false' in text
-    assert '--send' in text and '--create-only' in text
+    assert '--send' in text and '--create-only' in text and '--review' in text
+    setup=(ROOT/'deploy/setup_vps_bttn.sh').read_text(encoding='utf-8')
+    assert '30 11 * * 1-5 /root/BTTN/deploy/run_bttn.sh' in setup     # VPS chạy 11:30 thứ 2 - thứ 6
+    runner=(ROOT/'deploy/run_bttn.sh').read_text(encoding='utf-8')
+    assert '--review' in runner and '--send' in runner
 
 def test_sbv_localized_decimals_and_table_date():
     html='''<p>Archived date 01/01/2020</p><table><tr><td>1 Đô la Mỹ = 25.632 VND</td><td>Ngày ban hành 28/09/2026</td></tr></table><table><tr><td>1</td><td>USD</td><td>Đô la Mỹ</td><td>24.401,00</td><td>26.863,00</td></tr></table>'''

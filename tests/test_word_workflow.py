@@ -32,7 +32,7 @@ def manifest(tmp_path):
     return json.loads(next((tmp_path / "output").glob("*/manifest.json")).read_text(encoding="utf-8"))
 
 
-def test_workflow_offers_two_actions_without_smtp_sample_or_recipient_override():
+def test_workflow_offers_manual_actions_without_smtp_sample_or_recipient_override():
     text = (ROOT / ".github/workflows/market_report.yml").read_text(encoding="utf-8")
     workflow = yaml.safe_load(text)
     events = workflow.get("on") or workflow[True]
@@ -40,8 +40,9 @@ def test_workflow_offers_two_actions_without_smtp_sample_or_recipient_override()
     assert set(inputs) == {"action"}
     action = inputs["action"]
     assert action["type"] == "choice"
-    assert action["default"] == "1. Gửi file Word đến các email"
-    assert action["options"] == ["1. Gửi file Word đến các email", "2. Chỉ tạo file Word"]
+    assert action["default"] == "3. Gửi bản review cho người duyệt"
+    assert action["options"] == ["1. Gửi file Word đến các email", "2. Chỉ tạo file Word",
+                                 "3. Gửi bản review cho người duyệt"]
     assert "--test-smtp" not in text and "--test-recipient" not in text
     assert "Regression tests" not in text and "libreoffice" not in text.lower()
 
