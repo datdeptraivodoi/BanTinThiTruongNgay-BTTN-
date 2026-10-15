@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from .fx_editorial import EUR_SECOND_OPENING, replace_fx_opening
+from .fx_editorial import US_SECOND_OPENING, replace_fx_opening
 
 if TYPE_CHECKING:
     from .models import ReportContent, Section, Snapshot
@@ -342,15 +342,14 @@ def normalize_report_content(content: ReportContent, snapshot: Snapshot) -> Repo
 
     # 4. EUR/USD
     eur_paras = [normalize_text_prose(p, snapshot) for p in content.eur_usd.paragraphs if p.strip()]
-    # Một đoạn duy nhất: đoạn châu Âu (nếu tách riêng) được nối sau tin Mỹ, mở đầu "Về phía Châu Âu,".
-    if len(eur_paras) >= 2:
-        second = " ".join(eur_paras[1:]).strip()
-        if not second.startswith(EUR_SECOND_OPENING):
-            second = f"{EUR_SECOND_OPENING} {second}"
-        eur_paras = [f"{eur_paras[0]} {second}"]
+    # Hai đoạn: tỷ giá + tin châu Âu; đoạn hai "- Về phía kinh tế Mỹ," + tin Mỹ.
+    if len(eur_paras) > 2:
+        eur_paras = [eur_paras[0], " ".join(eur_paras[1:])]
+    if len(eur_paras) == 2 and not eur_paras[1].startswith(US_SECOND_OPENING):
+        eur_paras[1] = f"{US_SECOND_OPENING} {eur_paras[1].lstrip()}"
     if eur_paras:
         eur_paras[0] = replace_fx_opening(eur_paras[0], snapshot, "eur_usd")
-    content.eur_usd.paragraphs = eur_paras[:1]
+    content.eur_usd.paragraphs = eur_paras[:2]
     ensure_section_provenance(content.eur_usd, snapshot)
     if "eur_usd" in word_limits:
         adjust_word_count(content.eur_usd, *word_limits["eur_usd"], snapshot)

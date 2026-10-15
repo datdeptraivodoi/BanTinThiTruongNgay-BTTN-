@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 if TYPE_CHECKING:
     from .models import Snapshot
 
-EUR_SECOND_OPENING = "Về phía Châu Âu,"
+# Đoạn thứ hai của mục "Thị trường ngoại hối EU" (theo bản tin mẫu 15.10.2026).
+US_SECOND_OPENING = "- Về phía kinh tế Mỹ,"
 
 
 def spot_move(observation, flat_pct: float = 0.05) -> str:

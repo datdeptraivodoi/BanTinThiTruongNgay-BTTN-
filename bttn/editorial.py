@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import timedelta
 from pathlib import Path
 
-from .fx_editorial import EUR_SECOND_OPENING, fx_opening
+from .fx_editorial import US_SECOND_OPENING, fx_opening
 from .models import Section, SentenceReference, create_draft_placeholder_content
 from .nvidia_translation import is_vietnamese
 from .tradingeconomics_news import topic_for
@@ -128,7 +128,7 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
                 continue
             seen.add(identity)
             recency = 0.0
-            if topic in {"USD", "EUR"}:  # ưu tiên tin mới nhất trong cửa sổ 36 giờ
+            if topic in {"USD", "EUR", "China"}:  # ưu tiên tin mới nhất trong cửa sổ tin
                 recency = 3 * max(0.0, 1 - age.total_seconds() / (36 * 3600))
             candidates.append(Candidate(sentence, sid, max(1, 1 + score) + 1 / (index + 1) + recency, index))
     if topic == "macro":
@@ -178,20 +178,23 @@ def make_section(snapshot, groups, prefixes=None):
 
 
 def eur_usd_section(snapshot, opening, picked, eu_ids):
-    """Ghép thành một đoạn; câu trích dẫn giữ nguyên văn để kiểm tra nguồn."""
-    us = [c for c in picked if c.source_id not in eu_ids]
+    """Đoạn 1: câu tỷ giá + tin châu Âu. Đoạn 2: "- Về phía kinh tế Mỹ," + tin Mỹ.
+
+    Câu trích dẫn giữ nguyên văn để kiểm tra nguồn.
+    """
     eu = [c for c in picked if c.source_id in eu_ids]
-    parts = [opening] + [c.text for c in us]
-    if eu:
-        parts += [EUR_SECOND_OPENING] + [c.text for c in eu]
-    text = " ".join(p for p in parts if p).strip()
-    refs = [SentenceReference(paragraph=0, source_id=c.source_id, quote=c.text) for c in us + eu if c.quoted]
+    us = [c for c in picked if c.source_id not in eu_ids]
+    paragraphs = [" ".join([opening] + [c.text for c in eu]).strip()]
+    refs = [SentenceReference(paragraph=0, source_id=c.source_id, quote=c.text) for c in eu if c.quoted]
+    if us:
+        paragraphs.append(" ".join([US_SECOND_OPENING] + [c.text for c in us]))
+        refs += [SentenceReference(paragraph=1, source_id=c.source_id, quote=c.text) for c in us if c.quoted]
     source_ids = {c.source_id for c in picked}
-    for key in TOKEN.findall(text):
+    for key in TOKEN.findall(" ".join(paragraphs)):
         obs, _ = parse_placeholder_key(key, snapshot)
         if obs:
             source_ids.add(obs.source_id)
-    return Section(paragraphs=[text], source_ids=sorted(source_ids) or ["missing_source"], sentence_refs=refs)
+    return Section(paragraphs=paragraphs, source_ids=sorted(source_ids) or ["missing_source"], sentence_refs=refs)
 
 
 def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=False):
@@ -213,10 +216,11 @@ def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=Fals
                 opening = f"Phiên giao dịch hôm nay, tỷ giá USD-CNH biến động quanh mức {{{{{cnh_token}}}}}."
         low, high = rules()["word_limits"][name]
         if name == "eur_usd":
-            # Một đoạn: câu mở đầu tỷ giá, tin Mỹ, rồi "Về phía Châu Âu," và tin khu vực euro/Đức.
+            # Đoạn 1: câu tỷ giá + tin khu vực euro/Đức; đoạn 2: "- Về phía kinh tế Mỹ," + tin Mỹ.
+            # Tổng 185–200 từ, phân bổ linh hoạt giữa hai đoạn.
             us_candidates = pools["USD"][0]
             groups = ({c.source_id for c in us_candidates}, {c.source_id for c in candidates})
-            prefix = opening + " " + EUR_SECOND_OPENING
+            prefix = opening + " " + US_SECOND_OPENING
             picked = choose_sentences(us_candidates + candidates, snapshot, low, high,
                                       prefix=prefix, required_groups=groups)
             if not picked:  # thiếu hẳn một phía thì vẫn dùng tin phía còn lại

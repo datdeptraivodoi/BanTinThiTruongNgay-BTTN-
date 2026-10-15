@@ -4,7 +4,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from .fx_editorial import EUR_SECOND_OPENING, fx_opening
+from .fx_editorial import US_SECOND_OPENING, fx_opening
 from .models import Issue, ReportContent, Snapshot, business_days_between, previous_weekday
 from .trader_quotes import validate_trader_observations
 
@@ -302,8 +302,8 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
             prefix = "Cập nhật giá cà phê thế giới," if name == "coffee" else ""
             if prefix and paragraph_text.startswith(prefix):
                 paragraph_text = paragraph_text[len(prefix):].strip()
-            if name == "eur_usd":  # cụm chuyển ý đứng trước câu trích dẫn tin châu Âu
-                paragraph_text = paragraph_text.replace(EUR_SECOND_OPENING + " ", "", 1)
+            if name == "eur_usd" and paragraph_text.startswith(US_SECOND_OPENING):  # cụm mở đoạn tin Mỹ
+                paragraph_text = paragraph_text[len(US_SECOND_OPENING):].strip()
             valid = (source is not None and source.kind == "news" and ref.source_id in section.source_ids
                      and source.text_scope in ("article", "excerpt")
                      and (topic_for(source) is None or record is not None)
@@ -357,8 +357,8 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
             error("FX_OPENING", "Câu mở đầu phải đúng mẫu, ngày và placeholder tỷ giá")
         if name == "japan" and len(section.paragraphs) != 1:
             error("JPY_STRUCTURE", "Cần đúng một đoạn")
-        if name == "eur_usd" and (len(section.paragraphs) != 1 or EUR_SECOND_OPENING not in section.paragraphs[0]):
-            error("EU_STRUCTURE", "Cần một đoạn gồm tin Mỹ, rồi 'Về phía Châu Âu,' và tin châu Âu")
+        if name == "eur_usd" and (len(section.paragraphs) != 2 or not section.paragraphs[1].startswith(US_SECOND_OPENING)):
+            error("EU_STRUCTURE", "Cần hai đoạn: tỷ giá + tin châu Âu; đoạn hai bắt đầu '- Về phía kinh tế Mỹ,'")
         if name == "energy_metals":
             if len(section.paragraphs) != 2:
                 error("ENERGY_STRUCTURE", "Cần một đoạn Brent và một đoạn vàng")

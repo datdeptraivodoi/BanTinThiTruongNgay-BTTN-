@@ -376,6 +376,8 @@ def test_te_stream_fallback_collects_public_records(monkeypatch):
     assert "https://tradingeconomics.com/euro-area/news/123" in urls
     assert "https://tradingeconomics.com/germany/news/125" in urls  # tin Đức vào nhóm châu Âu
     assert not any("stock-market" in u for u in urls)  # bỏ tin cổ phiếu/futures
+    asked = {call.args[0].split("c=")[-1] for call in requests.get.call_args_list}
+    assert {"united states", "euro area", "germany", "china"} <= asked  # có cả trang tin Trung Quốc
 
 
 def test_translation_failure_is_diagnostic_and_not_saved_as_success(tmp_path):
