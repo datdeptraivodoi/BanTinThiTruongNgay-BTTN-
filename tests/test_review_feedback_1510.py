@@ -117,3 +117,39 @@ def test_rendered_word_keeps_template_columns(tmp_path):
     texts = "".join(t.text or "" for t in doc.element.iter(qn("w:t")))
     assert "Dự báo các chỉ số chính" in texts
     assert "Tỷ giá USD-VND ngân hàng" in texts
+
+
+def test_eur_usd_is_one_paragraph_with_us_then_europe(snap):
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from bttn.editorial import foreign_sections
+    from bttn.models import Source
+    from bttn.validation import count_words, resolve
+
+    def te(topic_path, i, hours, text):
+        sid = f"news_te_{topic_path}_{i}"
+        at = snap.as_of - timedelta(hours=hours)
+        snap.sources[sid] = Source(id=sid, url=f"https://tradingeconomics.com/{topic_path}/news/{i}",
+                                   published_at=at, retrieved_at=at, text="Title\n\nBody", kind="news",
+                                   text_scope="article")
+        return sid, SimpleNamespace(text=text)
+
+    us = ("Lạm phát CPI của Mỹ trong tháng 9 tăng 0,6% so với tháng trước, mức tăng mạnh nhất trong nhiều tháng qua. "
+          "Giá xăng tăng kỷ lục là nguyên nhân chính khiến chỉ số giá tiêu dùng của Mỹ đi lên. "
+          "Lạm phát lõi của Mỹ tăng 2,6% so với cùng kỳ năm trước, thấp hơn mức của tháng 8. "
+          "Thị trường đánh giá khả năng Fed tăng lãi suất trong cuộc họp cuối tháng 10 ở mức cao hơn. ")
+    eu = ("Lạm phát khu vực đồng euro trong tháng 9 tăng lên 2,4% so với cùng kỳ năm trước theo số liệu sơ bộ. "
+          "Sản lượng công nghiệp của Đức giảm 1,1% so với tháng trước, kém hơn mức kỳ vọng của thị trường. "
+          "Chỉ số niềm tin kinh tế ZEW của Đức giảm xuống mức thấp nhất trong sáu tháng gần đây. "
+          "Doanh số bán lẻ của khu vực đồng euro tăng 0,3% so với tháng trước nhờ chi tiêu cho dịch vụ. "
+          "Tỷ lệ thất nghiệp của khu vực đồng euro ổn định ở mức 6,3% trong tháng 8 vừa qua. ")
+    records = dict([te("united-states", 1, 3, us), te("euro-area", 2, 5, eu), te("germany", 3, 20, eu)])
+    result, audit = foreign_sections(snap, records)
+    section = result["eur_usd"]
+    assert len(section.paragraphs) == 1
+    text = section.paragraphs[0]
+    assert text.startswith("Trong phiên giao dịch hôm qua, tính đến ngày")
+    assert text.count("Về phía Châu Âu,") == 1
+    assert text.index("Lạm phát CPI của Mỹ") < text.index("Về phía Châu Âu,")
+    assert 185 <= count_words(resolve(text, snap, safe=True)) <= 198, audit["eur_usd"]

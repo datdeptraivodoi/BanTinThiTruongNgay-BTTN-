@@ -146,7 +146,7 @@ def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> Re
         ),
         eur_usd=Section(
             paragraphs=[
-                f"{fx_opening(snapshot, 'eur_usd')} [Phần nhận xét thị trường ngoại hối EUR-USD đang chờ cập nhật.]",
+                f"{fx_opening(snapshot, 'eur_usd')} [Phần nhận xét thị trường ngoại hối EUR-USD đang chờ cập nhật.] "
                 "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
             ],
             source_ids=src_eur,
@@ -220,7 +220,7 @@ def sanitize_content_for_draft_render(
                 ]
             elif sec_name == "eur_usd":
                 sec.paragraphs = [
-                    f"{fx_opening(snapshot, 'eur_usd')} [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.]",
+                    f"{fx_opening(snapshot, 'eur_usd')} [Phần nhận xét chi tiết chưa hoàn tất do lỗi kiểm định nội dung.] "
                     "Về phía Châu Âu, [Phần nhận định kinh tế Châu Âu đang chờ cập nhật.]",
                 ]
             elif sec_name == "japan":

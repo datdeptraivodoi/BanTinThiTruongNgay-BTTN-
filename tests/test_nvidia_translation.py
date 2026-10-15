@@ -365,12 +365,17 @@ def test_te_stream_fallback_collects_public_records(monkeypatch):
     monkeypatch.delenv("TRADINGECONOMICS_API_KEY", raising=False)
     monkeypatch.delenv("TE_NEWS_IMPORT_PATH", raising=False)
     row = news_row()
-    row.update(country="euro area", url="/euro-area/stock-market/news/123")
-    mock_resp = Mock(status_code=200, json=lambda: [row])
+    row.update(country="euro area", url="/euro-area/news/123")
+    stock = dict(row, id="stock-1", url="/euro-area/stock-market/news/124", title="European Stock Futures Rise")
+    german = dict(row, id="de-1", country="germany", url="/germany/news/125", title="German Factory Orders Rise")
+    mock_resp = Mock(status_code=200, json=lambda: [row, stock, german])
     monkeypatch.setattr(requests, "get", Mock(return_value=mock_resp))
     snap = Snapshot(as_of=AT)
     collect_tradingeconomics(None, snap, use_stream=True)
-    assert snap.sources
+    urls = {s.url for s in snap.sources.values()}
+    assert "https://tradingeconomics.com/euro-area/news/123" in urls
+    assert "https://tradingeconomics.com/germany/news/125" in urls  # tin Đức vào nhóm châu Âu
+    assert not any("stock-market" in u for u in urls)  # bỏ tin cổ phiếu/futures
 
 
 def test_translation_failure_is_diagnostic_and_not_saved_as_success(tmp_path):
