@@ -1,15 +1,20 @@
 # Bản tin thị trường ngày BTTN
 
-Pipeline Python tạo bản tin từ dữ liệu có nguồn, Riva dịch từng bài và Python chọn câu và template Word. Workflow bắt đầu **12:00 giờ Việt Nam, thứ Hai–thứ Sáu** (`05:00 UTC`). Đây là giờ trigger; GitHub Actions có thể xếp hàng nên không bảo đảm email đến đúng 12:00.
+Pipeline Python tạo bản tin từ dữ liệu có nguồn, Riva dịch từng bài và Python chọn câu và template Word.
 
-Trong **Actions → BTTN midday → Run workflow**, chỉ có một menu:
+## Vận hành hiện tại (VPS)
 
-1. **Gửi file Word đến các email**: gửi một file `.docx` tới danh sách `RECIPIENTS` sau kiểm tra tự động.
-2. **Chỉ tạo file Word**: lưu `.docx` trong Artifacts, không gửi email.
+- **VPS chạy lúc 11:30, thứ Hai–thứ Sáu** (`deploy/run_bttn.sh`, cron). Giai đoạn review: gửi bản **[REVIEW]** cho `REVIEW_RECIPIENTS` (mặc định datnh1@mbbank.com.vn), **kể cả khi còn lỗi kiểm tra**, khi đó gửi bản nháp kèm danh sách lỗi trong email. Lần chạy hỏng trước khi có file Word thì gửi email báo lỗi.
+- Khi muốn gửi danh sách nhận chính thức: đổi `BTTN_MODE="send"` trong `/root/BTTN/.env` (chỉ gửi khi qua mọi kiểm tra).
+- Báo giá trader (USD-VND ITB và SWAP) lấy trực tiếp từ database streamer Teams của BTS trên cùng VPS (`/root/TyGia/MasterData/market_master.db`), chỉ dữ liệu trong ngày, trước giờ chốt. Không có thì để trống, không dùng số mặc định.
+- Biểu đồ EUR-USD, USD-JPY, Brent, Arabica vẽ kiểu TradingView bằng thư viện mã nguồn mở [Lightweight Charts](https://github.com/tradingview/lightweight-charts) (Apache-2.0, logo TradingView là phần ghi công bắt buộc), chụp bằng Chrome trên VPS. Không có Node/Chrome thì tự quay về mplfinance (`BTTN_CHART_ENGINE=mpl` để ép dùng mplfinance).
+- GitHub Actions **không còn chạy theo lịch**; **Actions → BTTN midday → Run workflow** để chạy tay dự phòng (mặc định gửi bản review).
 
-Mặc định chọn gửi Word; lịch 12:00 cũng gửi Word. Không còn ô gửi email thử,
-địa chỉ nhận thử hoặc nhánh gửi báo cáo mẫu SMTP. **Tạm ngừng tạo và đính kèm PDF.**
-Kiểm thử mã nguồn nằm trong workflow `BTTN checks`, không chạy lại trước mỗi lượt xuất bản.
+Cài đặt lần đầu trên VPS:
+```bash
+cd /root && git clone https://github.com/datdeptraivodoi/BanTinThiTruongNgay-BTTN-.git BTTN
+bash /root/BTTN/deploy/setup_vps_bttn.sh
+```
 
 ## Các thay đổi
 

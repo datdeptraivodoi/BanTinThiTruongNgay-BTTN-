@@ -67,7 +67,7 @@ def run(args):
     if getattr(args, "translate_news_only", False):
         return run_news_translation(args)
     from .analysis import generate
-    from .delivery import send_report
+    from .delivery import review_recipients, send_failure_alert, send_report
     from .http import Http
     from .rendering import render, validate_docx
     from .sources import collect_snapshot
@@ -80,6 +80,7 @@ def run(args):
         "status": "started",
         "as_of": as_of.isoformat(),
         "send_requested": args.send,
+        "review_requested": getattr(args, "review", False),
         "output_format": "docx",
         "pdf_generated": False,
         "translation_review_policy": "optional",
@@ -108,7 +109,7 @@ def run(args):
             snapshot = collect_snapshot(Http(directory / "sources"), as_of)
         (directory / "snapshot.json").write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
 
-        if args.send and snapshot.purpose != "live":
+        if (args.send or getattr(args, "review", False)) and snapshot.purpose != "live":
             raise ValueError("Test fixtures cannot be sent")
 
         data_issues = validate_snapshot(snapshot)
@@ -180,6 +181,19 @@ def run(args):
         manifest["document_validation"] = "docx_structure_times_new_roman_11"
         manifest["artifacts"] = {output.name: hashlib.sha256(output.read_bytes()).hexdigest()}
 
+        # --review: luôn gửi cho người duyệt (kể cả bản nháp còn lỗi), kèm danh sách lỗi trong email
+        if getattr(args, "review", False):
+            all_issues = [i.model_dump() for i in (data_issues + content_issues)]
+            if ai_error:
+                all_issues.append({"severity": "error", "code": "AI_INCOMPLETE", "message": ai_error})
+            recipients = review_recipients()
+            manifest["recipients"] = recipients
+            send_report(snapshot, [output], Path(args.state_dir), recipients, review=True, issues=all_issues)
+            manifest["status"] = "review_sent_with_issues" if all_issues else "review_sent"
+            manifest["issue_count"] = len(all_issues)
+            LOG.info("Review email sent to %s (%d issues)", recipients, len(all_issues))
+            return 0
+
         # If there are data or content issues:
         # In --send mode: Block delivery and return 1 (artifacts preserved for review)
         # In --create-only mode: Return 0 with draft_with_issues status
@@ -217,6 +231,8 @@ def run(args):
         message = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else type(exc).__name__
         manifest["error_message"] = message
         LOG.error("%s. Run directory: %s", message, directory)
+        if getattr(args, "review", False) and manifest["status"] == "failed":
+            manifest["failure_alert_sent"] = send_failure_alert(as_of, message, directory, review_recipients())
         return 1
     finally:
         manifest["elapsed_seconds"] = round(time.monotonic() - started, 3)
@@ -234,6 +250,8 @@ def main(argv=None):
     parser.add_argument("--type", choices=["midday"], default="midday")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--send", action="store_true", help="Send only after all validation gates pass")
+    modes.add_argument("--review", action="store_true",
+                       help="Gửi cho người duyệt (REVIEW_RECIPIENTS), kể cả bản nháp còn lỗi, kèm danh sách lỗi")
     modes.add_argument("--create-only", "--dry-run", dest="dry_run", action="store_true", help="Create Word without sending email (default); no PDF")
     modes.add_argument("--translate-news-only", action="store_true", help="NVIDIA translation review only; no other models or email")
     parser.add_argument("--news-file", help="Imported Trading Economics article JSON for translation review")
@@ -248,8 +266,8 @@ def main(argv=None):
         parser.error("--translate-news-only cannot be combined with content or collection options")
     if args.news_file and not args.translate_news_only:
         parser.error("--news-file requires --translate-news-only")
-    if args.send and args.collect_only:
-        parser.error("--send cannot be combined with --collect-only")
+    if (args.send or args.review) and args.collect_only:
+        parser.error("--send/--review cannot be combined with --collect-only")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     return run(args)
 
