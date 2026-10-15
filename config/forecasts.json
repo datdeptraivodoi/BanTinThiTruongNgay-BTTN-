@@ -1,0 +1,11 @@
+{
+  "_huong_dan": "Team cập nhật bảng 'Dự báo các chỉ số chính' (trang 2) tại đây. Ghi giá trị đúng như muốn hiện trong bản tin (dạng chữ). Đổi 'updated' thành ngày sửa; bảng chỉ hiện khi 'updated' trong vòng 'max_age_days' ngày, quá hạn thì bản tin để dấu — và báo lỗi FORECAST_STALE trong email review.",
+  "updated": "2026-10-15",
+  "max_age_days": 45,
+  "rows": [
+    {"name": "USD-VND", "1m": "26,150", "6m": "26,400", "note": "Rủi ro địa chính trị ảnh hưởng tới giá năng lượng"},
+    {"name": "EUR-USD", "1m": "1,1550", "6m": "1,1681", "note": "ECB tăng lãi suất trong thời gian tới"},
+    {"name": "USD-JPY", "1m": "159,82", "6m": "160,59", "note": "BOJ tinh chỉnh về chính sách điều hành lãi suất"},
+    {"name": "LiborUSD 6M", "1m": "3,50%", "6m": "3,50%", "note": "Fed dự kiến giữ nguyên lãi suất trong năm 2026"}
+  ]
+}

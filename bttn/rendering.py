@@ -3,6 +3,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -27,6 +28,18 @@ from .validation import format_value, resolve
 
 NAVY = "245794"
 BLUE = "0070C0"
+
+# Hình học bảng chính lấy từ file mẫu BT.TT.YYYY.MM.DD.template_placeholders.docx (đơn vị twip).
+# Ranh giới cột: trang 1 = 5157 | 4610 | 6110; trang 2 = 5297 | 5221 | 5359; trang 3 = 5323 | 5323 | 5231.
+TEMPLATE_GRID = [5157, 140, 26, 2600, 1844, 401, 350, 128, 5231]  # tổng 15877
+TEMPLATE_SPANS = {
+    0: [4, 5], 1: [9], 2: [6, 3],
+    3: [1, 4, 4], 4: [1, 4, 4], 5: [1, 4, 4],
+    6: [2, 5, 2], 7: [2, 5, 2], 8: [2, 5, 2], 9: [2, 7], 10: [2, 5, 2],
+    11: [3, 5, 1], 12: [3, 5, 1], 13: [9],
+}
+TEMPLATE_ROW_HEIGHTS = {0: 475, 1: 1156, 2: 605, 3: 3024, 4: 2995, 5: 2794, 6: 475,
+                        7: 5476, 8: 4324, 10: 475, 12: 4057, 13: 3518}
 
 
 def cells(row):
@@ -383,55 +396,30 @@ def render_contact_info(cell):
     return table
 
 
-def render_calendar_events_table(cell):
-    """Render Important Events calendar table on page 2 (Row 7 Col 0)."""
-    title = paragraph(cell, "Sự kiện quan trọng (12.10 – 16.10.2026)", bold=True, color=NAVY)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.paragraph_format.space_before = Pt(0)
-    title.paragraph_format.space_after = Pt(1)
-
-    headers = ["Ngày", "Sự kiện", "Nước"]
-    events = [
-        ("13.10.2026", "Biên bản họp RBA", "Australia", True),
-        ("", "Doanh số bán nhà cũ", "Mỹ", True),
-        ("14.10.2026", "Lạm phát CPI (so cùng kỳ)", "Trung Quốc", False),
-        ("", "Lạm phát lõi (so tháng trước)", "Mỹ", False),
-        ("", "Lạm phát lõi (so cùng kỳ)", "Mỹ", False),
-        ("", "Lạm phát CPI (so tháng trước)", "Mỹ", False),
-        ("", "Lạm phát CPI (so cùng kỳ)", "Mỹ", False),
-        ("15.10.2026", "Tăng trưởng GDP", "Anh Quốc", False),
-        ("15.10.2026", "Chỉ số giá sản xuất (PPI)", "Mỹ", False),
-        ("", "Doanh số bán lẻ (so tháng trước)", "Mỹ", False),
-        ("16.10.2026", "Chỉ số lạm phát HICP MoM", "Châu Âu", False),
-        ("", "Chỉ số lạm phát HICP YoY", "Châu Âu", False),
-    ]
-
-    ratios = [0.26, 0.50, 0.24]
+def _blue_table(cell, headers, rows, ratios, aligns, styles):
+    """Bảng lồng kiểu mẫu: hàng tiêu đề nền 4F81BD chữ trắng; styles[i][j] = (bold, màu)."""
     width = int((cell.width or Inches(3.5)) - Inches(.08))
     widths = [int(width * r) for r in ratios]
-
-    table = cell.add_table(rows=len(events) + 1, cols=3)
+    table = cell.add_table(rows=len(rows) + 1, cols=len(headers))
     table.autofit = False
     for col, w in zip(table.columns, widths):
         col.width = w
-    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
 
-    for j, label in enumerate(headers):
-        c = table.cell(0, j)
-        c.width = widths[j]
+    def fill(c, text, align, bold, color, shade=None):
         p = c.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.alignment = align
         p.paragraph_format.keep_together = True
         p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(0)
         p.paragraph_format.line_spacing = 1
-        r = p.add_run(label)
+        r = p.add_run(text)
         style_run(r, size=10)
-        r.bold = True
-        r.font.color.rgb = RGBColor.from_string("FFFFFF")
-        shade = OxmlElement("w:shd")
-        shade.set(qn("w:fill"), "4F81BD")
-        c._tc.get_or_add_tcPr().append(shade)
+        r.bold = bold
+        r.font.color.rgb = RGBColor.from_string(color)
+        if shade:
+            sh = OxmlElement("w:shd")
+            sh.set(qn("w:fill"), shade)
+            c._tc.get_or_add_tcPr().append(sh)
         margins = OxmlElement("w:tcMar")
         for name in ("top", "bottom", "left", "right"):
             edge = OxmlElement("w:" + name)
@@ -440,30 +428,18 @@ def render_calendar_events_table(cell):
             margins.append(edge)
         c._tc.get_or_add_tcPr().append(margins)
 
-    for i, (d_str, ev_str, co_str, is_high_impact) in enumerate(events, start=1):
+    for i in range(len(rows) + 1):
         table.rows[i]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
-        row_vals = [d_str, ev_str, co_str]
-        for j, val in enumerate(row_vals):
+    for j, label in enumerate(headers):
+        c = table.cell(0, j)
+        c.width = widths[j]
+        fill(c, label, WD_ALIGN_PARAGRAPH.CENTER, True, "FFFFFF", shade="4F81BD")
+    for i, values in enumerate(rows, start=1):
+        for j, val in enumerate(values):
             c = table.cell(i, j)
             c.width = widths[j]
-            p = c.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j < 2 else WD_ALIGN_PARAGRAPH.CENTER
-            p.paragraph_format.keep_together = True
-            p.paragraph_format.space_before = Pt(0)
-            p.paragraph_format.space_after = Pt(0)
-            p.paragraph_format.line_spacing = 1
-            r = p.add_run(val)
-            style_run(r, size=10)
-            r.bold = is_high_impact
-            r.font.color.rgb = RGBColor.from_string("245794" if is_high_impact else "4F81BD")
-            margins = OxmlElement("w:tcMar")
-            for name in ("top", "bottom", "left", "right"):
-                edge = OxmlElement("w:" + name)
-                edge.set(qn("w:w"), "10")
-                edge.set(qn("w:type"), "dxa")
-                margins.append(edge)
-            c._tc.get_or_add_tcPr().append(margins)
-
+            bold, color = styles[i - 1][j]
+            fill(c, str(val), aligns[j], bold, color)
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
     tail = cell.paragraphs[-1]
@@ -476,7 +452,133 @@ def render_calendar_events_table(cell):
     return table
 
 
-def render_international_money_market(cell):
+def calendar_events(snapshot):
+    """Lịch sự kiện tuần từ config/economic_calendar.json; chỉ dùng khi tuần trong file chứa ngày bản tin."""
+    from datetime import date as _date
+    data = _config_json("economic_calendar.json")
+    day = snapshot.as_of.date()
+    try:
+        start = _date.fromisoformat(data["week_start"])
+        end = _date.fromisoformat(data["week_end"])
+    except Exception:
+        start = end = None
+    if not start or not (start <= day <= end):
+        snapshot.add_issue("CALENDAR_STALE", "config/economic_calendar.json chưa cập nhật lịch sự kiện cho tuần này")
+        return None, []
+    events, last = [], None
+    for ev in data.get("events", []):
+        try:
+            d = _date.fromisoformat(ev["date"])
+        except Exception:
+            continue
+        label = d.strftime("%d.%m.%Y") if d != last else ""
+        last = d
+        events.append((label, str(ev.get("event", "")), str(ev.get("country", "")), bool(ev.get("high_impact"))))
+    return (start, end), events
+
+
+def render_calendar_events_table(cell, snapshot):
+    """Bảng Sự kiện quan trọng trên trang 2 (hàng 7 cột 0)."""
+    week, events = calendar_events(snapshot)
+    label = f"{week[0]:%d.%m} – {week[1]:%d.%m.%Y}" if week else "tuần này"
+    title = paragraph(cell, f"Sự kiện quan trọng ({label})", bold=True, color=NAVY)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.paragraph_format.space_before = Pt(0)
+    title.paragraph_format.space_after = Pt(1)
+    if not events:
+        events = [("—", "Chưa cập nhật lịch sự kiện", "—", False)]
+    rows = [(d, e, c) for d, e, c, _ in events]
+    styles = [[(hi, NAVY if hi else "4F81BD")] * 3 for *_, hi in events]
+    left, center = WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER
+    return _blue_table(cell, ["Ngày", "Sự kiện", "Nước"], rows, [0.26, 0.50, 0.24], [left, left, center], styles)
+
+
+def forecast_rows(snapshot):
+    """Bảng dự báo từ config/forecasts.json do team cập nhật; quá hạn thì để —."""
+    from datetime import date as _date
+    data = _config_json("forecasts.json")
+    rows = data.get("rows") or []
+    try:
+        age = (snapshot.as_of.date() - _date.fromisoformat(data["updated"])).days
+        fresh = 0 <= age <= int(data.get("max_age_days", 45))
+    except Exception:
+        fresh = False
+    if not fresh:
+        snapshot.add_issue("FORECAST_STALE", "config/forecasts.json quá hạn hoặc thiếu ngày cập nhật; bảng dự báo để —")
+    names = [r.get("name") for r in rows] or ["USD-VND", "EUR-USD", "USD-JPY", "LiborUSD 6M"]
+    by_name = {r.get("name"): r for r in rows}
+    out = []
+    for name in names:
+        r = by_name.get(name, {}) if fresh else {}
+        out.append((name, r.get("1m") or "—", r.get("6m") or "—", r.get("note") or ""))
+    return out
+
+
+def render_forecast_table(cell, snapshot):
+    """Bảng 'Dự báo các chỉ số chính' (hàng 9, cột phải trang 2) theo file mẫu."""
+    heading(cell, "Dự báo các chỉ số chính")
+    rows = forecast_rows(snapshot)
+    styles = [[(True, "000000"), (False, NAVY), (False, NAVY), (False, NAVY)] for _ in rows]
+    center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
+    # Tỷ lệ cột như mẫu: 2035 | 1345 | 1440 | 5310
+    return _blue_table(cell, ["", "1 tháng", "6 tháng", "Ghi chú"], rows,
+                       [0.20, 0.13, 0.14, 0.53], [left, center, center, left], styles)
+
+
+def _config_json(name):
+    import json
+    path = Path(__file__).resolve().parents[1] / "config" / name
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def term_sofr_rows(snapshot):
+    """Term SOFR từ config/term_sofr.json; quá 3 ngày làm việc so với ngày bản tin thì để —."""
+    from datetime import date as _date
+    data = _config_json("term_sofr.json")
+    fresh = False
+    if data.get("date"):
+        try:
+            d = _date.fromisoformat(str(data["date"]))
+            day = snapshot.as_of.date()
+            business = sum(1 for i in range(1, (day - d).days + 1)
+                           if (d + timedelta(days=i)).weekday() < 5)
+            fresh = 0 <= (day - d).days and business <= 3
+        except ValueError:
+            fresh = False
+    if not fresh:
+        snapshot.add_issue("TERM_SOFR_STALE", "config/term_sofr.json chưa có Term SOFR trong 3 ngày làm việc gần nhất; bảng để —")
+
+    def sofr(t):
+        v = data.get(t)
+        return f"{float(v):.5f}%" if fresh and v not in (None, "") else "—"
+
+    def vnibor(t):
+        obs = snapshot.observations.get(f"VND_{t}")
+        return f"{float(obs.value):.2f}%" if obs else "—"  # cùng định dạng dấu chấm với SOFR như mẫu
+    return [(f"SOFRUSD{t}", sofr(t), f"Vnibor{t}", vnibor(t)) for t in ("1M", "3M", "6M")]
+
+
+def world_stock_rows(snapshot):
+    """Chỉ số chứng khoán (phiên gần nhất) và % thay đổi so với phiên liền trước."""
+    rows = []
+    for key in ("DOW", "NIKKEI", "DAX"):
+        obs = snapshot.observations.get(key)
+        if not obs:
+            rows.append((key, "—", "—"))
+            continue
+        level = f"{float(obs.value):,.2f}"
+        change = "—"
+        if obs.series and len(obs.series) >= 2 and float(obs.series[-2].value):
+            prev = float(obs.series[-2].value)
+            change = f"{(float(obs.value) / prev - 1) * 100:+.2f}%"
+        rows.append((key, level, change))
+    return rows
+
+
+def render_international_money_market(cell, snapshot=None):
     """Render International Money Market and World Stock Market on page 2 (Row 8 Col 0)."""
     width = int((cell.width or Inches(3.5)) - Inches(.08))
 
@@ -493,13 +595,10 @@ def render_international_money_market(cell):
 
     # 2. Table: Lãi suất cơ bản
     policy_headers = ["Lãi suất cơ bản", "Giá trị", "Thay đổi"]
-    policy_rates = [
-        ("FED", "3,75-4,00%", "+0,25%"),
-        ("BOE", "3,75%", "0,00%"),
-        ("BOJ", "1,25%", "+0,25%"),
-        ("RBA", "4,60%", "+0,25%"),
-        ("ECB", "2,50%", "+0,25%"),
-    ]
+    # Lãi suất điều hành: config/policy_rates.json (team cập nhật khi NHTW thay đổi)
+    policy_rates = [(r.get("bank", ""), r.get("value", "—"), r.get("change", "—"))
+                    for r in _config_json("policy_rates.json").get("rates", [])] or [
+        (b, "—", "—") for b in ("FED", "BOE", "BOJ", "RBA", "ECB")]
     t_policy_ratios = [0.38, 0.34, 0.28]
     t_policy_widths = [int(width * r) for r in t_policy_ratios]
 
@@ -589,11 +688,8 @@ def render_international_money_market(cell):
     r_s.font.color.rgb = RGBColor.from_string(NAVY)
 
     # 5. Table: SOFR - Vnibor
-    sofr_rows = [
-        ("SOFRUSD1M", "3.91666%", "Vnibor1M", "5.20000%"),
-        ("SOFRUSD3M", "4.02975%", "Vnibor3M", "6.75000%"),
-        ("SOFRUSD6M", "4.18252%", "Vnibor6M", "7.90000%"),
-    ]
+    sofr_rows = term_sofr_rows(snapshot) if snapshot is not None else [
+        (f"SOFRUSD{t}", "—", f"Vnibor{t}", "—") for t in ("1M", "3M", "6M")]
     t_sofr_ratios = [0.28, 0.22, 0.26, 0.24]
     t_sofr_widths = [int(width * r) for r in t_sofr_ratios]
     t_sofr = cell.add_table(rows=len(sofr_rows), cols=4)
@@ -640,11 +736,8 @@ def render_international_money_market(cell):
 
     # 7. Table: Thị trường chứng khoán thế giới
     stock_headers = ["", "Giá trị", "Thay đổi"]
-    stock_rows = [
-        ("DOW", "51,185.13", "-0.66%"),
-        ("NIKKEI", "69,042.11", "-1.42%"),
-        ("DAX", "24,959.19", "-0.58%"),
-    ]
+    stock_rows = world_stock_rows(snapshot) if snapshot is not None else [
+        (k, "—", "—") for k in ("DOW", "NIKKEI", "DAX")]
     t_stock_ratios = [0.34, 0.36, 0.30]
     t_stock_widths = [int(width * r) for r in t_stock_ratios]
     t_stock = cell.add_table(rows=len(stock_rows) + 1, cols=3)
@@ -730,17 +823,16 @@ def render_sbv_block(cell, snapshot):
         ["", "Mua", "Bán"],
         ["", value(snapshot, "SBV_BUY"), value(snapshot, "SBV_SELL")],
     ], [.44, .28, .28], blue_cells={(0, 0), (0, 1), (0, 2), (1, 0), (2, 1), (2, 2)})
-    title = paragraph(cell, "Tỷ giá USD-VND liên ngân hàng\n(tham khảo)", bold=True, color=NAVY)
+    title = paragraph(cell, "Tỷ giá USD-VND ngân hàng\n(tham khảo)", bold=True, color=NAVY)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
     def pair(suffix):
+        # Giá mua vào - bán ra chuyển khoản niêm yết trên website MBBank của từng ngày
         buy = snapshot.observations.get("MB_BUY" + suffix)
         sell = snapshot.observations.get("MB_SELL" + suffix)
-        if buy and sell:
-            return format_value(buy) + "/" + format_value(sell)
-        bid, ask = [trader_observation(snapshot, "INTERBANK_" + side + suffix) for side in ("BID", "ASK")]
-        if not bid or not ask or bid.value > ask.value or bid.source_id != ask.source_id:
+        if not buy or not sell or buy.value > sell.value:
             return "—"
-        return format_value(bid) + "/" + format_value(ask)
+        return format_value(buy) + " - " + format_value(sell)
     styled_table(cell, [["Hôm qua", "Hôm nay"], [pair("_PREV"), pair("")]], [.5, .5],
                  blue_cells={(0, 0), (0, 1)}, red_cells={(1, 1)})
 
@@ -904,12 +996,11 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         s.right_margin = Pt(0)
         s.header_distance = Pt(0)
         s.footer_distance = Pt(0)
-    total = 15877 * 635
     for child in list(table._tbl.tblGrid):
         table._tbl.tblGrid.remove(child)
-    for _ in range(6):
+    for w in TEMPLATE_GRID:
         col = OxmlElement("w:gridCol")
-        col.set(qn("w:w"), str(round(15877 / 6)))
+        col.set(qn("w:w"), str(w))
         table._tbl.tblGrid.append(col)
     tbl_w = table._tbl.tblPr.find(qn("w:tblW"))
     if tbl_w is not None:
@@ -930,20 +1021,24 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         for node in list(row._tr.get_or_add_trPr()):
             if node.tag in {qn("w:gridBefore"), qn("w:gridAfter"), qn("w:wBefore"), qn("w:wAfter")}:
                 row._tr.trPr.remove(node)
-        if index in (6, 10):
-            trPr = row._tr.get_or_add_trPr()
-            for th in list(trPr.findall(qn("w:trHeight"))):
-                trPr.remove(th)
+        # Chiều cao hàng giữ đúng file mẫu (tối thiểu), để ô và biểu đồ thẳng hàng như mẫu.
+        trPr = row._tr.get_or_add_trPr()
+        for th in list(trPr.findall(qn("w:trHeight"))):
+            trPr.remove(th)
+        if TEMPLATE_ROW_HEIGHTS.get(index):
             trHeight = OxmlElement("w:trHeight")
-            trHeight.set(qn("w:val"), "400")
-            trHeight.set(qn("w:hRule"), "exact")
+            trHeight.set(qn("w:val"), str(TEMPLATE_ROW_HEIGHTS[index]))
+            if index in (6, 10):
+                trHeight.set(qn("w:hRule"), "exact")
             trPr.append(trHeight)
-        spans = {0: [3, 3], 1: [6], 2: [4, 2], 9: [2, 4], 13: [6]}.get(index, [2, 2, 2])
+        spans = TEMPLATE_SPANS[index]
         if len(row._tr.tc_lst) != len(spans):
             raise ValueError("Unexpected template cell spans")
+        start = 0
         for tc, span in zip(row._tr.tc_lst, spans):
             tc.grid_span = span
-            tc.width = int(total * span / 6)
+            tc.width = sum(TEMPLATE_GRID[start:start + span]) * 635
+            start += span
     # Clear every dynamic cell, including merged cells, drawings, nested tables,
     # calendars and forecast values. No stale template data survives.
     cleared = set()
@@ -1020,7 +1115,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     heading(r5[1], "Ý tưởng sản phẩm")
     mb_buy = snapshot.observations.get("MB_BUY")
     mb_sell = snapshot.observations.get("MB_SELL")
-    min_str, max_str = "25.700", "26.200"
+    min_str = max_str = None
     if mb_buy and mb_sell and mb_buy.value and mb_sell.value:
         try:
             b_val = float(mb_buy.value)
@@ -1032,7 +1127,9 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         except Exception:
             pass
 
-    paragraph(r5[1], f"Nhiều khả năng tỷ giá USD-VND có thể biến động trong khu vực từ {min_str}-{max_str}.", bold=False, color=BLUE)
+    if min_str and max_str:  # chỉ nêu vùng giá khi có giá MBBank thật trong ngày
+        paragraph(r5[1], f"Nhiều khả năng tỷ giá USD-VND có thể biến động trong khu vực từ {min_str}-{max_str}.",
+                  bold=False, color=BLUE)
     paragraph(r5[1], "- Sử dụng sản phẩm vay VND lãi suất ưu đãi kết hợp sản phẩm AIRS để giúp khách hàng có thể vay VND với lãi suất cạnh tranh hơn so với phương án vay VND thông thường.", bold=True, color="C00000")
     paragraph(r5[1], "- Sử dụng sản phẩm mua ngoại tệ kỳ hạn FX FWD kỳ hạn dưới 1 tháng để tận dụng điểm kỳ hạn đang ở mức hấp dẫn và tỷ giá điều chỉnh về vùng phù hợp.", bold=True, color="C00000")
 
@@ -1046,7 +1143,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         p3.add_run().add_picture(str(chart3_path), width=Cm(10.0), height=Cm(3.8))
     else:
         plot_bonds(r5[2], snapshot, output.parent)
-    render_calendar_events_table(r7[0])
+    render_calendar_events_table(r7[0], snapshot)
     narrative(r7[1], "Thị trường ngoại hối EU", content.eur_usd, snapshot, show_source=False, forecast=build_eurusd_forecast(snapshot, content))
     heading(r7[2], "Thị trường ngoại hối Châu Á")
     for section in [content.japan, content.china]:
@@ -1054,7 +1151,8 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
             paragraph(r7[2], resolve(p, snapshot, safe=True))
     p_asia = paragraph(r7[2], build_asia_forecast(snapshot), bold=True, color="C00000")
     p_asia.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    render_international_money_market(r8[0])
+    render_international_money_market(r8[0], snapshot)
+    render_forecast_table(r9[1], snapshot)
     plot_candlestick_cell(r8[1], "Tỷ giá EUR-USD", snapshot, "EURUSD", output.parent, "eurusd", chart_type="currency", tv_cache=tv_cache)
     plot_candlestick_cell(r8[2], "Tỷ giá USD-JPY", snapshot, "USDJPY", output.parent, "usdjpy", chart_type="currency", tv_cache=tv_cache)
 

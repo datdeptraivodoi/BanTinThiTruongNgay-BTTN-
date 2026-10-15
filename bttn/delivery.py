@@ -75,7 +75,7 @@ def send_report(snapshot, attachments: list[Path], state_dir: Path, recipients: 
         message.set_content(
             f"Kính gửi Quý Anh/Chị,\n\n"
             f"Bản tin chốt dữ liệu lúc {snapshot.as_of:%H:%M %d/%m/%Y} đính kèm.\n"
-            f"Phần dự báo tạm để trống. Dấu — là dữ liệu chưa được xác minh."
+            f"Dấu — là dữ liệu chưa được xác minh."
             f"\n\nTrân trọng."
         )
     for path in attachments:

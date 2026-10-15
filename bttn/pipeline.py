@@ -176,14 +176,18 @@ def run(args):
         is_draft = snapshot.purpose != "live" or bool(data_issues or content_issues or ai_error)
         output = directory / f"BTTN-{snapshot.as_of:%Y%m%d}.docx"
         render_content = sanitize_content_for_draft_render(content, snapshot, content_issues) if (content_issues or ai_error) else content
+        issues_before_render = len(snapshot.issues)
         render(snapshot, render_content, ROOT / "template.docx", output, is_draft=is_draft)
+        # Cảnh báo phát sinh khi dựng Word (bảng dự báo/lịch sự kiện/Term SOFR quá hạn) cũng vào email review.
+        render_issues = list(snapshot.issues[issues_before_render:])
+        manifest["render_warnings"] = [i.model_dump() for i in render_issues]
         validate_docx(output)
         manifest["document_validation"] = "docx_structure_times_new_roman_11"
         manifest["artifacts"] = {output.name: hashlib.sha256(output.read_bytes()).hexdigest()}
 
         # --review: luôn gửi cho người duyệt (kể cả bản nháp còn lỗi), kèm danh sách lỗi trong email
         if getattr(args, "review", False):
-            all_issues = [i.model_dump() for i in (data_issues + content_issues)]
+            all_issues = [i.model_dump() for i in (data_issues + content_issues + render_issues)]
             if ai_error:
                 all_issues.append({"severity": "error", "code": "AI_INCOMPLETE", "message": ai_error})
             recipients = review_recipients()

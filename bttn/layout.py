@@ -78,11 +78,15 @@ def normalize_typography(doc):
         for node in part.element.iter(qn("w:p")):
             compact_paragraph(Paragraph(node, part))
     for node in list(doc.element.iter(qn("w:trHeight"))):
-        tr = node.getparent()
+        tr_pr = node.getparent()
+        tr = tr_pr.getparent() if tr_pr is not None else None
         if tr is not None and any(shd.get(qn("w:fill")) == "4F81BD" for shd in tr.iter(qn("w:shd"))):
             continue
-        if tr is not None:
-            tr.remove(node)
+        tbl = tr.getparent() if tr is not None else None
+        if tbl is not None and tbl.getparent() is not None and tbl.getparent().tag == qn("w:body"):
+            continue  # hàng của bảng chính giữ chiều cao theo file mẫu
+        if tr_pr is not None:
+            tr_pr.remove(node)
     for node in doc.element.iter(qn("w:tblHeader")):
         node.getparent().remove(node)
     for node in doc.element.iter(qn("w:tcMar")):

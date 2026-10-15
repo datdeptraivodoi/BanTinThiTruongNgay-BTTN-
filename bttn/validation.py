@@ -102,6 +102,7 @@ def parse_placeholder_key(key: str, snapshot: Snapshot):
     if key in snapshot.observations:
         return snapshot.observations[key], "value"
     for suffix, field in [
+        ("_abs_pct", "abs_daily_pct"),
         ("_daily_pct", "daily_pct"),
         ("_annual_pct", "annual_pct"),
         ("_pct", "daily_pct"),
@@ -123,10 +124,9 @@ def parse_placeholder_key(key: str, snapshot: Snapshot):
         from .models import Observation
         sjc = snapshot.sources["sjc_gold"]
         nums = re.findall(r"\d+(?:[.,]\d+)?", sjc.text)
-        val = Decimal("139.2") if key == "SJC_BUY" else Decimal("142.2")
-        if len(nums) >= 2:
-            idx = 0 if key == "SJC_BUY" else 1
-            val = Decimal(nums[idx].replace(",", "."))
+        if len(nums) < 2:
+            return None, None  # không có giá SJC thật thì không tự điền số
+        val = Decimal(nums[0 if key == "SJC_BUY" else 1].replace(",", "."))
         obs = Observation(
             id=key, label="Vàng SJC " + ("mua" if key == "SJC_BUY" else "bán"),
             value=val, unit="triệu đồng/lượng", source_id="sjc_gold",
@@ -138,6 +138,10 @@ def parse_placeholder_key(key: str, snapshot: Snapshot):
 
 
 def format_value(obs, field: str = "value"):
+    if field == "abs_daily_pct":
+        if obs.daily_pct is None:
+            return "—"
+        return f"{abs(obs.daily_pct):.2f}".replace(".", ",")
     if field == "daily_pct":
         if obs.daily_pct is None:
             return "—"
@@ -360,4 +364,10 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
                 gold = resolve(section.paragraphs[1], snapshot)
                 if len(re.findall(r"[.!?](?:\s|$)", gold)) != 2:
                     error("GOLD_SENTENCES", "Đoạn vàng phải có đúng hai câu")
+                parts = rules().get("energy_metals_parts", {"brent": [90, 95], "gold": [35, 40]})
+                for label, text, key in (("Brent", section.paragraphs[0], "brent"), ("vàng", section.paragraphs[1], "gold")):
+                    n = count_words(resolve(text, snapshot, safe=True))
+                    lo, hi = parts[key]
+                    if not lo <= n <= hi:
+                        error("WORD_COUNT", f"Đoạn {label}: {n} từ, yêu cầu {lo}–{hi}")
     return result

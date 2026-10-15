@@ -1,0 +1,8 @@
+{
+  "_huong_dan": "Term SOFR 1M/3M/6M (%/năm) nhập hằng ngày từ LSEG (.SR1M/.SR3M/.SR6M). 'date' là ngày công bố của số liệu. Số quá 3 ngày làm việc so với ngày bản tin sẽ hiện —.",
+  "date": null,
+  "source": "LSEG",
+  "1M": null,
+  "3M": null,
+  "6M": null
+}
