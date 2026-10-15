@@ -1,0 +1,19 @@
+{
+  "_huong_dan": "Lịch 'Sự kiện quan trọng' trang 2. Mỗi thứ Hai team điền tuần mới: week_start/week_end (YYYY-MM-DD) và tối đa 14 sự kiện theo thứ tự ngày. high_impact=true thì in đậm xanh đậm. Ngày bản tin nằm ngoài tuần trong file thì bảng hiện 'Chưa cập nhật lịch sự kiện' và email review báo CALENDAR_STALE.",
+  "week_start": "2026-10-12",
+  "week_end": "2026-10-16",
+  "events": [
+    {"date": "2026-10-13", "event": "Biên bản họp RBA", "country": "Australia", "high_impact": true},
+    {"date": "2026-10-13", "event": "Doanh số bán nhà cũ", "country": "Mỹ", "high_impact": true},
+    {"date": "2026-10-14", "event": "Lạm phát CPI (so cùng kỳ)", "country": "Trung Quốc", "high_impact": false},
+    {"date": "2026-10-14", "event": "Lạm phát lõi (so tháng trước)", "country": "Mỹ", "high_impact": false},
+    {"date": "2026-10-14", "event": "Lạm phát lõi (so cùng kỳ)", "country": "Mỹ", "high_impact": false},
+    {"date": "2026-10-14", "event": "Lạm phát CPI (so tháng trước)", "country": "Mỹ", "high_impact": false},
+    {"date": "2026-10-14", "event": "Lạm phát CPI (so cùng kỳ)", "country": "Mỹ", "high_impact": false},
+    {"date": "2026-10-15", "event": "Tăng trưởng GDP", "country": "Anh Quốc", "high_impact": false},
+    {"date": "2026-10-15", "event": "Chỉ số giá sản xuất (PPI)", "country": "Mỹ", "high_impact": false},
+    {"date": "2026-10-15", "event": "Doanh số bán lẻ (so tháng trước)", "country": "Mỹ", "high_impact": false},
+    {"date": "2026-10-16", "event": "Chỉ số lạm phát HICP MoM", "country": "Châu Âu", "high_impact": false},
+    {"date": "2026-10-16", "event": "Chỉ số lạm phát HICP YoY", "country": "Châu Âu", "high_impact": false}
+  ]
+}

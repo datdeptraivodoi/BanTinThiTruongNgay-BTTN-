@@ -191,30 +191,125 @@ def parse_mb(payload):
     return buy, sell
 
 
-def collect_mb(http, snapshot):
-    url = "https://www.mbbank.com.vn/ExchangeRate"
-    page = BeautifulSoup(http.get(url).text, "html.parser")
+MB_PAGE = "https://www.mbbank.com.vn/ExchangeRate"
+
+
+def _mb_api_direct(http, days):
+    """Gọi thẳng API của trang MBBank (thường bị chặn ngoài trình duyệt)."""
+    out = {}
+    page = BeautifulSoup(http.get(MB_PAGE).text, "html.parser")
     token = page.find("input", {"name": "__RequestVerificationToken"})
-    headers = {"Referer": url, "X-Requested-With": "XMLHttpRequest",
+    headers = {"Referer": MB_PAGE, "X-Requested-With": "XMLHttpRequest",
                "Accept": "application/json, text/plain, */*"}
     if token:
         headers["MB-XSRF-Token-FormOnline"] = token.get("value", "")
-    today = snapshot.as_of.date()
-    for suffix, day in [("", today), ("_PREV", previous_weekday(today))]:
+    for day in days:
         endpoint = f"https://www.mbbank.com.vn/api/getExchangeRate/{day.isoformat()}"
         try:
             response = http.get(endpoint, headers=headers)
-            buy, sell = parse_mb(response.json())
-            sid = f"mb{suffix}"
-            snapshot.sources[sid] = Source(id=sid, url=endpoint,
-                published_at=datetime.combine(day, time(0), tzinfo=snapshot.as_of.tzinfo),
-                retrieved_at=datetime.now(timezone.utc), sha256=hashlib.sha256(response.content).hexdigest())
-            for name, value in [("BUY", buy), ("SELL", sell)]:
-                key = f"MB_{name}{suffix}"
-                snapshot.observations[key] = Observation(id=key, label=key, value=value, unit="VND/USD",
-                    source_id=sid, trading_date=day, basis="MB transfer rate requested for explicit date; previous weekday, unavailable holidays remain missing")
+            out[day] = (*parse_mb(response.json()), endpoint, response.content)
+        except Exception:
+            continue
+    return out
+
+
+def _mb_via_browser(days):
+    """Mở trang tỷ giá MBBank bằng Chrome (scripts/fetch_mb_rates.mjs) và đọc API của chính trang."""
+    import json
+    import subprocess
+    script = ROOT / "scripts" / "fetch_mb_rates.mjs"
+    if not script.is_file():
+        return {}
+    proc = subprocess.run(["node", str(script), *[d.isoformat() for d in days]], cwd=str(ROOT),
+                          capture_output=True, text=True, timeout=90)
+    result = json.loads(proc.stdout or "{}")
+    if not result.get("ok"):
+        raise RuntimeError(result.get("error") or proc.stderr[-200:])
+    out = {}
+    for day in days:
+        payload = result["days"].get(day.isoformat())
+        try:
+            raw = json.dumps(payload, ensure_ascii=False).encode()
+            out[day] = (*parse_mb(payload), MB_PAGE + f"#api/getExchangeRate/{day.isoformat()}", raw)
+        except Exception:
+            continue
+    return out
+
+
+def _webgia_hex(r):
+    r = re.sub(r"[A-Z]", "", str(r or ""))
+    try:
+        return "".join(chr(int(r[i:i + 2], 16)) for i in range(0, len(r) - 1, 2))
+    except ValueError:
+        return ""
+
+
+def parse_webgia_mb(html, today):
+    """Giá USD (50-100) chuyển khoản của MBBank trên webgia.com; chỉ nhận khi trang cập nhật đúng ngày."""
+    text = re.sub(r"<[^>]+>", " ", html)
+    stamp = (re.search(r"cập nhật lúc[^\d]*\d{1,2}:\d{2}(?::\d{2})?[^\d]*(\d{1,2})/(\d{1,2})/(\d{4})", text, re.I)
+             or re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", text))
+    if not stamp:
+        raise ValueError("WebGia: không thấy ngày cập nhật")
+    d, m, y = map(int, stamp.groups())
+    if (y, m, d) != (today.year, today.month, today.day):
+        raise ValueError(f"WebGia: dữ liệu ngày {d:02d}/{m:02d}/{y}, không phải hôm nay")
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table")
+    for tr in (table.find_all("tr") if table else []):
+        tds = tr.find_all(["td", "th"])
+        vals = [(_webgia_hex(td.get("nb")) if td.get("nb") else td.get_text(strip=True)) for td in tds]
+        if len(vals) < 4:
+            continue
+        name = vals[0].upper()
+        if "USD" in name and ("50" in name or name == "USD"):
+            buy = parse_vnd(vals[3] if len(vals) > 4 else vals[2])
+            sell = parse_vnd(vals[4] if len(vals) > 4 else vals[3])
+            if buy > sell:
+                raise ValueError("WebGia: mua lớn hơn bán")
+            return buy, sell
+    raise ValueError("WebGia: không thấy dòng USD")
+
+
+def collect_mb(http, snapshot):
+    """
+    Tỷ giá USD mua vào / bán ra chuyển khoản niêm yết trên trang tỷ giá MBBank, hôm nay và phiên trước.
+    Thứ tự: API trực tiếp -> mở trang bằng Chrome -> WebGia (chỉ hôm nay, đúng ngày). Thiếu thì để trống.
+    """
+    today = snapshot.as_of.date()
+    days = [today, previous_weekday(today)]
+    found, errors = {}, []
+    try:
+        found.update(_mb_api_direct(http, days))
+    except Exception as exc:
+        errors.append(f"API: {type(exc).__name__}")
+    missing = [d for d in days if d not in found]
+    if missing:
+        try:
+            found.update(_mb_via_browser(missing))
         except Exception as exc:
-            snapshot.add_issue("MB_MISSING", f"{day}: {type(exc).__name__}")
+            errors.append(f"Chrome: {type(exc).__name__}: {str(exc)[:80]}")
+    if today not in found:
+        url = "https://webgia.com/ty-gia/mbbank/"
+        try:
+            response = http.get(url, headers={"Accept": "text/html"})
+            found[today] = (*parse_webgia_mb(response.text, today), url, response.content)
+        except Exception as exc:
+            errors.append(f"WebGia: {str(exc)[:80]}")
+    for suffix, day in [("", today), ("_PREV", days[1])]:
+        if day not in found:
+            snapshot.add_issue("MB_MISSING", f"{day}: " + "; ".join(errors or ["không có dữ liệu"]))
+            continue
+        buy, sell, url, content = found[day]
+        sid = f"mb{suffix}"
+        snapshot.sources[sid] = Source(id=sid, url=url,
+            published_at=datetime.combine(day, time(0), tzinfo=snapshot.as_of.tzinfo),
+            retrieved_at=datetime.now(timezone.utc), sha256=hashlib.sha256(content).hexdigest())
+        for name, val in [("BUY", buy), ("SELL", sell)]:
+            key = f"MB_{name}{suffix}"
+            snapshot.observations[key] = Observation(id=key, label=key, value=val, unit="VND/USD",
+                source_id=sid, trading_date=day,
+                basis="Tỷ giá USD chuyển khoản niêm yết trên website MBBank cho đúng ngày")
 
 
 def collect_news(http, snapshot):
@@ -589,6 +684,30 @@ def collect_sjc_gold(http, snapshot):
         )
 
 
+VIRA_SUBHEADINGS = re.compile(r"(?:(?<=[.!?:])|^)\s*(?:Nghiệp vụ thị trường mở|Thị trường trái phiếu|Thị trường TPCP)\s*:?\s+")
+
+
+def parse_vira_sections(text: str) -> dict:
+    """Tách 'Bản tin Kinh tế - Tài chính ngày' của VIRA thành mục ngoại tệ (fx) và tiền tệ LNH (lnh).
+
+    Mục lnh gồm cả nghiệp vụ thị trường mở và trái phiếu; tiêu đề con thành ngắt đoạn để mỗi câu
+    trích dẫn khớp nguyên văn.
+    """
+    flat = " ".join(text.split())
+    out = {}
+    lnh_at = flat.rfind("Thị trường tiền tệ LNH")
+    if lnh_at < 0:
+        return out
+    # Lấy lần xuất hiện cuối cùng trước mục LNH để không dính menu/sidebar của trang.
+    fx_at = flat.rfind("Thị trường ngoại tệ", 0, lnh_at)
+    if fx_at >= 0:
+        out["fx"] = re.sub(r"^Thị trường ngoại tệ\s*:?\s*", "", flat[fx_at:lnh_at]).strip()
+    m = re.match(r"Thị trường tiền tệ LNH\s*:?\s*(.*?)(?=Thị trường chứng khoán|Tin quốc tế|$)", flat[lnh_at:])
+    if m:
+        out["lnh"] = VIRA_SUBHEADINGS.sub("\n\n", m[1]).strip()
+    return out
+
+
 def collect_vira_daily(http, snapshot):
     """Archive actual VIRA prose only; rates still come from Market Watch."""
     list_url = "https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay.html"
@@ -603,14 +722,16 @@ def collect_vira_daily(http, snapshot):
             at = article_time(detail)
             if not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=36):
                 continue
-            text = detail.get_text(" ", strip=True)
-            match = re.search(r"Thị trường tiền tệ LNH:(.*?)(?=Thị trường chứng khoán|Tin quốc tế|$)", text, re.DOTALL)
-            if not match or len(match[1].split()) < 35:
+            sections = parse_vira_sections(detail.get_text("\n", strip=True))
+            if len(sections.get("lnh", "").split()) < 35:
                 continue
-            body = match[1].strip()
-            snapshot.sources["vira_daily"] = Source(id="vira_daily", url=url, published_at=at,
-                retrieved_at=datetime.now(timezone.utc), text=body, sha256=hashlib.sha256(body.encode()).hexdigest(),
-                kind="news", text_scope="excerpt")
+            for sid, key in (("vira_daily", "lnh"), ("vira_fx", "fx")):
+                body = sections.get(key, "")
+                if not body:
+                    continue
+                snapshot.sources[sid] = Source(id=sid, url=url, published_at=at,
+                    retrieved_at=datetime.now(timezone.utc), text=body, sha256=hashlib.sha256(body.encode()).hexdigest(),
+                    kind="news", text_scope="excerpt")
             return
     except Exception as exc:
         LOG.debug("VIRA daily failed: %s", type(exc).__name__)

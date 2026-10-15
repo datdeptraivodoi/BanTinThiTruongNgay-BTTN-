@@ -192,3 +192,14 @@ Bảng NHNN là 4 hàng × 3 cột, tỷ lệ 44/28/28, màu xanh `4F81BD`. Bả
 Chỉ báo giá trong ngày, trước giờ chốt mới xuất hiện ở cột Hôm nay và bảng SWAP. Mỗi kỳ hạn chọn báo giá cuối cùng phù hợp. Giá mua lớn hơn giá bán, thiếu một vế hoặc thiếu múi giờ bị từ chối. File ví dụ mang nhãn fixture và không được dùng trong báo cáo live. Khi chưa nhập dữ liệu, hiển thị `—` và ghi cảnh báo, không lấy `config/swap_rates.json` làm giá thật. Chênh lệch VND − USD vẫn nằm trong snapshot dưới các mã `SWAP_*` để tham khảo; báo giá trader dùng mã `ALM_SWAP_*`.
 
 Biểu đồ nội địa cũng chỉ dùng snapshot của kỳ báo cáo: lãi suất theo kỳ hạn VIRA, lịch sử báo giá trader USD-VND và so sánh lợi suất trái phiếu mười năm theo quốc gia. Không dựng chuỗi lịch sử bằng các file giá mẫu cũ. Times New Roman trên Linux có thể cài qua `ttf-mscorefonts-installer` theo điều khoản Microsoft; workflow kiểm tra font trước khi chạy.
+
+## File cấu hình team cập nhật (thư mục `config/`)
+
+| File | Nội dung trong bản tin | Khi nào sửa |
+|---|---|---|
+| `forecasts.json` | Bảng "Dự báo các chỉ số chính" (trang 2) | Khi team đổi dự báo; quá `max_age_days` thì bảng để — |
+| `economic_calendar.json` | Bảng "Sự kiện quan trọng" (trang 2) | Mỗi thứ Hai, điền tuần mới |
+| `term_sofr.json` | Term SOFR 1M/3M/6M (nhập từ LSEG; CME không cho phép tự động lấy để hiển thị) | Hằng ngày, chậm nhất 3 ngày làm việc |
+| `policy_rates.json` | Lãi suất cơ bản FED/BOE/BOJ/RBA/ECB | Sau mỗi kỳ họp NHTW |
+
+File quá hạn không làm dừng gửi bản tin; email review liệt kê cảnh báo `FORECAST_STALE`, `CALENDAR_STALE`, `TERM_SOFR_STALE`.

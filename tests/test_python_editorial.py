@@ -93,19 +93,79 @@ def test_verified_news_sentence_can_keep_figures_but_modified_figures_fail():
     assert any(i.code == "SENTENCE_SOURCE" for i in validate_content(content, snap))
 
 
-def test_data_templates_meet_word_limits_and_use_trader_instead_of_mb_quotes(monkeypatch):
+VIRA_LNH = (
+    "Ngày 23/9, lãi suất VND liên ngân hàng giảm từ 0,20 đến 1,30 điểm phần trăm ở các kỳ hạn từ qua đêm đến 1 tháng so với phiên trước. "
+    "Cụ thể, lãi suất qua đêm ở mức 3,50%, kỳ hạn 1 tuần 4,70%, kỳ hạn 2 tuần 5,50% và kỳ hạn 1 tháng 5,30%. "
+    "Lãi suất USD liên ngân hàng tăng nhẹ 0,01 điểm phần trăm ở hầu hết các kỳ hạn.\n\n"
+    "NHNN chào thầu 1.000 tỷ đồng ở mỗi kỳ hạn 7, 14, 35 và 91 ngày với lãi suất 4,5%. "
+    "Có 564,85 tỷ đồng trúng thầu và 1.329,76 tỷ đồng đáo hạn trong phiên. "
+    "Như vậy, NHNN hút ròng 764,91 tỷ đồng khỏi thị trường qua kênh thị trường mở.\n\n"
+    "Lợi suất trái phiếu Chính phủ trên thị trường thứ cấp biến động trái chiều, kỳ hạn 10 năm đóng cửa ở mức 4,47%."
+)
+VIRA_FX = (
+    "Ngày 23/9, tỷ giá trung tâm được NHNN niêm yết ở mức 25.646 VND/USD, tăng 13 đồng so với phiên trước. "
+    "Trên thị trường liên ngân hàng, tỷ giá đóng cửa ở mức 25.898 VND/USD, giảm 16 đồng. "
+    "Tỷ giá trên thị trường tự do giao dịch ở mức 26.020 VND/USD chiều mua vào và 26.120 VND/USD chiều bán ra."
+)
+
+
+def vira_source(sid, text, at):
+    return Source(id=sid, url="https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay/Ban-tin.html",
+                  published_at=at, retrieved_at=at, text=text, kind="news", text_scope="excerpt")
+
+
+def test_domestic_paragraphs_use_vira_sentences_and_trader_quotes(monkeypatch):
     from bttn.trader_quotes import collect_trader_quotes
     root = Path(__file__).resolve().parents[1]
     snap = Snapshot.model_validate_json((root / "tests/fixtures/snapshot.json").read_text(encoding="utf-8"))
     monkeypatch.setenv("TRADER_QUOTES_PATH", str(root / "config/trader_quotes.example.json"))
     collect_trader_quotes(None, snap)
+    snap.sources["vira_daily"] = vira_source("vira_daily", VIRA_LNH, snap.as_of)
+    snap.sources["vira_fx"] = vira_source("vira_fx", VIRA_FX, snap.as_of)
     sections, _ = domestic_sections(snap, {})
-    assert 80 <= count_words(resolve(" ".join(sections["interbank"].paragraphs), snap)) <= 95
-    assert sections["interbank"].paragraphs[0].startswith(f"Phiên ngày {snap.as_of.strftime('%d.%m.%Y')}, thị trường lãi suất interbank")
-    assert "Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm đi ngang, quanh mức 4,2%-4,75%, thanh khoản vừa." in sections["interbank"].paragraphs[0]
-    assert "NHNN hút ròng" in sections["interbank"].paragraphs[0]
-    assert 77 <= count_words(resolve(" ".join(sections["usd_vnd"].paragraphs), snap)) <= 82
-    assert "{{INTERBANK_BID}}/{{INTERBANK_ASK}}" in sections["usd_vnd"].paragraphs[0]
+    interbank = " ".join(sections["interbank"].paragraphs)
+    assert 80 <= count_words(resolve(interbank, snap)) <= 95
+    assert "hút ròng" in interbank and "qua đêm" in interbank
+    # Mọi câu đều là câu nguyên văn của VIRA, không có số liệu mẫu cố định.
+    assert all(ref.source_id == "vira_daily" for ref in sections["interbank"].sentence_refs)
+    assert "0,8%-5,0%" not in interbank and "4,2%-4,75%" not in interbank
+    usd = " ".join(sections["usd_vnd"].paragraphs)
+    assert "{{INTERBANK_BID}}/{{INTERBANK_ASK}}" in usd
+    assert "tự do" in usd
+    assert "1,27 tỷ USD" not in usd and "26.000 – 26.150" not in usd
+    assert count_words(resolve(usd, snap)) <= 82
+    content = ReportContent.model_validate_json((root / "tests/fixtures/content.json").read_text(encoding="utf-8"))
+    content.interbank = sections["interbank"]
+    issues = [i for i in validate_content(content, snap) if i.message.startswith("interbank")]
+    assert not [i for i in issues if i.code in ("SENTENCE_SOURCE", "UNBOUND_NUMBER")]
+
+
+def test_domestic_paragraphs_without_vira_do_not_invent_figures(monkeypatch):
+    root = Path(__file__).resolve().parents[1]
+    snap = Snapshot.model_validate_json((root / "tests/fixtures/snapshot.json").read_text(encoding="utf-8"))
+    for key in [k for k in snap.observations if k.startswith("INTERBANK") or k.startswith("MB_")]:
+        snap.observations.pop(key)
+    sections, _ = domestic_sections(snap, {})
+    text = " ".join(sections["interbank"].paragraphs + sections["usd_vnd"].paragraphs)
+    assert "1.546,74" not in text and "25.783/26.170" not in text and "NHNN hút ròng 9.195,95" not in text
+
+
+def test_gold_data_sentences_fit_35_to_40_words():
+    from decimal import Decimal
+
+    from bttn.editorial import gold_data_sentences
+    from bttn.models import Observation
+    root = Path(__file__).resolve().parents[1]
+    snap = Snapshot.model_validate_json((root / "tests/fixtures/snapshot.json").read_text(encoding="utf-8"))
+    sid = next(iter(snap.sources))
+    for key, val in (("SJC_BUY", "146.5"), ("SJC_SELL", "148.5")):
+        snap.observations[key] = Observation(id=key, label=key, value=Decimal(val), unit="triệu đồng/lượng",
+                                             source_id=sid, trading_date=snap.as_of.date(), basis="test")
+    for pct in (None, 0.52, -1.2):
+        snap.observations["GOLD"].daily_pct = pct
+        text = resolve(" ".join(c.text for c in gold_data_sentences(snap)), snap)
+        assert 35 <= count_words(text) <= 40, text
+        assert "-1,20" not in text
 
 
 def test_underlength_verified_prose_is_preserved_for_draft_review():

@@ -1,0 +1,11 @@
+{
+  "_huong_dan": "Lãi suất điều hành của các NHTW. Sửa khi NHTW công bố thay đổi; 'updated' là ngày bạn sửa.",
+  "updated": "2026-10-15",
+  "rates": [
+    {"bank": "FED", "value": "3,75-4,00%", "change": "+0,25%"},
+    {"bank": "BOE", "value": "3,75%", "change": "0,00%"},
+    {"bank": "BOJ", "value": "1,25%", "change": "+0,25%"},
+    {"bank": "RBA", "value": "4,60%", "change": "+0,25%"},
+    {"bank": "ECB", "value": "2,50%", "change": "+0,25%"}
+  ]
+}
