@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # BẢN TIN THỊ TRƯỜNG NGÀY (BTTN) - RUNNER HẰNG NGÀY TRÊN VPS
-# Cron 11:30 thứ Hai - thứ Sáu: tạo bản tin và gửi bản REVIEW cho người duyệt
+# Cron 11:30 thứ Hai - thứ Năm (thứ Sáu là bản tin tuần, quy trình riêng): tạo bản tin và gửi bản REVIEW cho người duyệt
 # (REVIEW_RECIPIENTS trong .env). Còn lỗi kiểm tra thì vẫn gửi bản nháp kèm danh sách lỗi.
 # Khi muốn gửi danh sách nhận chính thức: đổi BTTN_MODE=send trong .env.
 # ==============================================================================
