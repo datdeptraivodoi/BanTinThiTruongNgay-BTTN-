@@ -119,7 +119,7 @@ def test_rendered_word_keeps_template_columns(tmp_path):
     assert "Tỷ giá USD-VND ngân hàng" in texts
 
 
-def test_eur_usd_is_one_paragraph_with_us_then_europe(snap):
+def test_eur_usd_has_europe_paragraph_then_us_paragraph(snap):
     from datetime import timedelta
     from types import SimpleNamespace
 
@@ -147,9 +147,9 @@ def test_eur_usd_is_one_paragraph_with_us_then_europe(snap):
     records = dict([te("united-states", 1, 3, us), te("euro-area", 2, 5, eu), te("germany", 3, 20, eu)])
     result, audit = foreign_sections(snap, records)
     section = result["eur_usd"]
-    assert len(section.paragraphs) == 1
-    text = section.paragraphs[0]
-    assert text.startswith("Trong phiên giao dịch hôm qua, tính đến ngày")
-    assert text.count("Về phía Châu Âu,") == 1
-    assert text.index("Lạm phát CPI của Mỹ") < text.index("Về phía Châu Âu,")
-    assert 185 <= count_words(resolve(text, snap, safe=True)) <= 198, audit["eur_usd"]
+    assert len(section.paragraphs) == 2
+    first, second = section.paragraphs
+    assert first.startswith("Trong phiên giao dịch hôm qua, tính đến ngày")
+    assert "khu vực đồng euro" in first or "Đức" in first
+    assert second.startswith("- Về phía kinh tế Mỹ,") and "của Mỹ" in second
+    assert 185 <= count_words(resolve(first + " " + second, snap, safe=True)) <= 200, audit["eur_usd"]

@@ -124,6 +124,7 @@ def fetch_tradingeconomics_stream(countries=None, limit=30):
         ("germany", "germany"),
         ("united states", "united-states"),
         ("japan", "japan"),
+        ("china", "china"),
     ]
     if countries:
         stream_map = [(c, ref) for c, ref in stream_map if c in countries or COUNTRIES.get(c) in countries]
