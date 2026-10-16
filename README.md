@@ -4,7 +4,7 @@ Pipeline Python tạo bản tin từ dữ liệu có nguồn, Riva dịch từng
 
 ## Vận hành hiện tại (VPS)
 
-- **VPS chạy lúc 11:30, thứ Hai–thứ Sáu** (`deploy/run_bttn.sh`, cron). Giai đoạn review: gửi bản **[REVIEW]** cho `REVIEW_RECIPIENTS` (mặc định datnh1@mbbank.com.vn), **kể cả khi còn lỗi kiểm tra**, khi đó gửi bản nháp kèm danh sách lỗi trong email. Lần chạy hỏng trước khi có file Word thì gửi email báo lỗi.
+- **VPS chạy lúc 11:30, thứ Hai–thứ Năm** (thứ Sáu là bản tin thị trường tuần, quy trình riêng) (`deploy/run_bttn.sh`, cron). Giai đoạn review: gửi bản **[REVIEW]** cho `REVIEW_RECIPIENTS` (mặc định datnh1@mbbank.com.vn), **kể cả khi còn lỗi kiểm tra**, khi đó gửi bản nháp kèm danh sách lỗi trong email. Lần chạy hỏng trước khi có file Word thì gửi email báo lỗi.
 - Khi muốn gửi danh sách nhận chính thức: đổi `BTTN_MODE="send"` trong `/root/BTTN/.env` (chỉ gửi khi qua mọi kiểm tra).
 - Báo giá trader (USD-VND ITB và SWAP) lấy trực tiếp từ database streamer Teams của BTS trên cùng VPS (`/root/TyGia/MasterData/market_master.db`), chỉ dữ liệu trong ngày, trước giờ chốt. Không có thì để trống, không dùng số mặc định.
 - Biểu đồ EUR-USD, USD-JPY, Brent, Arabica vẽ kiểu TradingView bằng thư viện mã nguồn mở [Lightweight Charts](https://github.com/tradingview/lightweight-charts) (Apache-2.0, logo TradingView là phần ghi công bắt buộc), chụp bằng Chrome trên VPS. Không có Node/Chrome thì tự quay về mplfinance (`BTTN_CHART_ENGINE=mpl` để ép dùng mplfinance).
@@ -185,7 +185,7 @@ Không chạy workflow gửi thư chỉ để kiểm thử code. Xem `validation
 
 Tin nổi bật thứ nhất và thứ hai **35–45 từ**, tin thứ ba **12–45 từ**; liên ngân hàng **88–95 từ**, USD-VND **75–80 từ**. Đếm theo khoảng trắng sau khi thay placeholder; không tính số thứ tự, tiêu đề, nguồn và nhãn dự báo. Các giới hạn nằm trong `config/editorial_rules.json` và được dùng chung ở bộ chọn câu Python và validator. Renderer dùng nguyên nội dung biên tập; không ghi đè bằng tin mẫu, toàn văn VIRA hay dự báo cố định.
 
-Bảng NHNN là 4 hàng × 3 cột, tỷ lệ 44/28/28, màu xanh `4F81BD`. Bảng liên ngân hàng có hai cột Hôm qua/Hôm nay, số hôm nay màu đỏ. Cặp mua/bán lấy từ trader, không lấy bảng niêm yết MBBank. “Hôm qua” là phiên làm việc liền trước (thứ Hai dùng thứ Sáu); ngày thực tế ghi dưới bảng. Lịch này chưa nhận diện nghỉ lễ.
+Bảng NHNN là 4 hàng × 3 cột, tỷ lệ 44/28/28, màu xanh `4F81BD`. Bảng "Tỷ giá USD-VND ngân hàng (tham khảo)" có hai cột Hôm qua/Hôm nay ghi "mua vào - bán ra" niêm yết trên website MBBank, số hôm nay màu đỏ. “Hôm qua” là phiên làm việc liền trước (thứ Hai dùng thứ Sáu); ngày thực tế ghi dưới bảng. Lịch này chưa nhận diện nghỉ lễ.
 
 Để nhập báo giá từ room **firm ALM**, tạo file riêng ngoài repo, ví dụ `/etc/bttn/trader_quotes.json`, theo cấu trúc `config/trader_quotes.example.json`. Thay `purpose` bằng `live`, ghi giá thực bằng số thập phân dùng dấu chấm, `quoted_at` có múi giờ và `source_url` là link tin nhắn Teams. Giữ cả báo giá phiên trước và hiện tại. Đặt `TRADER_QUOTES_PATH` trong môi trường chạy BTTN trỏ tới file này. Đây là đầu vào nhập thủ công; code chưa tự đọc room Teams và không xác thực nội dung tin nhắn.
 

@@ -80,11 +80,11 @@ fi
 [ -n "$CHROME" ] && setval CHROME_PATH "$CHROME"
 echo "   Người duyệt: $(getval REVIEW_RECIPIENTS) · Chế độ: $(getval BTTN_MODE)"
 
-echo "== 6/6 Lịch chạy 11:30 thứ Hai - thứ Sáu"
+echo "== 6/6 Lịch chạy 11:30 thứ Hai - thứ Năm (thứ Sáu là bản tin tuần)"
 chmod +x deploy/run_bttn.sh
 git config core.fileMode false
 ( crontab -l 2>/dev/null | grep -v 'run_bttn.sh'; \
-  echo "30 11 * * 1-5 /root/BTTN/deploy/run_bttn.sh >> /var/log/bttn_daily.log 2>&1" ) | crontab -
+  echo "30 11 * * 1-4 /root/BTTN/deploy/run_bttn.sh >> /var/log/bttn_daily.log 2>&1" ) | crontab -
 crontab -l | grep run_bttn.sh
 
 echo "✅ Xong. Chạy thử không gửi email:  cd /root/BTTN && .venv/bin/python market_report.py --create-only"
