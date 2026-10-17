@@ -32,6 +32,14 @@ CHARTS = {
     "credit": (5, 2),     # tăng trưởng huy động / tín dụng
 }
 
+# Chiều cao tối đa (cm) của 4 biểu đồ Word ở trang 1. Mẫu để 5,1–5,4 cm làm trang 1 tràn khi mở
+# bằng Word; 4,6 cm vẫn đọc rõ và chừa khoảng an toàn để cả bản tin nằm gọn 3 trang.
+PAGE1_CHART_MAX_CM = 4.6
+
+# Chiều cao tối đa (cm) của khung ảnh biểu đồ giá ở trang 2 (mẫu: 5,75 / 5,36 / 6,03 cm).
+# Giữ nguyên bề rộng cột; ảnh biểu đồ do code vẽ sẽ được vẽ đúng tỷ lệ khung này.
+PAGE2_IMAGE_MAX_CM = {"eurusd": 5.3, "usdjpy": 5.3, "arabica": 5.0, "robusta": 5.0, "brent": 5.5, "gasoline": 5.5}
+
 # Ba bảng nhỏ đầu trang 2: hàng 1 = giá trị, hàng 2 = thay đổi
 SMALL_TABLES = {
     "sofr": (7, 0),

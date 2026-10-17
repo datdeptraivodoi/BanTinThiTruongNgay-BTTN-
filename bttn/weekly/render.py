@@ -18,6 +18,7 @@ from .content import WeeklyContent
 C_NS = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+WP_NS = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}"
 FORECAST_COLOR = "C00000"
 
 
@@ -244,25 +245,37 @@ def replace_image(doc, tc, png_path):
     part._blob = Path(png_path).read_bytes()
 
 
+def _tiny_paragraph(p, page_break_before=False):
+    """Đoạn ngăn cách cao 1/20 pt, không có chữ: không tự đẩy nội dung sang trang mới."""
+    for child in list(p):
+        p.remove(child)
+    ppr = OxmlElement("w:pPr")
+    if page_break_before:
+        ppr.append(OxmlElement("w:pageBreakBefore"))
+    spacing = OxmlElement("w:spacing")
+    for k, v in (("w:before", "0"), ("w:after", "0"), ("w:line", "1"), ("w:lineRule", "exact")):
+        spacing.set(qn(k), v)
+    ppr.append(spacing)
+    rpr = OxmlElement("w:rPr")
+    sz = OxmlElement("w:sz")
+    sz.set(qn("w:val"), "2")
+    rpr.append(sz)
+    ppr.append(rpr)
+    p.append(ppr)
+    return p
+
+
 def split_pages(doc, table):
-    """Ba trang cố định như mẫu (layout.PAGES), ngắt trang tường minh giữa các phần."""
+    """Ba trang cố định như mẫu (layout.PAGES).
+
+    Giữa hai bảng là một đoạn rất thấp có thuộc tính "ngắt trang trước" (không dùng ký tự ngắt
+    trang): nếu trang trước đã đầy, Word chỉ sang trang một lần, không sinh trang trắng/trang thứ 4.
+    """
     parent = table._tbl.getparent()
     position = parent.index(table._tbl)
     for n, rows in enumerate(layout.PAGES):
         if n:
-            p = OxmlElement("w:p")
-            ppr = OxmlElement("w:pPr")
-            spacing = OxmlElement("w:spacing")
-            for k, v in (("w:before", "0"), ("w:after", "0"), ("w:line", "1"), ("w:lineRule", "exact")):
-                spacing.set(qn(k), v)
-            ppr.append(spacing)
-            p.append(ppr)
-            r = OxmlElement("w:r")
-            br = OxmlElement("w:br")
-            br.set(qn("w:type"), "page")
-            r.append(br)
-            p.append(r)
-            parent.insert(position, p)
+            parent.insert(position, _tiny_paragraph(OxmlElement("w:p"), page_break_before=True))
             position += 1
         tbl = deepcopy(table._tbl)
         for tr in tbl.findall(qn("w:tr")):
@@ -272,6 +285,36 @@ def split_pages(doc, table):
         parent.insert(position, tbl)
         position += 1
     parent.remove(table._tbl)
+    # Đoạn cuối văn bản (sau bảng trang 3) phải thật thấp, nếu không Word đẩy nó sang trang 4.
+    body = doc.element.body
+    for p in body.findall(qn("w:p"))[-1:]:
+        if p.getparent() is body and not text_of(p).strip() and p.find(".//" + qn("w:sectPr")) is None:
+            _tiny_paragraph(p)
+
+
+def fit_to_three_pages(doc, table):
+    """Thu chiều cao biểu đồ trang 1 và khung ảnh trang 2 để bản tin nằm gọn 3 trang khi mở bằng Word.
+
+    Biểu đồ Word tự co nội dung theo khung mới. Khung ảnh giữ bề rộng cột, chỉ giảm chiều cao.
+    """
+    limits = [(pos, layout.PAGE1_CHART_MAX_CM) for pos in layout.CHARTS.values()]
+    limits += [(layout.IMAGES[name], cm) for name, cm in layout.PAGE2_IMAGE_MAX_CM.items()]
+    for pos, cm in limits:
+        limit = int(cm * 360000)
+        for ext in tc_at(table, pos).iter(WP_NS + "extent"):
+            if int(ext.get("cy")) > limit:
+                ext.set("cy", str(limit))
+        for xfrm_ext in tc_at(table, pos).iter("{%s}ext" % A_NS):  # kích thước ảnh bên trong khung
+            if xfrm_ext.get("cy") and int(xfrm_ext.get("cy")) > limit:
+                xfrm_ext.set("cy", str(limit))
+
+
+def image_frame_cm(template: Path, name: str) -> tuple[float, float]:
+    """Kích thước (rộng, cao) cm của khung ảnh sau khi căn 3 trang, để vẽ ảnh biểu đồ đúng tỷ lệ."""
+    doc = Document(template)
+    ext = next(tc_at(doc.tables[0], layout.IMAGES[name]).iter(WP_NS + "extent"))
+    height = min(int(ext.get("cy")), int(layout.PAGE2_IMAGE_MAX_CM[name] * 360000))
+    return int(ext.get("cx")) / 360000, height / 360000
 
 
 def render_weekly(content: WeeklyContent, template: Path, output: Path, *, split=True) -> Path:
@@ -291,6 +334,7 @@ def render_weekly(content: WeeklyContent, template: Path, output: Path, *, split
     for name, path in content.images.items():
         replace_image(doc, tc_at(table, layout.IMAGES[name]), path)
     fill_calendar(tc_at(table, layout.CALENDAR), content.calendar)
+    fit_to_three_pages(doc, table)
     if split:
         split_pages(doc, table)
     output.parent.mkdir(parents=True, exist_ok=True)

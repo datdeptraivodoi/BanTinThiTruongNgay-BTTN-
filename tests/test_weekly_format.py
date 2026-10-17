@@ -48,8 +48,21 @@ def test_three_pages_with_template_geometry(tmp_path, lang):
     tpl = Document(TEMPLATES[lang]).tables[0]
     assert [len(t.rows) for t in doc.tables] == [len(p) for p in layout.PAGES]
     assert all(grid(t) == grid(tpl) for t in doc.tables)
-    breaks = [br for br in doc.element.body.iter(qn("w:br")) if br.get(qn("w:type")) == "page"]
-    assert len(breaks) == 2
+    # Ngắt trang bằng "page break before" trên đoạn ngăn cách, không dùng ký tự ngắt trang
+    # (ký tự ngắt trang làm Word sinh trang thứ 4 khi trang trước vừa đầy).
+    assert not [br for br in doc.element.body.iter(qn("w:br")) if br.get(qn("w:type")) == "page"]
+    assert len(list(doc.element.body.iter(qn("w:pageBreakBefore")))) == 2
+    # Đoạn cuối văn bản thật thấp để không bị đẩy sang trang 4
+    last = doc.element.body.findall(qn("w:p"))[-1]
+    assert last.find(qn("w:pPr")).find(qn("w:spacing")).get(qn("w:lineRule")) == "exact"
+    # 4 biểu đồ trang 1 không cao quá giới hạn
+    wp = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}extent"
+    page1 = doc.tables[0]
+    heights = [int(e.get("cy")) for e in page1._tbl.iter(wp) if int(e.get("cx")) > 3000000]
+    assert len(heights) == 4 and max(heights) <= layout.PAGE1_CHART_MAX_CM * 360000
+    page2 = doc.tables[1]
+    img = [int(e.get("cy")) for e in page2._tbl.iter(wp)]
+    assert len(img) == 6 and max(img) <= max(layout.PAGE2_IMAGE_MAX_CM.values()) * 360000
 
 
 def test_new_content_charts_images_and_calendar(tmp_path):
