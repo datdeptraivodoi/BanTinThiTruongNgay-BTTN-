@@ -26,8 +26,8 @@ from .nvidia_translation import (  # noqa: F401  (re-exported for callers)
 
 BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
 ENDPOINT = BASE_URL + "/chat/completions"
-# Exact id as returned by GET /models for DeepSeek V4.1 Flash; override with DEEPSEEK_MODEL.
-DEFAULT_MODEL = "deepseek-chat"
+# DeepSeek V4.1 Flash is "deepseek-flash" in GET /models (verified 2026-10-18); override with DEEPSEEK_MODEL.
+DEFAULT_MODEL = "deepseek-flash"
 MODEL = (os.getenv("DEEPSEEK_MODEL") or DEFAULT_MODEL).strip()
 RULES_VERSION = "deepseek-en-vi-finance-v1"
 
@@ -96,7 +96,7 @@ class DeepSeekTranslator:
                 response = self.session.post(
                     ENDPOINT, headers={"Authorization": "Bearer " + self.api_key},
                     json={"model": self.model, "messages": messages, "temperature": 0,
-                          "max_tokens": 4096, "stream": False},
+                          "max_tokens": 8192, "stream": False},
                     timeout=(10, 120), allow_redirects=False,
                 )
                 status = response.status_code

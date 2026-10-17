@@ -23,16 +23,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install requests
+      - run: python -m pip install requests pydantic python-dotenv
       - name: Call DeepSeek
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_V4DOT1_API_KEY }}
           DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL }}
-        run: python scripts/deepseek_smoke.py deepseek/smoke/result.json || echo "smoke exit $?"
+        run: |
+          python scripts/deepseek_smoke.py deepseek/smoke/result.json || echo "smoke exit $?"
+          python scripts/deepseek_translate_check.py deepseek/smoke/translate_check.json || echo "check exit $?"
       - name: Commit result for review
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
-          git add deepseek/smoke/result.json
+          git add deepseek/smoke/result.json deepseek/smoke/translate_check.json
           git commit -m "DeepSeek smoke result [skip ci]" || exit 0
           git push
