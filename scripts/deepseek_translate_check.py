@@ -12,6 +12,8 @@ SAMPLES = [
     "Core inflation slowed to 2.8% in September, while headline inflation ticked up and Nonfarm Payrolls rose by 150,000.",
     "The offshore yuan strengthened to 7.12 per dollar as China announced $500 billion in expansionary fiscal policies.",
     "ECB Chief Economist Philip Lane said further tightening may be needed in the first quarter, sending the euro up 0.4% to $1.1650.",
+    "Germany's current account surplus widened to €24.6 billion on Monday, and the offshore yuan traded flat around 7.1350 per dollar.",
+    "Traders now price two further rate hikes by the Bank of Japan, while the yen weakened past 152.40 per dollar on Friday.",
 ]
 client = DeepSeekTranslator(os.getenv("DEEPSEEK_API_KEY"))
 results = []
