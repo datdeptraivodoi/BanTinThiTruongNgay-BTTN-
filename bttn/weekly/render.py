@@ -139,6 +139,8 @@ def fill_news(tc, items):
         tc.remove(p)
     # Như mẫu: các tin đầu nằm chung một đoạn, xuống dòng bằng ngắt dòng; tin cuối là một đoạn riêng.
     # Nhờ vậy khoảng cách giữa các tin và chiều cao ô giữ đúng như file mẫu.
+    if not items:
+        return
     groups = [items[:-1], items[-1:]] if len(items) > 1 else [items]
     anchor = title
     for group in groups:

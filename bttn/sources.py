@@ -39,6 +39,8 @@ INSTRUMENTS = {
     "COTTON": ("CT=F", "Cotton futures", "USc/lb"),
     "BRENT": ("BZ=F", "Dầu Brent futures", "USD/thùng"),
     "GAS": ("NG=F", "Khí tự nhiên futures", "USD/MMBtu"),
+    "GASOLINE": ("RB=F", "Xăng RBOB futures", "USD/gallon"),
+    "CRB": ("^BCOM", "Bloomberg Commodity Index", "điểm"),
     "GOLD": ("GC=F", "Vàng futures", "USD/oz"),
     "SILVER": ("SI=F", "Bạc futures", "USD/oz"),
 }
