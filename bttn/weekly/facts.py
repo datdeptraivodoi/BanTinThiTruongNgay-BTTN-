@@ -68,7 +68,7 @@ class WeeklyFacts:
     news_en: dict[str, list[dict]]  # tin Trading Economics cả tuần theo nhóm (te_stream.topic_of)
     inputs: dict
     issues: list[dict] = field(default_factory=list)
-    vbma: dict = field(default_factory=dict)   # lợi suất TPCP theo VBMA: {ngày thứ Sáu: {"1N": 3.54, ...}}
+    bond_yields: dict = field(default_factory=dict)   # lợi suất TPCP theo ngày (VBMA + VIRA): {ngày: {"1N": 3.54, ...}}
 
     def warn(self, code, message):
         self.issues.append({"severity": "warning", "code": code, "message": message})

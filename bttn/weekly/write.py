@@ -135,22 +135,55 @@ def fx_vi(f: WeeklyFacts) -> str:
     return fill(fixed, cands, lo_w, hi_w, lines)
 
 
+BOND_TENORS = ("3N", "5N", "7N", "10N", "15N")
+OWN_BOND_SENTENCE = re.compile(r"Lợi suất TPCP trên thị trường thứ cấp|chốt phiên", re.I)
+
+
+def bond_sentence_vi(row: dict, prev: dict) -> str:
+    """Câu lợi suất TPCP thứ cấp như file mẫu: mức chốt phiên mới nhất và chiều so với tuần trước."""
+    tenors = [t for t in BOND_TENORS if t in row]
+    if len(tenors) < 3:
+        return ""
+    values = "; ".join(f"{t[:-1]}Y {fmt(row[t], 2, 'vi')}%" for t in tenors)
+    moves = {t: round((row[t] - prev[t]) * 100) if t in prev else 0 for t in tenors}
+    flat = [f"{t[:-1]}Y" for t in tenors if moves[t] == 0]
+    up = [t for t in tenors if moves[t] > 0]
+    down = [t for t in tenors if moves[t] < 0]
+    if not up and not down:
+        return ("Lợi suất TPCP trên thị trường thứ cấp duy trì không đổi ở các kỳ hạn, chốt phiên: "
+                f"{values} không đổi so với tuần trước đó.")
+    if up and down:
+        return f"Lợi suất TPCP trên thị trường thứ cấp biến động trái chiều so với tuần trước, chốt phiên: {values}."
+    word = "tăng" if up else "giảm"
+    if max(abs(m) for m in moves.values()) <= 5:
+        word += " nhẹ"
+    moving = [f"{t[:-1]}Y" for t in up + down]
+    if flat and len(moving) <= 2 and len(flat) >= 3:
+        return (f"Lợi suất TPCP trên thị trường thứ cấp đi ngang ở hầu hết các kỳ hạn so với tuần trước, riêng kỳ hạn "
+                f"{' và '.join(moving)} {word}, chốt phiên: {values}.")
+    if flat:
+        return (f"Lợi suất TPCP trên thị trường thứ cấp đi ngang ở kỳ hạn {', '.join(flat)} trong khi {word} ở các kỳ hạn "
+                f"còn lại so với tuần trước, chốt phiên: {values}.")
+    return f"Lợi suất TPCP trên thị trường thứ cấp {word} ở các kỳ hạn so với tuần trước, chốt phiên: {values}."
+
+
 def bonds_vi(f: WeeklyFacts) -> str:
+    from .bond_yields import week_view
+
     lo_w, hi_w, lines = limits("vi", "bonds")
     fixed = []
-    bond = f.markets.get("BOND_Vietnam")
-    if bond and bond.close is not None:
-        word = trend_vi(bond.change, 0.02)
-        tail = f"so với tuần trước, về mức {fmt(bond.close, 2, 'vi')}%" if word != "đi ngang" else f"quanh mức {fmt(bond.close, 2, 'vi')}%"
-        fixed.append(f"Lợi suất TPCP kỳ hạn 10 năm trên thị trường thứ cấp {word} {tail}.")
-    if f.vbma:
-        last = max(f.vbma)
-        row = f.vbma[last]
-        if all(row.get(t) is not None for t in ("1N", "3N", "5N", "7N")):
-            fixed.append(f"Theo VBMA, phiên {last.day}/{last.month} lợi suất TPCP các kỳ hạn 1, 3, 5 và 7 năm lần lượt ở mức "
-                         f"{fmt(row['1N'], 2, 'vi')}%, {fmt(row['3N'], 2, 'vi')}%, {fmt(row['5N'], 2, 'vi')}% "
-                         f"và {fmt(row['7N'], 2, 'vi')}%.")
-    cands = [s for d in reversed(f.days) for s in split_sentences(d.vira_lnh) if BOND_WORDS.search(s)]
+    view = week_view(f.bond_yields, f.monday, f.friday) if f.bond_yields else None
+    own = bond_sentence_vi(view[1], view[2]) if view else ""
+    if own:
+        fixed.append(own)
+    else:
+        bond = f.markets.get("BOND_Vietnam")
+        if bond and bond.close is not None:
+            word = trend_vi(bond.change, 0.02)
+            tail = f"so với tuần trước, về mức {fmt(bond.close, 2, 'vi')}%" if word != "đi ngang" else f"quanh mức {fmt(bond.close, 2, 'vi')}%"
+            fixed.append(f"Lợi suất TPCP kỳ hạn 10 năm trên thị trường thứ cấp {word} {tail}.")
+    cands = [s for d in reversed(f.days) for s in split_sentences(d.vira_lnh) if BOND_WORDS.search(s)
+             and not (own and OWN_BOND_SENTENCE.search(s))]
     return fill(fixed, cands, lo_w, hi_w, lines)
 
 

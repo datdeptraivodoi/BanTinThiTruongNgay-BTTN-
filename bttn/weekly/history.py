@@ -56,8 +56,8 @@ def update(charts: dict[str, ChartData], facts: WeeklyFacts) -> dict[str, ChartD
         if "usdvnd" in charts and (d.itb_ask or d.sbv_central):
             spread = d.itb_ask - d.itb_bid if d.itb_ask and d.itb_bid else None
             upsert(charts["usdvnd"], label, [d.itb_ask, d.sbv_central, spread], KEEP["usdvnd"])
-    if "bonds" in charts and facts.vbma:
-        charts["bonds"] = bonds_from_vbma(facts.vbma, facts.friday, len(charts["bonds"].series))
+    if "bonds" in charts and facts.bond_yields:
+        charts["bonds"] = bonds_chart(facts.bond_yields, facts.friday, len(charts["bonds"].series))
     for label, values in sorted(((facts.inputs.get("bond_curve") or {}).get("rows") or {}).items(),
                                 key=lambda kv: tuple(reversed([int(x) for x in kv[0].split("/")]))):
         if "bonds" in charts:
@@ -68,10 +68,10 @@ def update(charts: dict[str, ChartData], facts: WeeklyFacts) -> dict[str, ChartD
     return charts
 
 
-def bonds_from_vbma(yields: dict, friday, n_series: int = 5) -> ChartData:
-    """Dựng lại cả biểu đồ lợi suất 1/2/3/5/7 năm từ kho số VBMA (cùng một nguồn, không nối số cũ).
+def bonds_chart(yields: dict, friday, n_series: int = 5) -> ChartData:
+    """Dựng lại cả biểu đồ lợi suất 1/2/3/5/7 năm từ số theo ngày (VBMA thứ Sáu + VIRA thứ Hai–thứ Năm).
 
-    VBMA chỉ công bố số phiên thứ Sáu; mỗi ngày làm việc lấy số VBMA gần nhất tính tới ngày đó
+    Phiên không có số (ví dụ thứ Sáu tuần này, VBMA chưa công bố) lấy số gần nhất trước đó
     (lợi suất TPCP ít biến động). Giữ khoảng 1 năm gần nhất.
     """
     from datetime import timedelta

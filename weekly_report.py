@@ -32,7 +32,7 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
 
     from bttn.http import Http
     from bttn.sources import collect_snapshot
-    from bttn.weekly import history, te_stream, vbma
+    from bttn.weekly import bond_yields, history, te_stream
     from bttn.weekly.build import build_contents
     from bttn.weekly.calendar import build_calendar
     from bttn.weekly.deliver import send_weekly
@@ -57,13 +57,13 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
             facts.markets["CRB"] = bcom
         else:
             facts.warn("BCOM_TRADINGVIEW", "Không lấy được BCOM Index từ TradingView; dùng số Yahoo (^BCOM) nếu có")
-        facts.vbma, vbma_notes = vbma.refresh(fri)
-        for n in vbma_notes:
-            facts.warn("VBMA_YIELDS", n)
-        if facts.vbma:
-            last = max(facts.vbma)
-            facts.warn("VBMA_YIELDS_DATE", f"Lợi suất TPCP (biểu đồ, đoạn trái phiếu) theo báo cáo VBMA phiên {last:%d/%m/%Y}; "
-                                           "các phiên sau đó giữ nguyên số này")
+        facts.bond_yields, bond_notes = bond_yields.refresh(fri)
+        for n in bond_notes:
+            facts.warn("BOND_YIELDS", n)
+        view = bond_yields.week_view(facts.bond_yields, monday, fri)
+        if view:
+            facts.warn("BOND_YIELDS_DATE", f"Lợi suất TPCP trong đoạn trái phiếu là phiên {view[0]:%d/%m/%Y} (VIRA/VBMA), so với "
+                                           "phiên cuối tuần trước; biểu đồ 1Y, 2Y các phiên VIRA là số ước tính")
         earlier = (load_week_snapshots(ROOT / "output", monday - timedelta(days=7), fri - timedelta(days=7))
                    + load_week_snapshots(ROOT / "output", monday - timedelta(days=14), fri - timedelta(days=14)))
         centrals = history.friday_centrals(facts, earlier)

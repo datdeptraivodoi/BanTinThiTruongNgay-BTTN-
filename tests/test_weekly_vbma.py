@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 
 from bttn.weekly import vbma
-from bttn.weekly.history import bonds_from_vbma
+from bttn.weekly.history import bonds_chart
 
 FIX = Path(__file__).parent / "fixtures" / "vbma_weekly_20261009_p5.json"
 WORDS = json.loads(FIX.read_text(encoding="utf-8"))["words"]
@@ -65,7 +65,7 @@ def test_latest_yields_reports_source_error():
 
 def test_chart_rebuilt_from_vbma_fridays():
     row_0210 = {"1N": 3.53, "2N": 3.64, "3N": 3.71, "5N": 4.29, "7N": 4.34}
-    chart = bonds_from_vbma({date(2026, 10, 2): row_0210, date(2026, 10, 9): ROW_0910}, date(2026, 10, 16))
+    chart = bonds_chart({date(2026, 10, 2): row_0210, date(2026, 10, 9): ROW_0910}, date(2026, 10, 16))
     assert chart.categories[0] == "2/10/2026" and chart.categories[-1] == "16/10/2026"
     assert len(chart.categories) == 11                                       # chỉ ngày làm việc
     i = chart.categories.index("8/10/2026")
@@ -76,7 +76,7 @@ def test_chart_rebuilt_from_vbma_fridays():
 def test_chart_keeps_about_one_year():
     from datetime import timedelta
     fridays = {date(2026, 10, 9) - timedelta(days=7 * k): ROW_0910 for k in range(60)}
-    chart = bonds_from_vbma(fridays, date(2026, 10, 16))
+    chart = bonds_chart(fridays, date(2026, 10, 16))
     assert len(chart.categories) == 261 and chart.categories[-1] == "16/10/2026"
 
 
