@@ -201,6 +201,8 @@ def build_contents(f: WeeklyFacts, *, translator: Translator | None, template_se
             problems += [{"severity": "warning", "code": "TRANSLATION", "message": f"{dst}/{name}: {n}"} for n in notes]
     news, notes = translate_news(translator, write.news_candidates_vi(f))
     problems += [{"severity": "warning", "code": "TRANSLATION", "message": f"en/news: {n}"} for n in notes]
+    if getattr(translator, "log", None) is not None:
+        (work / "translation_log.json").write_text(json.dumps(translator.log, ensure_ascii=False, indent=1), encoding="utf-8")
     charts = history.update(history.load(history_path, seed=template_seed), f)
     history.save(charts, history_path)
     images = chart_images(f, work)

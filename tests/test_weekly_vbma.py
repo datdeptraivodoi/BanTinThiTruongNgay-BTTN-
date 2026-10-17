@@ -19,7 +19,7 @@ def test_parse_table_from_real_report_layout():
 
 
 def test_pdf_reader_finds_table():
-    import fitz
+    import pymupdf as fitz
 
     doc = fitz.open()
     page = doc.new_page(width=612, height=792)

@@ -289,3 +289,24 @@ def test_condense_retries_when_word_count_off():
     t, calls = _condense_translator(lambda n: "Dollar fell." if n == 1 else good)
     text, _ = t.paragraph(LONG_EN, "vi", "en", min_words=15, max_words=25)
     assert text == good and len(calls) == 2
+
+
+def test_number_check_accepts_spelled_counts_and_trillions():
+    from bttn.weekly.translate import same_numbers
+    assert same_numbers("NHNN hút ròng 1.612,28 tỷ đồng trong 5 phiên", "vi",
+                        "The SBV net withdrew VND 1,612.28 billion over five sessions", "en")
+    assert same_numbers("Dòng vốn FDI trong 9 tháng đầu năm 2026", "vi", "FDI inflows in the first nine months of 2026", "en")
+    assert same_numbers("Kỳ hạn 15Y 1.000 tỷ đồng, 30Y 500 tỷ đồng", "vi", "The 15Y tenor raised VND 1 trillion and 30Y VND 500 billion", "en")
+    assert same_numbers("Tín dụng tăng 13,3 nghìn tỷ đồng", "vi", "Credit rose by VND 13.3 trillion", "en")
+    assert not same_numbers("Tỷ giá ở mức 25.877", "vi", "The rate stood at 25,887", "en")          # sai số
+    assert not same_numbers("Lãi suất 4,5%", "vi", "The rate was 4.5% versus 4.0%", "en")              # thêm số lạ
+    assert not same_numbers("Giá tăng 25 điểm", "vi", "Prices rose by twenty-five points", "en")      # số lớn phải giữ chữ số
+
+
+def test_sentence_falls_back_to_llm_when_numbers_change():
+    from bttn.weekly.translate import Translator
+    t = Translator(api_key="x", sleep=lambda s: None)
+    t._call = lambda text, pair: "The rate stood at 25,887."                 # mô hình dịch viết sai số
+    t._chat = lambda model, system, text, temperature=0: "The rate stood at 25,877."
+    assert t.sentence("Tỷ giá ở mức 25.877.", "vi", "en") == "The rate stood at 25,877."
+    assert [e["attempt"] for e in t.log] == [0, 1] and t.log[0]["status"] == "failed"

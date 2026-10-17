@@ -93,7 +93,7 @@ def parse_yield_table(words: list[dict]) -> dict[date, dict[str, float]]:
 
 def pdf_yields(pdf_bytes: bytes) -> dict[date, dict[str, float]]:
     """Đọc PDF báo cáo tuần (PyMuPDF), tìm trang có bảng lợi suất."""
-    import fitz
+    import pymupdf as fitz
 
     with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
         for page in doc:
