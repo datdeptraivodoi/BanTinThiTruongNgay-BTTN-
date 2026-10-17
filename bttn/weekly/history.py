@@ -14,7 +14,7 @@ from .facts import WeeklyFacts
 
 ROOT = Path(__file__).resolve().parents[2]
 HISTORY = ROOT / "data" / "weekly" / "chart_history.json"
-KEEP = {"interbank": 22, "usdvnd": 22, "bonds": 243, "credit": 13}
+KEEP = {"interbank": 22, "usdvnd": 22, "bonds": 261, "credit": 13}   # bonds: khoảng 1 năm ngày làm việc
 
 
 def load(path: Path = HISTORY, seed: dict[str, ChartData] | None = None) -> dict[str, ChartData]:
@@ -57,7 +57,7 @@ def update(charts: dict[str, ChartData], facts: WeeklyFacts) -> dict[str, ChartD
             spread = d.itb_ask - d.itb_bid if d.itb_ask and d.itb_bid else None
             upsert(charts["usdvnd"], label, [d.itb_ask, d.sbv_central, spread], KEEP["usdvnd"])
     if "bonds" in charts and facts.vbma:
-        update_bonds_vbma(charts["bonds"], facts.vbma, facts.friday)
+        charts["bonds"] = bonds_from_vbma(facts.vbma, facts.friday, len(charts["bonds"].series))
     for label, values in sorted(((facts.inputs.get("bond_curve") or {}).get("rows") or {}).items(),
                                 key=lambda kv: tuple(reversed([int(x) for x in kv[0].split("/")]))):
         if "bonds" in charts:
@@ -68,29 +68,27 @@ def update(charts: dict[str, ChartData], facts: WeeklyFacts) -> dict[str, ChartD
     return charts
 
 
-def update_bonds_vbma(chart: ChartData, yields: dict, friday) -> ChartData:
-    """Nối lợi suất 1/2/3/5/7 năm theo VBMA vào biểu đồ ngày.
+def bonds_from_vbma(yields: dict, friday, n_series: int = 5) -> ChartData:
+    """Dựng lại cả biểu đồ lợi suất 1/2/3/5/7 năm từ kho số VBMA (cùng một nguồn, không nối số cũ).
 
-    Mỗi ngày làm việc từ sau phiên cuối đã có đến thứ Sáu kỳ bản tin lấy số VBMA mới nhất tính tới ngày
-    đó (lợi suất TPCP ít biến động; VBMA chỉ công bố số thứ Sáu). Phiên đã có số VBMA thì cập nhật đúng số.
+    VBMA chỉ công bố số phiên thứ Sáu; mỗi ngày làm việc lấy số VBMA gần nhất tính tới ngày đó
+    (lợi suất TPCP ít biến động). Giữ khoảng 1 năm gần nhất.
     """
     from datetime import timedelta
 
-    from .vbma import CHART_TENORS, chart_label, parse_label
+    from .vbma import CHART_TENORS, chart_label
 
-    known = sorted(yields)
+    known = sorted(d for d in yields if d <= friday)
+    chart = ChartData(categories=[], series=[[] for _ in CHART_TENORS[:n_series]])
     if not known:
         return chart
-    dates = [d for d in (parse_label(c) for c in chart.categories) if d]
-    day = (max(dates) + timedelta(days=1)) if dates else known[0]
-    for d in known:                       # sửa đúng phiên thứ Sáu đã có trong biểu đồ
-        if chart_label(d) in chart.categories:
-            upsert(chart, chart_label(d), [yields[d].get(t) for t in CHART_TENORS], KEEP["bonds"])
+    day, i = known[0], 0
     while day <= friday:
-        base = [d for d in known if d <= day]
-        if day.weekday() < 5 and base:
-            row = yields[base[-1]]
-            upsert(chart, chart_label(day), [row.get(t) for t in CHART_TENORS], KEEP["bonds"])
+        while i + 1 < len(known) and known[i + 1] <= day:
+            i += 1
+        if day.weekday() < 5:
+            row = yields[known[i]]
+            upsert(chart, chart_label(day), [row.get(t) for t in CHART_TENORS[:n_series]], KEEP["bonds"])
         day += timedelta(days=1)
     return chart
 

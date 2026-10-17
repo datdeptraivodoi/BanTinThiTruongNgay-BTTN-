@@ -11,12 +11,19 @@ review ghi rõ ngày số liệu VBMA.
 """
 from __future__ import annotations
 
+import json
 import re
+import time
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 from urllib.parse import unquote, urljoin
 
 LIST_URL = "https://vbma.org.vn/vi/reports/weekly"
+LIST_PAGE_URL = LIST_URL + "?page={n}"
+STORE = Path(__file__).resolve().parents[2] / "data" / "weekly" / "vbma_yields.json"
+BACKFILL_WEEKS = 53            # lần đầu: nạp lại khoảng 1 năm để biểu đồ cùng một nguồn
+FULL_HISTORY = 40              # có ít hơn số thứ Sáu này trong kho thì nạp lại
 TENORS = ("1N", "2N", "3N", "5N", "7N", "10N", "15N", "20N", "30N")
 CHART_TENORS = ("1N", "2N", "3N", "5N", "7N")       # biểu đồ bản tin tuần: 1, 2, 3, 5, 7 năm
 TABLE_TITLE = re.compile(r"BIẾN\s+ĐỘNG\s+LỢI\s+SUẤT", re.I)
@@ -111,20 +118,31 @@ def _get(url: str, http=None) -> bytes:
     return resp.content
 
 
-def latest_yields(friday: date, *, http=None, fetch=_get, weeks: int = 1) -> tuple[dict[date, dict[str, float]], list[str]]:
+def latest_yields(friday: date, *, http=None, fetch=_get, weeks: int = 1,
+                  pause: float = 0.0) -> tuple[dict[date, dict[str, float]], list[str]]:
     """Lợi suất từ các báo cáo VBMA mới nhất kết thúc trước hoặc đúng thứ Sáu của kỳ bản tin.
 
-    weeks > 1 dùng để nạp lại lịch sử (mỗi báo cáo cho 2 thứ Sáu: tuần báo cáo và tuần trước đó).
+    Mỗi báo cáo cho 2 phiên thứ Sáu (tuần báo cáo và tuần trước đó); weeks lớn để nạp lại lịch sử,
+    khi đó đọc thêm các trang danh sách tiếp theo (mỗi trang 12 báo cáo).
     """
     notes = []
+    reports: list[Report] = []
     try:
-        reports = [r for r in list_reports(fetch(LIST_URL, http).decode("utf-8", "replace")) if r.end <= friday]
+        page = 1
+        while True:
+            url = LIST_URL if page == 1 else LIST_PAGE_URL.format(n=page)
+            found = [r for r in list_reports(fetch(url, http).decode("utf-8", "replace")) if r.end <= friday]
+            reports += [r for r in found if r.url not in {x.url for x in reports}]
+            if len(reports) >= weeks or not found or page >= 8:
+                break
+            page += 1
     except Exception as exc:  # noqa: BLE001 - nguồn lỗi thì báo trong email review
-        return {}, [f"Không mở được trang báo cáo tuần VBMA ({type(exc).__name__}: {exc})"]
+        if not reports:
+            return {}, [f"Không mở được trang báo cáo tuần VBMA ({type(exc).__name__}: {exc})"]
     if not reports:
         return {}, ["Trang VBMA chưa có báo cáo tuần nào trước kỳ bản tin"]
     out: dict[date, dict[str, float]] = {}
-    for rep in reports[:weeks]:
+    for rep in sorted(reports, key=lambda r: r.end, reverse=True)[:weeks]:
         try:
             table = pdf_yields(fetch(rep.url, http))
         except Exception as exc:  # noqa: BLE001
@@ -135,7 +153,34 @@ def latest_yields(friday: date, *, http=None, fetch=_get, weeks: int = 1) -> tup
         for day, row in table.items():
             if 0 <= (rep.end - day).days <= 7:   # bỏ dòng cùng kỳ năm trước
                 out.setdefault(day, row)
+        if pause:
+            time.sleep(pause)
     return out, notes
+
+
+def load_store(path: Path = STORE) -> dict[date, dict[str, float]]:
+    if not path.is_file():
+        return {}
+    return {date.fromisoformat(k): v for k, v in json.loads(path.read_text(encoding="utf-8")).items()}
+
+
+def save_store(store: dict[date, dict[str, float]], path: Path = STORE):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({k.isoformat(): store[k] for k in sorted(store)}, indent=1), encoding="utf-8")
+    tmp.replace(path)
+
+
+def refresh(friday: date, *, http=None, fetch=_get, path: Path = STORE) -> tuple[dict[date, dict[str, float]], list[str]]:
+    """Kho lợi suất thứ Sáu theo VBMA trên VPS: lần đầu nạp ~1 năm, các tuần sau chỉ lấy báo cáo mới."""
+    store = load_store(path)
+    full = len([d for d in store if (friday - d).days <= 370]) >= FULL_HISTORY
+    fresh, notes = latest_yields(friday, http=http, fetch=fetch, weeks=2 if full else BACKFILL_WEEKS,
+                                 pause=0 if full else 0.5)
+    store.update(fresh)
+    if fresh:
+        save_store(store, path)
+    return store, notes
 
 
 def chart_label(day: date) -> str:

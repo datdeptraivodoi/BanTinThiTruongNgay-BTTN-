@@ -57,7 +57,7 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
             facts.markets["CRB"] = bcom
         else:
             facts.warn("BCOM_TRADINGVIEW", "Không lấy được BCOM Index từ TradingView; dùng số Yahoo (^BCOM) nếu có")
-        facts.vbma, vbma_notes = vbma.latest_yields(fri, weeks=2)
+        facts.vbma, vbma_notes = vbma.refresh(fri)
         for n in vbma_notes:
             facts.warn("VBMA_YIELDS", n)
         if facts.vbma:
