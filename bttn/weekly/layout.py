@@ -33,8 +33,9 @@ CHARTS = {
 }
 
 # Chiều cao tối đa (cm) của 4 biểu đồ Word ở trang 1. Mẫu để 5,1–5,4 cm làm trang 1 tràn khi mở
-# bằng Word; 4,6 cm vẫn đọc rõ và chừa khoảng an toàn để cả bản tin nằm gọn 3 trang.
-PAGE1_CHART_MAX_CM = 4.6
+# bằng Word. Biểu đồ trái phiếu cao hơn một chút để dòng ngày tháng (nhãn xoay) không bị che;
+# hàng trái phiếu vẫn do cột chữ quyết định chiều cao nên không làm trang 1 dài thêm.
+PAGE1_CHART_MAX_CM = {"interbank": 4.6, "usdvnd": 4.6, "bonds": 5.2, "credit": 4.6}
 
 # Chiều cao tối đa (cm) của khung ảnh biểu đồ giá ở trang 2 (mẫu: 5,75 / 5,36 / 6,03 cm).
 # Giữ nguyên bề rộng cột; ảnh biểu đồ do code vẽ sẽ được vẽ đúng tỷ lệ khung này.

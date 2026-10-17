@@ -59,7 +59,7 @@ def test_three_pages_with_template_geometry(tmp_path, lang):
     wp = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}extent"
     page1 = doc.tables[0]
     heights = [int(e.get("cy")) for e in page1._tbl.iter(wp) if int(e.get("cx")) > 3000000]
-    assert len(heights) == 4 and max(heights) <= layout.PAGE1_CHART_MAX_CM * 360000
+    assert len(heights) == 4 and max(heights) <= max(layout.PAGE1_CHART_MAX_CM.values()) * 360000
     page2 = doc.tables[1]
     img = [int(e.get("cy")) for e in page2._tbl.iter(wp)]
     assert len(img) == 6 and max(img) <= max(layout.PAGE2_IMAGE_MAX_CM.values()) * 360000

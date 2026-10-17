@@ -297,7 +297,7 @@ def fit_to_three_pages(doc, table):
 
     Biểu đồ Word tự co nội dung theo khung mới. Khung ảnh giữ bề rộng cột, chỉ giảm chiều cao.
     """
-    limits = [(pos, layout.PAGE1_CHART_MAX_CM) for pos in layout.CHARTS.values()]
+    limits = [(layout.CHARTS[name], cm) for name, cm in layout.PAGE1_CHART_MAX_CM.items()]
     limits += [(layout.IMAGES[name], cm) for name, cm in layout.PAGE2_IMAGE_MAX_CM.items()]
     for pos, cm in limits:
         limit = int(cm * 360000)
