@@ -7,20 +7,20 @@
   ],
   "chat": {
     "http_status": 200,
-    "elapsed_seconds": 1.95,
+    "elapsed_seconds": 2.46,
     "returned_model": "deepseek-flash",
     "finish_reason": "stop",
     "content": "Cục Dự trữ Liên bang giữ nguyên lãi suất ở mức 4,25%, trong khi đồng yên Nhật giảm giá vượt mốc 150 yên đổi 1 đô la vào thứ Ba.",
     "has_reasoning_content": true,
     "usage": {
       "prompt_tokens": 70,
-      "completion_tokens": 306,
-      "total_tokens": 376,
+      "completion_tokens": 343,
+      "total_tokens": 413,
       "prompt_tokens_details": {
         "cached_tokens": 0
       },
       "completion_tokens_details": {
-        "reasoning_tokens": 246
+        "reasoning_tokens": 283
       },
       "prompt_cache_hit_tokens": 0,
       "prompt_cache_miss_tokens": 70
