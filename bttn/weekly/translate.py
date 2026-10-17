@@ -40,7 +40,11 @@ DATES = {
            re.compile(rf"\b\d{{1,2}}(?:st|nd|rd|th)?\s*(?:[-–]\s*\d{{1,2}}\s+)?(?:of\s+)?(?:{MONTHS})\b(?:,?\s*\d{{4}})?", re.I)],
 }
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
-CONDENSE_MODEL = "meta/llama-3.3-70b-instruct"
+CONDENSE_MODEL = "mistralai/mistral-large-2-instruct"
+# NVIDIA thỉnh thoảng rút mô hình khỏi danh mục (HTTP 404/410): thử lần lượt các mô hình sau
+LLM_MODELS = ("mistralai/mistral-large-2-instruct", "google/gemma-4-31b-it", "deepseek-ai/deepseek-v4.1-flash",
+              "nvidia/llama-3.1-nemotron-70b-instruct", "meta/llama-3.3-70b-instruct")
+GONE = ("NVIDIA_HTTP_404", "NVIDIA_HTTP_410", "NVIDIA_HTTP_400")
 TRANSLATE_PROMPT = {
     "vi-en": ("Translate this sentence from a Vietnamese bank market bulletin into professional English. Keep every "
               "number in digits exactly as in the source, written in English format (1,612.28; 3.1%); keep amounts in "
@@ -128,6 +132,19 @@ def same_numbers(src: str, src_lang: str, out: str, out_lang: str) -> bool:
     return not (missing - words) and all(v <= 12 for v in missing)
 
 
+GLOSSARY_EN = [(r"\bNHNN\b", "SBV"), (r"\bTPCP\b", "government bond"), (r"\bKBNN\b", "the State Treasury"),
+               (r"\breposo\b", "repo"), (r"\bthe the\b", "the"), (r"\bVND(\d)", r"VND \1")]
+
+
+def glossary(text: str, lang: str) -> str:
+    """Sửa vài thuật ngữ mô hình dịch hay để nguyên tiếng Việt hoặc dịch sai."""
+    if lang != "en":
+        return text
+    for pat, rep in GLOSSARY_EN:
+        text = re.sub(pat, rep, text)
+    return text
+
+
 class Translator:
     def __init__(self, api_key=None, *, session=None, sleep=time.sleep):
         self.api_key = (api_key or os.getenv("NVIDIA_API_KEY") or "").strip()
@@ -137,6 +154,25 @@ class Translator:
 
     def _call(self, text: str, pair: str) -> str:
         return self._chat(MODEL, pair, text)
+
+    def _llm(self, system: str, text: str, temperature: float = 0) -> str:
+        """Gọi mô hình ngôn ngữ của NVIDIA; mô hình bị rút (404/410) thì chuyển sang mô hình kế tiếp."""
+        first = os.getenv("NVIDIA_CONDENSE_MODEL")
+        models = getattr(self, "_models", None) or [m for m in ((first,) if first else ()) + LLM_MODELS if m]
+        last = None
+        while models:
+            try:
+                out = self._chat(models[0], system, text, temperature)
+                self._models = models
+                return re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip().strip('"')
+            except WeeklyTranslationError as exc:
+                last = exc
+                if str(exc) not in GONE:
+                    raise
+                self.log.append({"pair": "llm", "status": "model_unavailable", "model": models[0], "error": str(exc)})
+                models = models[1:]
+        self._models = []
+        raise last or WeeklyTranslationError("NVIDIA_NO_LLM")
 
     def _chat(self, model: str, system: str, text: str, temperature: float = 0) -> str:
         if not self.api_key:
@@ -154,12 +190,14 @@ class Translator:
         return " ".join(choice["message"]["content"].split())
 
     def sentence(self, text: str, src: str, dst: str) -> str:
+        return glossary(self._sentence(text, src, dst), dst)
+
+    def _sentence(self, text: str, src: str, dst: str) -> str:
         """Dịch một câu: mô hình dịch trước; sai số liệu thì nhờ mô hình ngôn ngữ dịch lại với yêu cầu giữ số."""
         pair = f"{src}-{dst}"
         last = None
         attempts = (lambda: self._call(text, pair),
-                    lambda: self._chat(os.getenv("NVIDIA_CONDENSE_MODEL") or CONDENSE_MODEL,
-                                       TRANSLATE_PROMPT[pair], text).strip().strip('"'))
+                    lambda: self._llm(TRANSLATE_PROMPT[pair], text))
         for attempt, run in enumerate(attempts):
             try:
                 out = run()
@@ -176,13 +214,12 @@ class Translator:
 
     def condense(self, text: str, lang: str, lo: int, hi: int, max_lines=None) -> str | None:
         """AI rút gọn đoạn về [lo, hi] từ; trả None nếu sau 2 lần vẫn không đạt điều kiện."""
-        model = os.getenv("NVIDIA_CONDENSE_MODEL") or CONDENSE_MODEL
         allowed = Counter(numbers(text, lang))
         system = CONDENSE_PROMPT[lang].format(lo=lo, hi=hi)
         prompt = text
         for _ in range(2):
             try:
-                out = self._chat(model, system, prompt, temperature=0.2).strip().strip('"')
+                out = self._llm(system, prompt, temperature=0.2)
             except (WeeklyTranslationError, requests.RequestException, KeyError, ValueError) as exc:
                 self.log.append({"pair": f"condense-{lang}", "status": "failed", "error": str(exc)})
                 return None

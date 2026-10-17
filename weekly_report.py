@@ -36,7 +36,13 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
     from bttn.weekly.build import build_contents
     from bttn.weekly.calendar import build_calendar
     from bttn.weekly.deliver import send_weekly
-    from bttn.weekly.facts import build_facts, load_inputs, load_week_snapshots, tradingview_move
+    from bttn.weekly.facts import (
+        build_facts,
+        fill_markets,
+        load_inputs,
+        load_week_snapshots,
+        tradingview_move,
+    )
 
     load_dotenv(ROOT / ".env")
     run = out / datetime.now(VN_TZ).strftime("%Y%m%d-%H%M%S")
@@ -49,14 +55,19 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
         monday, fri = week_bounds(friday)
         snaps = load_week_snapshots(ROOT / "output", monday, fri, extra=[snap])
         te_items, te_errors = te_stream.collect_week(monday, fri)
+        for topic, items in te_stream.from_snapshots(snaps).items():
+            have = {i["url"] for i in te_items.get(topic, [])}
+            te_items.setdefault(topic, []).extend(i for i in items if i["url"] not in have)
         facts = build_facts(friday, snaps, load_inputs(), te_items)
         for e in te_errors:
             facts.warn("TE_WEEK_SOURCE", e)
         bcom = tradingview_move("CRB", os.getenv("TV_BCOM_SYMBOL", "TVC:BCOM"), monday, fri)
         if bcom is not None:
             facts.markets["CRB"] = bcom
-        else:
-            facts.warn("BCOM_TRADINGVIEW", "Không lấy được BCOM Index từ TradingView; dùng số Yahoo (^BCOM) nếu có")
+        filled = fill_markets(facts)
+        if bcom is None:
+            facts.warn("BCOM_TRADINGVIEW", "Không lấy được BCOM Index từ TradingView; "
+                       + ("đã dùng số Yahoo (^BCOM)" if "CRB" in filled else "Yahoo (^BCOM) cũng không có số"))
         facts.bond_yields, bond_notes = bond_yields.refresh(fri)
         for n in bond_notes:
             facts.warn("BOND_YIELDS", n)

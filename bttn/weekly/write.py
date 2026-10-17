@@ -17,6 +17,24 @@ from .fit import count_lines, count_words, rules
 from .forecasts import fmt, forecast_sentence
 
 BOND_WORDS = re.compile(r"lợi suất|TPCP|trái phiếu|KBNN|Kho bạc|đấu thầu|trúng thầu", re.I)
+BOND_STRICT = re.compile(r"TPCP|trái phiếu|KBNN|Kho bạc|\b\d{1,2}Y\b", re.I)
+NOT_BOND = re.compile(r"cầm cố|OMO|thị trường mở|tín phiếu|\d+\s*ngày", re.I)
+FX_WORDS = re.compile(r"tỷ giá|USD|ngoại tệ|DXY|đồng bạc xanh", re.I)
+NOT_FX = re.compile(r"lãi suất|swap|OMO|cầm cố", re.I)
+JUNK = re.compile(r"Ảnh:|Trong ảnh|\.\.\.|…|Nguồn:|Xem thêm|Đọc thêm", re.I)
+
+
+def clean_sentences(text: str) -> list[str]:
+    """Câu của bài báo, bỏ chú thích ảnh, câu cụt có dấu ba chấm và dòng nguồn."""
+    out, after_cut = [], False
+    for s in split_sentences(text):
+        cut = bool(JUNK.search(s))
+        # câu nối tiếp ngay sau một đoạn cụt "..." hoặc mở đầu bằng ngoặc kép/chữ thường là mảnh vỡ của tiêu đề
+        fragment = after_cut or s[:1] in "\"“”'‘’" or s[:1].islower()
+        if not cut and not fragment and len(s.split()) >= 5:
+            out.append(s)
+        after_cut = cut and ("..." in s or "…" in s)
+    return out
 LNH_WORDS = re.compile(r"liên ngân hàng|LNH|qua đêm|kỳ hạn", re.I)
 OMO_NET = re.compile(r"(hút ròng|bơm ròng)\s+(?:khoảng\s+|gần\s+|hơn\s+)?([\d.]+(?:,\d+)?)\s*tỷ", re.I)
 
@@ -119,7 +137,7 @@ def fx_vi(f: WeeklyFacts) -> str:
         fixed.append(f"Tỷ giá USD-VND trên thị trường liên ngân hàng {word} so với mức giá mở cửa đầu tuần, "
                      f"đóng cửa ngày {asks[-1][0]:%d.%m} quanh mức {fmt(asks[-1][1], 0, 'vi')}.")
         values = [a for _, a in asks]
-        if len(values) > 1:
+        if len(values) > 1 and max(values) - min(values) >= 10:   # biên độ quá hẹp (số báo giá không đổi) thì bỏ
             fixed.append(f"Trong tuần, tỷ giá dao động trong khoảng {fmt(min(values), 0, 'vi')} – {fmt(max(values), 0, 'vi')}.")
     central = [(d.day, d.sbv_central) for d in f.days if d.sbv_central]
     if len(central) > 1:
@@ -130,8 +148,10 @@ def fx_vi(f: WeeklyFacts) -> str:
             fixed.append(f"Tỷ giá trung tâm do NHNN công bố {'tăng' if change > 0 else 'giảm'} {fmt(abs(change), 0, 'vi')} "
                          f"đồng so với đầu tuần, {'lên' if change > 0 else 'xuống'} mức {fmt(central[-1][1], 0, 'vi')} đồng/USD.")
     free = [s for d in reversed(f.days) for s in split_sentences(d.vira_fx) if "tự do" in s]
-    cands = free[:1] + [s for n in vietnam_news(f) for s in split_sentences(n["text"])[:2]
-                        if re.search(r"tỷ giá|ngoại tệ|tín dụng|NHNN|xuất khẩu|FDI|kiều hối", s, re.I)]
+    vira = [s for d in reversed(f.days) for s in split_sentences(d.vira_fx)
+            if FX_WORDS.search(s) and "tự do" not in s and not NOT_FX.search(s)]
+    cands = free[:1] + vira + [s for n in vietnam_news(f) for s in clean_sentences(n["text"])[:2]
+                               if re.search(r"tỷ giá|ngoại tệ|kiều hối|dự trữ ngoại hối", s, re.I)]
     return fill(fixed, cands, lo_w, hi_w, lines)
 
 
@@ -182,7 +202,8 @@ def bonds_vi(f: WeeklyFacts) -> str:
             word = trend_vi(bond.change, 0.02)
             tail = f"so với tuần trước, về mức {fmt(bond.close, 2, 'vi')}%" if word != "đi ngang" else f"quanh mức {fmt(bond.close, 2, 'vi')}%"
             fixed.append(f"Lợi suất TPCP kỳ hạn 10 năm trên thị trường thứ cấp {word} {tail}.")
-    cands = [s for d in reversed(f.days) for s in split_sentences(d.vira_lnh) if BOND_WORDS.search(s)
+    cands = [s for d in reversed(f.days) for s in split_sentences(d.vira_lnh)
+             if BOND_WORDS.search(s) and BOND_STRICT.search(s) and not NOT_BOND.search(s)
              and not (own and OWN_BOND_SENTENCE.search(s))]
     return fill(fixed, cands, lo_w, hi_w, lines)
 
@@ -200,7 +221,7 @@ def news_candidates_vi(f: WeeklyFacts, limit: int = 8) -> list[tuple[str, str]]:
     out, articles = [], 0
     for article in vietnam_news(f):
         picked, variants = [], []
-        for s in split_sentences(article["text"]):
+        for s in clean_sentences(article["text"]):
             if count_words(" ".join(picked + [s])) > hi:
                 break
             picked.append(s)
@@ -247,6 +268,13 @@ def _move_en(name: str, move, decimals: int, unit: str, prefix: str = "") -> str
     return f"{name} {verb} {fmt(abs(move.pct), 1, 'en')}% this week to {prefix}{fmt(move.close, decimals, 'en')}{unit}."
 
 
+def _range_en(name: str, move, decimals: int, unit: str = "", prefix: str = "") -> str | None:
+    if not move or move.high is None or move.low is None or move.high - move.low <= 0:
+        return None
+    return (f"Over the week, {name} traded between {prefix}{fmt(move.low, decimals, 'en')} and "
+            f"{prefix}{fmt(move.high, decimals, 'en')}{unit}.")
+
+
 def _news_sentences(f: WeeklyFacts, topics: list[str]) -> list[str]:
     out = []
     for topic in topics:
@@ -257,23 +285,30 @@ def _news_sentences(f: WeeklyFacts, topics: list[str]) -> list[str]:
 
 def intl_fx_en(f: WeeklyFacts) -> str:
     lo, hi, lines = limits("en", "intl_fx")
-    fixed = [_move_en("The US Dollar Index", f.markets.get("DXY"), 2, "")]
-    return fill(fixed, _news_sentences(f, ["currency_us", "currency_eu", "currency_jp", "macro_us", "macro_eu", "macro_jp"]),
-                lo, hi, lines)
+    m = f.markets
+    fixed = [_move_en("The US Dollar Index", m.get("DXY"), 2, ""),
+             _move_en("EUR-USD", m.get("EURUSD"), 4, ""),
+             _move_en("USD-JPY", m.get("USDJPY"), 2, "")]
+    extra = [_range_en("EUR-USD", m.get("EURUSD"), 4), _range_en("USD-JPY", m.get("USDJPY"), 2)]
+    news = _news_sentences(f, ["currency_us", "currency_eu", "currency_jp", "macro_us", "macro_eu", "macro_jp"])
+    return fill(fixed, news + [s for s in extra if s], lo, hi, lines)
 
 
 def coffee_en(f: WeeklyFacts) -> str:
     lo, hi, lines = limits("en", "coffee")
     fixed = [_move_en("Arabica coffee futures", f.markets.get("ARABICA"), 2, " USc/lbs"),
              _move_en("Robusta coffee", f.markets.get("ROBUSTA"), 0, "/ton", prefix="$")]
-    return fill(fixed, _news_sentences(f, ["coffee"]), lo, hi, lines)
+    extra = [_range_en("arabica", f.markets.get("ARABICA"), 2, " USc/lbs"),
+             _range_en("robusta", f.markets.get("ROBUSTA"), 0, "/ton", prefix="$")]
+    return fill(fixed, _news_sentences(f, ["coffee"]) + [s for s in extra if s], lo, hi, lines)
 
 
 def energy_en(f: WeeklyFacts) -> str:
     lo, hi, lines = limits("en", "energy")
     fixed = [_move_en("Brent crude oil", f.markets.get("BRENT"), 2, "/Bbl", prefix="$"),
              _move_en("Gasoline futures", f.markets.get("GASOLINE"), 2, " USD/Gal")]
-    return fill(fixed, _news_sentences(f, ["energy"]), lo, hi, lines)
+    extra = [_range_en("Brent", f.markets.get("BRENT"), 2, "/Bbl", prefix="$")]
+    return fill(fixed, _news_sentences(f, ["energy"]) + [s for s in extra if s], lo, hi, lines)
 
 
 # ---------- số dự báo gợi ý ----------

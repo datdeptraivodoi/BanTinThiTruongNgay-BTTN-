@@ -16,11 +16,14 @@ from ..tradingeconomics_news import is_stock_market_article
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 STREAM = "https://tradingeconomics.com/ws/stream.ashx"
+# Giống hệt request của bản tin ngày BTTN (đang chạy được trên VPS); thiếu Accept-Language thì trang trả 403.
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Accept-Language": "en-US,en;q=0.9",
     "X-Requested-With": "XMLHttpRequest",
 }
+PAGE = 30
 QUERIES = {
     "united-states": {"c": "united states"},
     "euro-area": {"c": "euro area"},
@@ -70,29 +73,61 @@ def parse_stream(records, monday: date, friday: date) -> list[dict]:
     return items
 
 
-def collect_week(monday: date, friday: date, *, session=None, size=80) -> tuple[dict[str, list[dict]], list[str]]:
+def collect_week(monday: date, friday: date, *, session=None, pages: int = 4) -> tuple[dict[str, list[dict]], list[str]]:
+    """Tin cả tuần: đọc từng trang 30 tin (như trang web), dừng khi đã lùi quá thứ Hai."""
     session = session or requests
     found, errors, seen = {}, [], set()
+    start_of_week = datetime.combine(monday, time.min, VN_TZ)
     for name, params in QUERIES.items():
-        try:
-            resp = session.get(STREAM, params={"start": 0, "size": size, **params},
-                               headers={**HEADERS, "Referer": f"https://tradingeconomics.com/{name}/news"},
-                               timeout=(10, 25))
-            if resp.status_code != 200:
-                errors.append(f"{name}: HTTP {resp.status_code}")
-                continue
-            records = resp.json()
-        except Exception as exc:  # noqa: BLE001 - ghi lại lỗi nguồn, không dừng cả bản tin
-            errors.append(f"{name}: {type(exc).__name__}")
-            continue
-        for item in parse_stream(records, monday, friday):
-            if item["id"] in seen:
-                continue
-            seen.add(item["id"])
-            found.setdefault(item["topic"], []).append(item)
+        for page in range(pages):
+            try:
+                resp = session.get(STREAM, params={"start": page * PAGE, "size": PAGE, **params},
+                                   headers={**HEADERS, "Referer": f"https://tradingeconomics.com/{name}/news"},
+                                   timeout=(10, 25))
+                if resp.status_code != 200:
+                    errors.append(f"{name}: HTTP {resp.status_code}")
+                    break
+                records = resp.json()
+            except Exception as exc:  # noqa: BLE001 - ghi lại lỗi nguồn, không dừng cả bản tin
+                errors.append(f"{name}: {type(exc).__name__}")
+                break
+            for item in parse_stream(records, monday, friday):
+                if item["id"] not in seen:
+                    seen.add(item["id"])
+                    found.setdefault(item["topic"], []).append(item)
+            oldest = min((_date_of(r) for r in records or [] if _date_of(r)), default=None)
+            if not records or len(records) < PAGE or (oldest and oldest < start_of_week):
+                break
     for items in found.values():
         items.sort(key=lambda x: x["published_at"], reverse=True)
     return found, errors
+
+
+def _date_of(rec) -> datetime | None:
+    try:
+        at = datetime.fromisoformat(str(rec["date"]).replace("Z", "+00:00"))
+        return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+    except (KeyError, ValueError):
+        return None
+
+
+def from_snapshots(snapshots) -> dict[str, list[dict]]:
+    """Dự phòng: tin Trading Economics bản tin ngày BTTN đã lưu trong các snapshot của tuần."""
+    found, seen = {}, set()
+    for snap in snapshots:
+        for src in snap.sources.values():
+            if src.kind != "news" or "tradingeconomics.com" not in src.url or src.url in seen:
+                continue
+            topic = topic_of(src.url)
+            if not topic:
+                continue
+            seen.add(src.url)
+            title, _, body = src.text.partition("\n\n")
+            found.setdefault(topic, []).append({"id": src.url, "title": title.strip(), "text": (body or src.text).strip(),
+                                                "url": src.url, "published_at": src.published_at, "topic": topic})
+    for items in found.values():
+        items.sort(key=lambda x: x["published_at"], reverse=True)
+    return found
 
 
 def week_window(friday: date) -> tuple[date, date]:

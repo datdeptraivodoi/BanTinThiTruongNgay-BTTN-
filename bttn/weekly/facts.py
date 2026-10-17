@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -206,3 +206,62 @@ def tradingview_move(key: str, tv_symbol: str, monday: date, friday: date, runne
         return None
     last_day = max(d for d, _ in points if d <= friday)
     return Move(before[-1] if before else None, week[0], week[-1], max(week), min(week), last_day)
+
+
+WEEK_MARKETS = ("DXY", "EURUSD", "USDJPY", "GOLD", "BRENT", "GASOLINE", "ARABICA", "ROBUSTA", "CRB")
+
+
+def yahoo_move(key: str, monday: date, friday: date, fetch=None) -> Move | None:
+    """Giá cả tuần của một mã (nến ngày Yahoo Finance, tính theo ngày giao dịch của sàn)."""
+    from urllib.parse import quote
+
+    import requests
+
+    from ..sources import INSTRUMENTS
+
+    symbol = INSTRUMENTS.get(key, (None,))[0]
+    if not symbol:
+        return None
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol, safe='')}?interval=1d&range=1mo"
+    try:
+        if fetch is None:
+            resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=(10, 20))
+            resp.raise_for_status()
+            data = resp.json()
+        else:
+            data = fetch(url)
+        result = data["chart"]["result"][0]
+        offset = int(result.get("meta", {}).get("gmtoffset") or 0)
+        closes = result["indicators"]["quote"][0]["close"]
+        highs = result["indicators"]["quote"][0].get("high") or closes
+        lows = result["indicators"]["quote"][0].get("low") or closes
+    except Exception:  # noqa: BLE001 - nguồn lỗi thì để trống và báo trong email review
+        return None
+    rows = []
+    for t, c, h, lo in zip(result.get("timestamp") or [], closes, highs, lows):
+        if c is None:
+            continue
+        day = datetime.fromtimestamp(int(t) + offset, timezone.utc).date()
+        rows.append((day, float(c), float(h if h is not None else c), float(lo if lo is not None else c)))
+    before = [c for d, c, _, _ in rows if d < monday]
+    week = [r for r in rows if monday <= r[0] <= friday]
+    if not week:
+        return None
+    return Move(before[-1] if before else None, week[0][1], week[-1][1], max(r[2] for r in week),
+                min(r[3] for r in week), week[-1][0])
+
+
+def fill_markets(facts: "WeeklyFacts", keys=WEEK_MARKETS, fetch=None) -> list[str]:
+    """Mã nào snapshot ngày không có đủ giá cả tuần (ví dụ cà phê lấy từ VietnamBiz) thì lấy nến Yahoo."""
+    filled = []
+    for key in keys:
+        m = facts.markets.get(key)
+        if m is not None and m.close is not None and m.pct is not None:
+            continue
+        move = yahoo_move(key, facts.monday, facts.friday, fetch=fetch)
+        if move is not None:
+            facts.markets[key] = move
+            filled.append(key)
+    facts.issues = [i for i in facts.issues if not (i["code"] == "WEEK_MARKET_MISSING"
+                                                     and i["message"].split(":")[0] in filled)]
+    return filled
