@@ -56,6 +56,8 @@ def update(charts: dict[str, ChartData], facts: WeeklyFacts) -> dict[str, ChartD
         if "usdvnd" in charts and (d.itb_ask or d.sbv_central):
             spread = d.itb_ask - d.itb_bid if d.itb_ask and d.itb_bid else None
             upsert(charts["usdvnd"], label, [d.itb_ask, d.sbv_central, spread], KEEP["usdvnd"])
+    if "bonds" in charts and facts.vbma:
+        update_bonds_vbma(charts["bonds"], facts.vbma, facts.friday)
     for label, values in sorted(((facts.inputs.get("bond_curve") or {}).get("rows") or {}).items(),
                                 key=lambda kv: tuple(reversed([int(x) for x in kv[0].split("/")]))):
         if "bonds" in charts:
@@ -64,6 +66,33 @@ def update(charts: dict[str, ChartData], facts: WeeklyFacts) -> dict[str, ChartD
         if "credit" in charts:
             upsert(charts["credit"], label, [None if v is None else float(v) for v in values], KEEP["credit"])
     return charts
+
+
+def update_bonds_vbma(chart: ChartData, yields: dict, friday) -> ChartData:
+    """Nối lợi suất 1/2/3/5/7 năm theo VBMA vào biểu đồ ngày.
+
+    Mỗi ngày làm việc từ sau phiên cuối đã có đến thứ Sáu kỳ bản tin lấy số VBMA mới nhất tính tới ngày
+    đó (lợi suất TPCP ít biến động; VBMA chỉ công bố số thứ Sáu). Phiên đã có số VBMA thì cập nhật đúng số.
+    """
+    from datetime import timedelta
+
+    from .vbma import CHART_TENORS, chart_label, parse_label
+
+    known = sorted(yields)
+    if not known:
+        return chart
+    dates = [d for d in (parse_label(c) for c in chart.categories) if d]
+    day = (max(dates) + timedelta(days=1)) if dates else known[0]
+    for d in known:                       # sửa đúng phiên thứ Sáu đã có trong biểu đồ
+        if chart_label(d) in chart.categories:
+            upsert(chart, chart_label(d), [yields[d].get(t) for t in CHART_TENORS], KEEP["bonds"])
+    while day <= friday:
+        base = [d for d in known if d <= day]
+        if day.weekday() < 5 and base:
+            row = yields[base[-1]]
+            upsert(chart, chart_label(day), [row.get(t) for t in CHART_TENORS], KEEP["bonds"])
+        day += timedelta(days=1)
+    return chart
 
 
 CENTRALS = ROOT / "data" / "weekly" / "central_rates.json"
