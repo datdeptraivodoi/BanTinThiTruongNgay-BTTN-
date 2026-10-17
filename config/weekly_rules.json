@@ -1,0 +1,28 @@
+{
+  "_huong_dan": "Giới hạn nội dung bản tin tuần (anh Đạt chốt 17/10/2026). words = [tối thiểu, tối đa] số từ của đoạn thân bài; max_lines = số dòng tối đa của đoạn trong cột (đo bằng font Times New Roman 11, bằng số dòng của file mẫu). Số dòng là giới hạn bắt buộc để không tràn trang; nếu viết đủ số từ mà vượt số dòng thì phải rút gọn. Đoạn dự báo dùng câu mẫu cố định, chỉ thay số, tối đa 2 dòng.",
+  "column_width_pt": 259,
+  "font_size_pt": 11,
+  "forecast_max_lines": 2,
+  "sections": {
+    "vi": {
+      "interbank": {"words": [90, 97], "max_lines": 9},
+      "fx": {"words": [97, 107], "max_lines": 9},
+      "bonds": {"words": [110, 116], "max_lines": 10},
+      "intl_fx": {"words": [130, 136], "max_lines": 11},
+      "coffee": {"words": [110, 115], "max_lines": 10},
+      "energy": {"words": [127, 131], "max_lines": 11}
+    },
+    "en": {
+      "interbank": {"words": [80, 85], "max_lines": 9},
+      "fx": {"words": [78, 86], "max_lines": 10},
+      "bonds": {"words": [70, 75], "max_lines": 9},
+      "intl_fx": {"words": [90, 95], "max_lines": 10},
+      "coffee": {"words": [80, 88], "max_lines": 10},
+      "energy": {"words": [80, 89], "max_lines": 11}
+    }
+  },
+  "news": {
+    "vi": {"items": 3, "item_words": [30, 44], "total_words": [105, 118]},
+    "en": {"items": 3, "item_words": [25, 30], "total_words": [75, 84]}
+  }
+}
