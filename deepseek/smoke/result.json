@@ -1,0 +1,31 @@
+{
+  "base_url": "https://api.deepseek.com",
+  "key_present": true,
+  "models": [
+    "deepseek-flash",
+    "deepseek-v4-pro"
+  ],
+  "chat": {
+    "http_status": 200,
+    "elapsed_seconds": 2.3,
+    "returned_model": "deepseek-flash",
+    "finish_reason": "stop",
+    "content": "Cục Dự trữ Liên bang giữ nguyên lãi suất ở mức 4,25%, trong khi đồng yên Nhật mất giá vượt mốc 150 yên đổi 1 USD vào thứ Ba.",
+    "has_reasoning_content": true,
+    "usage": {
+      "prompt_tokens": 70,
+      "completion_tokens": 320,
+      "total_tokens": 390,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 263
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 70
+    }
+  },
+  "models_http_status": 200,
+  "chosen_model": "deepseek-flash"
+}

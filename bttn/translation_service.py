@@ -12,7 +12,7 @@ from uuid import uuid4
 from pydantic import AwareDatetime, Field
 
 from .models import Snapshot, StrictModel, parse_as_of
-from .nvidia_translation import MODEL, RULES_VERSION, NvidiaTranslator, TranslationError, check_translation
+from .deepseek_translation import MODEL, RULES_VERSION, DeepSeekTranslator, TranslationError, check_translation
 from .tradingeconomics_news import TOPICS, collect_tradingeconomics, topic_for
 
 RETENTION_DAYS = 7
@@ -27,7 +27,7 @@ class TranslationRecord(StrictModel):
     original_text: str
     original_segments: list[str] = Field(min_length=1)
     translated_segments: list[str] = Field(min_length=1)
-    provider: str = "nvidia"
+    provider: str = "deepseek"
     requested_model: str = MODEL
     created_at: AwareDatetime
     modified_at: AwareDatetime
@@ -43,7 +43,7 @@ class TranslationRecord(StrictModel):
 def split_article(text, maximum=2800):
     """Translate every paragraph, without truncating the article tail."""
     segments = []
-    # A title is not a sentence in the article body; Riva may drop it when
+    # A title is not a sentence in the article body; a model may drop it when
     # translating a combined document. Treat each paragraph independently.
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
     if len(paragraphs) > 1:
@@ -193,8 +193,8 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
     directory.mkdir(parents=True, exist_ok=True)
     store = TranslationStore(cache_dir)
     store.cleanup()
-    translator = translator or NvidiaTranslator(os.getenv("NVIDIA_API_KEY"))
-    result = {"provider": "nvidia", "model": MODEL, "review_only": allow_stale, "articles": {}, "failures": {}}
+    translator = translator or DeepSeekTranslator(os.getenv("DEEPSEEK_API_KEY"))
+    result = {"provider": "deepseek", "model": MODEL, "review_only": allow_stale, "articles": {}, "failures": {}}
     for sid, source in snapshot.sources.items():
         topic = topic_for(source)
         if source.kind != "news" or topic is None:
@@ -227,7 +227,7 @@ def main(argv=None):
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-    parser = argparse.ArgumentParser(description="Translate news with NVIDIA only; never send email")
+    parser = argparse.ArgumentParser(description="Translate news with DeepSeek only; never send email")
     parser.add_argument("action", choices=["translate", "cleanup", "edit", "approve"])
     parser.add_argument("--cache-dir", default=".state/translations")
     parser.add_argument("--output-dir", default="output/translation-review")
@@ -267,7 +267,7 @@ def main(argv=None):
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     (Path(args.output_dir) / "snapshot.json").write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
     result = translate_snapshot(snapshot, args.output_dir, args.cache_dir, allow_stale=args.allow_stale_review)
-    print(f"NVIDIA translations: {len(result['articles'])}; technical checks: {result['status']}; "
+    print(f"DeepSeek translations: {len(result['articles'])}; technical checks: {result['status']}; "
           f"pending review: {len(result['pending_review'])}; no email sent")
     return 0 if result["status"] == "checked" else 2
 
