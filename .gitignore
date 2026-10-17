@@ -15,6 +15,7 @@ ENV/
 
 # File Word & PDF sinh ra (Chỉ giữ lại template.docx)
 *.docx
+!templates/weekly/*.docx
 !template.docx
 *.pdf
 *.png
