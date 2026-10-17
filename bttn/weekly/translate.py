@@ -12,6 +12,7 @@ Không đạt thì quay về cách cũ: bỏ bớt câu cuối.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -62,6 +63,10 @@ CONDENSE_PROMPT = {
            "Ưu tiên bỏ chi tiết ít quan trọng (bình luận phụ, bối cảnh lặp lại). Giữ nguyên cách viết mọi con số "
            "còn lại, giữ đúng sự kiện và thứ tự, không thêm thông tin hay con số mới. Chỉ trả về đoạn văn đã rút gọn."),
 }
+
+
+LOG = logging.getLogger("bttn.weekly.translate")
+TIME_BUDGET = int(os.getenv("WEEKLY_AI_BUDGET_SECONDS", "900"))   # quá 15 phút gọi AI thì dừng gọi, dùng phần đã có
 
 
 class WeeklyTranslationError(RuntimeError):
@@ -151,6 +156,8 @@ class Translator:
         self.session = session or requests.Session()
         self.sleep = sleep
         self.log = []
+        self.started = None
+        self.calls = 0
 
     def _call(self, text: str, pair: str) -> str:
         return self._chat(MODEL, pair, text)
@@ -177,11 +184,17 @@ class Translator:
     def _chat(self, model: str, system: str, text: str, temperature: float = 0) -> str:
         if not self.api_key:
             raise WeeklyTranslationError("NVIDIA_API_KEY_MISSING")
+        self.started = self.started or time.monotonic()
+        if time.monotonic() - self.started > TIME_BUDGET:
+            raise WeeklyTranslationError("AI_TIME_BUDGET")
+        self.calls += 1
+        if self.calls % 10 == 0:
+            LOG.info("AI: %d lượt gọi, %.0f giây", self.calls, time.monotonic() - self.started)
         resp = self.session.post(ENDPOINT, headers={"Authorization": "Bearer " + self.api_key},
                                  json={"model": model, "messages": [{"role": "system", "content": system},
                                                                     {"role": "user", "content": text}],
                                        "temperature": temperature, "top_p": 1, "max_tokens": 2048},
-                                 timeout=(10, 90), allow_redirects=False)
+                                 timeout=(10, 45), allow_redirects=False)
         if resp.status_code != 200:
             raise WeeklyTranslationError(f"NVIDIA_HTTP_{resp.status_code}")
         choice = resp.json()["choices"][0]

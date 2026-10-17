@@ -50,10 +50,12 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
     manifest = {"friday": friday.isoformat(), "status": "started"}
     try:
         now = datetime.now(VN_TZ)
+        LOG.info("1/7 Lấy số liệu hôm nay")
         snap = collect_snapshot(Http(run / "sources"), now)
         (run / "snapshot.json").write_text(snap.model_dump_json(indent=1), encoding="utf-8")
         monday, fri = week_bounds(friday)
         snaps = load_week_snapshots(ROOT / "output", monday, fri, extra=[snap])
+        LOG.info("2/7 Tin Trading Economics cả tuần")
         te_items, te_errors = te_stream.collect_week(monday, fri)
         for topic, items in te_stream.from_snapshots(snaps).items():
             have = {i["url"] for i in te_items.get(topic, [])}
@@ -61,6 +63,7 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
         facts = build_facts(friday, snaps, load_inputs(), te_items)
         for e in te_errors:
             facts.warn("TE_WEEK_SOURCE", e)
+        LOG.info("3/7 Giá cả tuần (TradingView, Yahoo)")
         bcom = tradingview_move("CRB", os.getenv("TV_BCOM_SYMBOL", "TVC:BCOM"), monday, fri)
         if bcom is not None:
             facts.markets["CRB"] = bcom
@@ -68,6 +71,7 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
         if bcom is None:
             facts.warn("BCOM_TRADINGVIEW", "Không lấy được BCOM Index từ TradingView; "
                        + ("đã dùng số Yahoo (^BCOM)" if "CRB" in filled else "Yahoo (^BCOM) cũng không có số"))
+        LOG.info("4/7 Lợi suất TPCP (VBMA, VIRA)")
         facts.bond_yields, bond_notes = bond_yields.refresh(fri)
         for n in bond_notes:
             facts.warn("BOND_YIELDS", n)
@@ -78,11 +82,14 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
         earlier = (load_week_snapshots(ROOT / "output", monday - timedelta(days=7), fri - timedelta(days=7))
                    + load_week_snapshots(ROOT / "output", monday - timedelta(days=14), fri - timedelta(days=14)))
         centrals = history.friday_centrals(facts, earlier)
+        LOG.info("5/7 Lịch kinh tế tuần sau")
         calendar, cal_issues = build_calendar(monday + timedelta(days=7))
         seed = extract_weekly(TEMPLATES["vi"], "vi").charts
+        LOG.info("6/7 Viết và dịch (AI)")
         contents, issues = build_contents(facts, translator=None, template_seed=seed, work=run,
                                           centrals=centrals, calendar=calendar)
         issues += cal_issues
+        LOG.info("7/7 Dựng file Word và gửi email")
         files = []
         for lang in ("vi", "en"):
             (run / f"content_{lang}.json").write_text(contents[lang].model_dump_json(indent=1), encoding="utf-8")
