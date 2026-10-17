@@ -30,20 +30,47 @@ def _pct(value, decimals, lang):
     return "—" if value is None else fmt(value, decimals, lang) + "%"
 
 
-def indicators(f: WeeklyFacts, lang: str, prev_week_central: float | None) -> Indicators:
+def central_forecast(f: WeeklyFacts, centrals: dict[date, float]) -> tuple[float | None, list[str]]:
+    """Dự báo tỷ giá trung tâm: lệch 30–60 điểm so với giá trung tâm thứ Sáu tuần này.
+
+    Mặc định lệch 45 điểm theo chiều đi của tuần (so với thứ Sáu tuần trước); team ghi đè bằng
+    indicators.tgtt_forecast. Số ghi đè nằm ngoài biên 30–60 điểm thì báo trong email review.
+    """
+    notes = []
+    base = centrals.get(f.friday)
+    prev = centrals.get(f.friday - timedelta(days=7))
+    override = (f.inputs.get("indicators") or {}).get("tgtt_forecast")
+    if override is not None and base is not None:
+        gap = abs(float(override) - base)
+        if not 30 <= gap <= 60:
+            notes.append(f"Dự báo tỷ giá trung tâm {override} lệch {gap:.0f} điểm so với {base:.0f} (yêu cầu 30–60)")
+        return float(override), notes
+    if base is None:
+        return None, ["Thiếu tỷ giá trung tâm phiên thứ Sáu tuần này để tính dự báo"]
+    direction = 1 if prev is None or base >= prev else -1
+    return base + direction * 45, notes
+
+
+def indicators(f: WeeklyFacts, lang: str, centrals: dict[date, float]) -> Indicators:
+    """Bảng "Các chỉ số cơ bản" lùi một tuần như mẫu: cột tuần trước, cột hai tuần trước, cột dự báo.
+
+    Tỷ giá trung tâm chỉ lấy phiên thứ Sáu của từng tuần; dự báo tính từ thứ Sáu tuần này.
+    """
     inp = f.inputs.get("indicators") or {}
-    prev_monday = f.monday - timedelta(days=7)
-    headers = [f"{f.monday:%d.%m}-{f.friday:%d.%m}", f"{prev_monday:%d.%m}-{prev_monday + timedelta(days=4):%d.%m}",
+    w1 = f.monday - timedelta(days=7)
+    w2 = f.monday - timedelta(days=14)
+    headers = [f"{w1:%d.%m}-{w1 + timedelta(days=4):%d.%m}", f"{w2:%d.%m}-{w2 + timedelta(days=4):%d.%m}",
                "Dự báo" if lang == "vi" else "Forecast"]
     rows = []
     for key in INDICATOR_ROWS:
         vals = (inp.get(key) or [None, None, None]) + [None] * 3
         rows.append([_pct(v, INDICATOR_DECIMALS[key], lang) for v in vals[:3]])
-    central = [d.sbv_central for d in f.days if d.sbv_central]
-    fc = inp.get("tgtt_forecast")
-    rows.append([fmt(central[-1], 0, lang) if central else "—",
-                 fmt(prev_week_central, 0, lang) if prev_week_central else "—",
-                 fmt(fc, 0, lang) if fc else "—"])
+    c1, c2 = centrals.get(f.friday - timedelta(days=7)), centrals.get(f.friday - timedelta(days=14))
+    fc, notes = central_forecast(f, centrals)
+    for n in notes:
+        if n not in [i["message"] for i in f.issues]:
+            f.warn("TGTT_FORECAST", n)
+    rows.append([fmt(v, 0, lang) if v else "—" for v in (c1, c2, fc)])
     if not inp:
         f.warn("INDICATORS_MISSING", "config/weekly_inputs.json chưa có lãi suất điều hành (indicators)")
     return Indicators(headers=headers, rows=rows)
@@ -115,11 +142,12 @@ def chart_images(f: WeeklyFacts, work: Path) -> dict[str, str]:
 
 
 def translate_section(translator, draft, src: str, dst: str, lim: dict) -> tuple[str, list[str]]:
-    """Dịch đoạn; nếu bản dịch ngắn hơn số từ tối thiểu thì dịch thêm câu nguồn còn dư để bù."""
+    """Dịch đoạn (quá dài thì AI rút gọn trong Translator); ngắn hơn số từ tối thiểu thì dịch thêm câu nguồn còn dư để bù."""
     lo, hi = lim["words"]
     if not str(draft):
         return "", []
-    text, notes = translator.paragraph(str(draft), src, dst, max_words=hi, max_lines=lim["max_lines"])
+    text, notes = translator.paragraph(str(draft), src, dst, min_words=lo, max_words=hi,
+                                       max_lines=lim["max_lines"])
     for extra in getattr(draft, "spare", []):
         if count_words(text) >= lo:
             break
@@ -132,7 +160,7 @@ def translate_section(translator, draft, src: str, dst: str, lim: dict) -> tuple
 
 
 def translate_news(translator, candidates: list[tuple[str, str]], budget: int = 16) -> tuple[dict[str, list[str]], list[str]]:
-    """Ghép từng tin tiếng Việt với bản dịch; mỗi bài giữ một độ dài mà cả hai bản đều đúng số từ, rồi chọn 3 tin."""
+    """Ghép từng tin tiếng Việt với bản dịch (bản dịch dài thì AI rút gọn); chọn 3 tin mà cả hai bản đều đúng số từ."""
     cfg = rules()["news"]
     en_lo, en_hi = cfg["en"]["item_words"]
     pairs, notes, done, calls = [], [], set(), 0
@@ -140,7 +168,7 @@ def translate_news(translator, candidates: list[tuple[str, str]], budget: int = 
         if key in done or calls >= budget:
             continue
         calls += 1
-        en_item, more = translator.paragraph(vi_item, "vi", "en")
+        en_item, more = translator.paragraph(vi_item, "vi", "en", min_words=en_lo, max_words=en_hi)
         notes += more
         if en_item and en_lo <= count_words(en_item) <= en_hi:
             pairs.append((vi_item, en_item))
@@ -153,7 +181,7 @@ def translate_news(translator, candidates: list[tuple[str, str]], budget: int = 
     return {"vi": [v for v, _ in chosen], "en": [e for _, e in chosen]}, notes
 
 def build_contents(f: WeeklyFacts, *, translator: Translator | None, template_seed: dict[str, ChartData],
-                   work: Path, prev_week_central: float | None = None, history_path: Path = history.HISTORY,
+                   work: Path, centrals: dict[date, float] | None = None, history_path: Path = history.HISTORY,
                    calendar: dict[str, Calendar] | None = None) -> tuple[dict[str, WeeklyContent], list[dict]]:
     translator = translator or Translator()
     cfg = rules()
@@ -185,7 +213,7 @@ def build_contents(f: WeeklyFacts, *, translator: Translator | None, template_se
             sections={name: Section(body=[sections[lang][name]] if sections[lang][name] else [], forecast=fc[name])
                       for name in PAGE1 + PAGE2},
             news=news[lang],
-            indicators=indicators(f, lang, prev_week_central),
+            indicators=indicators(f, lang, centrals or {}),
             small_tables=small_tables(f, lang),
             charts=charts,
             images=images,

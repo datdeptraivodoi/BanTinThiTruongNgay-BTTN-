@@ -182,3 +182,26 @@ def build_facts(friday: date, snapshots: list[Snapshot], inputs: dict | None = N
 
 def decimal_str(value: float | Decimal | None) -> str | None:
     return None if value is None else format(Decimal(str(value)).normalize(), "f")
+
+
+def tradingview_move(key: str, tv_symbol: str, monday: date, friday: date, runner=None) -> Move | None:
+    """Giá cả tuần lấy từ TradingView (cầu nối Node scripts/fetch_tradingview.js), ví dụ BCOM Index."""
+    import subprocess
+
+    try:
+        if runner is None:
+            proc = subprocess.run(["node", str(ROOT / "scripts" / "fetch_tradingview.js"), json.dumps({key: tv_symbol})],
+                                  cwd=str(ROOT), capture_output=True, text=True, timeout=60, check=True)
+            payload = json.loads(proc.stdout)
+        else:
+            payload = runner(key, tv_symbol)
+        candles = payload.get(key, {}).get("candles") or []
+    except Exception:  # noqa: BLE001 - nguồn lỗi thì trả None để báo trong email review
+        return None
+    points = sorted((datetime.fromtimestamp(int(c["time"]), VN_TZ).date(), float(c["close"])) for c in candles)
+    before = [v for d, v in points if d < monday]
+    week = [v for d, v in points if monday <= d <= friday]
+    if not week:
+        return None
+    last_day = max(d for d, _ in points if d <= friday)
+    return Move(before[-1] if before else None, week[0], week[-1], max(week), min(week), last_day)

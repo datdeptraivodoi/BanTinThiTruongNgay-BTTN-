@@ -103,9 +103,13 @@ def te_items():
 
 class EchoTranslator:
     """Thay AI trong test: trả nguyên câu (chỉ kiểm phần ghép, không kiểm chất lượng dịch)."""
-    def paragraph(self, text, src, dst, max_words=None, max_lines=None):
-        from bttn.weekly.translate import Translator
+    def paragraph(self, text, src, dst, min_words=None, max_words=None, max_lines=None):
+        from bttn.weekly.translate import Translator, WeeklyTranslationError
         t = Translator(api_key="x")
+
+        def no_ai(*a, **k):
+            raise WeeklyTranslationError("offline")
+        t._chat = no_ai
         # vi->en ngắn hơn khoảng 20% như bản dịch thật; en->vi dài hơn khoảng 30%
         def fake(s, a, b):
             words = s.rstrip(".").split()
@@ -113,7 +117,7 @@ class EchoTranslator:
                 return " ".join(words[: max(1, int(len(words) * 0.8))]) + "."
             return " ".join(words + words[: int(len(words) * 0.3)]) + "."
         t.sentence = fake
-        return t.paragraph(text, src, dst, max_words=max_words, max_lines=max_lines)
+        return t.paragraph(text, src, dst, min_words=min_words, max_words=max_words, max_lines=max_lines)
 
 
 def calendar_pack():
@@ -131,12 +135,13 @@ def calendar_pack():
 def built(tmp_path):
     facts = build_facts(FRIDAY, snapshots(), inputs={
         "indicators": {"LSCB": [9, 9, 9], "tai_chiet_khau": [3, 3, 3], "tai_cap_von": [4.5, 4.5, 4.5],
-                       "cvqd": [5, 5, 5], "omo": [4.5, 4.5, 4.5], "tgtt_forecast": 25620},
+                       "cvqd": [5, 5, 5], "omo": [4.5, 4.5, 4.5], "tgtt_forecast": None},
         "term_sofr": {"start": {"1M": 3.92465, "3M": 4.04249, "6M": 4.2014}, "end": {"1M": 3.97183, "3M": 4.11624, "6M": 4.29534}},
         "forecasts": {"fx": {"lo": 25800, "hi": 25950}}}, te_items=te_items())
     seed = extract_weekly(TEMPLATES["vi"], "vi").charts
     contents, issues = build_contents(facts, translator=EchoTranslator(), template_seed=seed, work=tmp_path,
-                                      prev_week_central=25620, history_path=tmp_path / "hist.json",
+                                      centrals={date(2026, 10, 2): 25629, date(2026, 10, 9): 25637, FRIDAY: 25638},
+                                      history_path=tmp_path / "hist.json",
                                       calendar=to_calendars(calendar_pack(), date(2026, 10, 19)))
     return facts, contents, issues
 
@@ -162,7 +167,9 @@ def test_tables_and_calendar(built):
     assert vi.small_tables["sofr"].values == ["3,97183", "4,11624", "4,29534"]
     assert en.small_tables["sofr"].changes == ["0.04718", "0.07375", "0.09394"]
     assert vi.small_tables["policy_rates"].changes[1] == "+25bps"
-    assert vi.indicators.rows[5] == ["25.638", "25.620", "25.620"]
+    # Bảng lùi một tuần: tuần 05–09.10, tuần 28.09–02.10; dự báo = trung tâm thứ Sáu 16.10 ± 45 điểm theo chiều tuần
+    assert vi.indicators.headers == ["05.10-09.10", "28.09-02.10", "Dự báo"]
+    assert vi.indicators.rows[5] == ["25.637", "25.629", "25.683"]
     assert len(vi.calendar.events) == 15
     vn = [e for e in vi.calendar.events if e.country == "Việt Nam"]
     assert len(vn) == 1 and vn[0].bold                        # dòng Việt Nam luôn giữ
@@ -207,3 +214,78 @@ def test_suggested_forecasts_from_week(built):
     s = write.suggested_forecasts(facts)
     assert s["interbank"] == {"lo": 3.0, "hi": 5.5}
     assert s["intl_fx"]["eurusd"] == pytest.approx(1.128)
+
+
+def _central_facts(override=None):
+    return build_facts(FRIDAY, snapshots(), inputs={"indicators": {"tgtt_forecast": override}}, te_items=[])
+
+
+def test_central_forecast_band_and_direction():
+    from bttn.weekly.build import central_forecast
+    up = {date(2026, 10, 9): 25637, FRIDAY: 25650}
+    down = {date(2026, 10, 9): 25660, FRIDAY: 25650}
+    assert central_forecast(_central_facts(), up) == (25695, [])
+    assert central_forecast(_central_facts(), down) == (25605, [])
+    value, notes = central_forecast(_central_facts(25690), up)       # lệch 40 điểm: hợp lệ
+    assert value == 25690 and not notes
+    value, notes = central_forecast(_central_facts(25620), up)       # lệch 30 điểm: biên dưới vẫn hợp lệ
+    assert not notes
+    value, notes = central_forecast(_central_facts(25640), up)       # lệch 10 điểm: báo trong email review
+    assert value == 25640 and "30–60" in notes[0]
+    assert central_forecast(_central_facts(), {})[0] is None
+
+
+def test_tradingview_move_from_candles():
+    from datetime import datetime as dt
+
+    from bttn.weekly.facts import VN_TZ, tradingview_move
+
+    def ts(d):
+        return int(dt(2026, 10, d, 12, tzinfo=VN_TZ).timestamp())
+
+    candles = [{"time": ts(9), "close": 100.0}] + [{"time": ts(d), "close": 100.0 + d - 11} for d in range(12, 17)]
+    m = tradingview_move("CRB", "TVC:BCOM", date(2026, 10, 12), FRIDAY, runner=lambda k, s: {k: {"candles": candles}})
+    assert (m.prev_close, m.open, m.close, m.high, m.low) == (100.0, 101.0, 105.0, 105.0, 101.0)
+    assert round(m.pct, 2) == 5.0
+    assert tradingview_move("CRB", "X", date(2026, 10, 12), FRIDAY, runner=lambda k, s: {}) is None
+
+
+def _condense_translator(reply):
+    from bttn.weekly.translate import Translator
+    t = Translator(api_key="x", sleep=lambda s: None)
+    t.sentence = lambda s, a, b: s
+    calls = []
+
+    def chat(model, system, text, temperature=0):
+        calls.append(system)
+        return reply(len(calls))
+    t._chat = chat
+    return t, calls
+
+
+LONG_EN = ("The dollar index fell 0.8% to 98.4 this week. Euro rose to 1.1650 after strong German data. "
+           "Analysts in London and New York said positioning was light ahead of the holiday. "
+           "Yen gained to 149.2 as Japanese officials repeated warnings about speculative moves.")
+
+
+def test_condense_used_when_translation_too_long():
+    short = "The dollar index fell 0.8% to 98.4. Euro rose to 1.1650. Yen gained to 149.2 on official warnings."
+    t, calls = _condense_translator(lambda n: short)
+    text, notes = t.paragraph(LONG_EN, "vi", "en", min_words=15, max_words=25)
+    assert text == short and not notes and "15 and 25 words" in calls[0]
+
+
+def test_condense_rejects_invented_numbers_then_drops_sentences():
+    bad = "The dollar index fell 0.9% to 98.4. Euro rose to 1.1650. Yen gained to 149.2 on official warnings."
+    t, calls = _condense_translator(lambda n: bad)
+    text, notes = t.paragraph(LONG_EN, "vi", "en", min_words=15, max_words=25)
+    assert len(calls) == 2                                  # thử lại một lần
+    assert text == "The dollar index fell 0.8% to 98.4 this week. Euro rose to 1.1650 after strong German data."
+    assert "AI rút gọn không đạt" in notes[0]
+
+
+def test_condense_retries_when_word_count_off():
+    good = "The dollar index fell 0.8% to 98.4. Euro rose to 1.1650. Yen gained to 149.2 on official warnings."
+    t, calls = _condense_translator(lambda n: "Dollar fell." if n == 1 else good)
+    text, _ = t.paragraph(LONG_EN, "vi", "en", min_words=15, max_words=25)
+    assert text == good and len(calls) == 2

@@ -32,11 +32,11 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
 
     from bttn.http import Http
     from bttn.sources import collect_snapshot
-    from bttn.weekly import te_stream
+    from bttn.weekly import history, te_stream
     from bttn.weekly.build import build_contents
     from bttn.weekly.calendar import build_calendar
     from bttn.weekly.deliver import send_weekly
-    from bttn.weekly.facts import build_facts, load_inputs, load_week_snapshots
+    from bttn.weekly.facts import build_facts, load_inputs, load_week_snapshots, tradingview_move
 
     load_dotenv(ROOT / ".env")
     run = out / datetime.now(VN_TZ).strftime("%Y%m%d-%H%M%S")
@@ -52,13 +52,18 @@ def collect_and_build(friday: date, out: Path, *, review: bool) -> int:
         facts = build_facts(friday, snaps, load_inputs(), te_items)
         for e in te_errors:
             facts.warn("TE_WEEK_SOURCE", e)
-        prev = load_week_snapshots(ROOT / "output", monday - timedelta(days=7), fri - timedelta(days=7))
-        prev_central = next((float(s.observations["SBV_CENTRAL"].value) for s in reversed(prev)
-                             if "SBV_CENTRAL" in s.observations), None)
+        bcom = tradingview_move("CRB", os.getenv("TV_BCOM_SYMBOL", "TVC:BCOM"), monday, fri)
+        if bcom is not None:
+            facts.markets["CRB"] = bcom
+        else:
+            facts.warn("BCOM_TRADINGVIEW", "Không lấy được BCOM Index từ TradingView; dùng số Yahoo (^BCOM) nếu có")
+        earlier = (load_week_snapshots(ROOT / "output", monday - timedelta(days=7), fri - timedelta(days=7))
+                   + load_week_snapshots(ROOT / "output", monday - timedelta(days=14), fri - timedelta(days=14)))
+        centrals = history.friday_centrals(facts, earlier)
         calendar, cal_issues = build_calendar(monday + timedelta(days=7))
         seed = extract_weekly(TEMPLATES["vi"], "vi").charts
         contents, issues = build_contents(facts, translator=None, template_seed=seed, work=run,
-                                          prev_week_central=prev_central, calendar=calendar)
+                                          centrals=centrals, calendar=calendar)
         issues += cal_issues
         files = []
         for lang in ("vi", "en"):

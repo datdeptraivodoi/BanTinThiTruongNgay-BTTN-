@@ -64,3 +64,31 @@ def update(charts: dict[str, ChartData], facts: WeeklyFacts) -> dict[str, ChartD
         if "credit" in charts:
             upsert(charts["credit"], label, [None if v is None else float(v) for v in values], KEEP["credit"])
     return charts
+
+
+CENTRALS = ROOT / "data" / "weekly" / "central_rates.json"
+# Tỷ giá trung tâm phiên thứ Sáu đã có trong file mẫu (để tuần đầu chạy có đủ hai cột lùi tuần).
+CENTRAL_SEED = {"2026-10-02": 25629.0, "2026-10-09": 25637.0}
+
+
+def friday_centrals(facts: WeeklyFacts, earlier_snapshots=(), path: Path = CENTRALS) -> dict:
+    """Tỷ giá trung tâm phiên thứ Sáu theo tuần: lưu trên VPS, thêm thứ Sáu tuần này nếu có."""
+    from datetime import date
+
+    from ..models import VN_TZ
+
+    store = dict(CENTRAL_SEED)
+    if path.is_file():
+        store.update(json.loads(path.read_text(encoding="utf-8")))
+    for snap in earlier_snapshots:
+        day = snap.as_of.astimezone(VN_TZ).date()
+        if day.weekday() == 4 and "SBV_CENTRAL" in snap.observations:
+            store.setdefault(day.isoformat(), float(snap.observations["SBV_CENTRAL"].value))
+    friday = next((d for d in facts.days if d.day == facts.friday and d.sbv_central), None)
+    if friday:
+        store[facts.friday.isoformat()] = friday.sbv_central
+    else:
+        facts.warn("TGTT_FRIDAY_MISSING", "Chưa có tỷ giá trung tâm phiên thứ Sáu tuần này")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(dict(sorted(store.items())), indent=1), encoding="utf-8")
+    return {date.fromisoformat(k): float(v) for k, v in store.items()}

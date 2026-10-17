@@ -2,13 +2,13 @@
   "_huong_dan": "Số liệu team nhập cho bản tin tuần (sửa trên web GitHub trước 11:30 thứ Sáu). Số ghi dạng số (dấu chấm thập phân), code tự viết theo kiểu Việt/Anh. Để null nếu chưa có; bản tin sẽ hiện — và email review báo thiếu.",
   "week_friday": "2026-10-16",
   "indicators": {
-    "_ghi_chu": "Mỗi dòng: [tuần này, tuần trước, dự báo], đơn vị %. LSCB = lãi suất cơ bản, tai_chiet_khau, tai_cap_von, cvqd = cho vay qua đêm, omo = lãi suất OMO.",
+    "_ghi_chu": "Bảng lùi 1 tuần như mẫu. Mỗi dòng: [tuần trước, hai tuần trước, dự báo], đơn vị %. Tỷ giá trung tâm code tự lấy phiên thứ Sáu; tgtt_forecast = null thì code gợi ý (thứ Sáu tuần này ± 45 điểm), ghi đè phải lệch 30–60 điểm. LSCB = lãi suất cơ bản, tai_chiet_khau, tai_cap_von, cvqd = cho vay qua đêm, omo = lãi suất OMO.",
     "LSCB": [9, 9, 9],
     "tai_chiet_khau": [3.0, 3.0, 3.0],
     "tai_cap_von": [4.5, 4.5, 4.5],
     "cvqd": [5.0, 5.0, 5.0],
     "omo": [4.5, 4.5, 4.5],
-    "tgtt_forecast": 25620
+    "tgtt_forecast": null
   },
   "term_sofr": {
     "_ghi_chu": "Term SOFR từ CME/LSEG: đầu tuần và cuối tuần (%), như sheet CME trong Data Bản tin tuần.xlsx.",
