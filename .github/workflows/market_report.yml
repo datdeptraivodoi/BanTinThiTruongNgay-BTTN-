@@ -53,7 +53,8 @@ jobs:
           restore-keys: bttn-ledger-
       - name: Collect, validate, render and publish
         env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.Deepsee_V4dot1_API_Key }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL }}
           TRADINGECONOMICS_API_KEY: ${{ secrets.TRADINGECONOMICS_API_KEY }}
           SWAP_DATA_URL: ${{ secrets.SWAP_DATA_URL || vars.SWAP_DATA_URL }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}

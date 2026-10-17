@@ -248,7 +248,7 @@ def validate_snapshot(snapshot: Snapshot) -> list[Issue]:
 
 def validate_content(content: ReportContent, snapshot: Snapshot, *, translations_path=None) -> list[Issue]:
     from .editorial import sentences
-    from .nvidia_translation import TranslationError
+    from .deepseek_translation import TranslationError
     from .tradingeconomics_news import topic_for
     from .translation_service import load_verified_translations
 

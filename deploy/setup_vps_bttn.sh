@@ -67,9 +67,9 @@ if [ -z "$(getval SENDER_PASSWORD)" ] && [ -f /root/TyGia/.env ]; then
     GP=$(grep -E '^GMAIL_APP_PASSWORD=' /root/TyGia/.env | tail -1 | cut -d= -f2- | tr -d '"')
     [ -n "$GP" ] && setval SENDER_PASSWORD "$GP" && echo "   Đã dùng Gmail app password của BTS."
 fi
-if [ -z "$(getval NVIDIA_API_KEY)" ]; then
-    read -r -s -p "   Dán NVIDIA_API_KEY rồi Enter (bỏ trống nếu chưa có): " NK; echo
-    [ -n "$NK" ] && setval NVIDIA_API_KEY "$NK"
+if [ -z "$(getval DEEPSEEK_API_KEY)" ]; then
+    read -r -s -p "   Dán DEEPSEEK_API_KEY rồi Enter (bỏ trống nếu chưa có): " DK; echo
+    [ -n "$DK" ] && setval DEEPSEEK_API_KEY "$DK"
 fi
 if [ -z "$(getval TRADINGECONOMICS_API_KEY)" ]; then
     read -r -s -p "   Dán TRADINGECONOMICS_API_KEY rồi Enter (bỏ trống nếu không có): " TK; echo

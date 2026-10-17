@@ -111,7 +111,7 @@ def generate_markdown_summary(
         lines.append("")
 
     if attempts_data:
-        lines.append("### Nhật ký dịch NVIDIA\n")
+        lines.append("### Nhật ký dịch DeepSeek\n")
         lines.append("Các lần lỗi dưới đây có thể đã phục hồi khi thử lại; trạng thái cuối cùng nằm ở đầu trang.\n")
         lines.append("| Lần | Mô hình | Kết quả | Mã lỗi | Thời gian |")
         lines.append("| :---: | :--- | :--- | :--- | :---: |")

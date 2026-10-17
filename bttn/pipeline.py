@@ -27,7 +27,7 @@ def write_json(path, value):
 
 
 def run_news_translation(args):
-    """Isolated NVIDIA-only review, without prices, other models, Word or SMTP."""
+    """Isolated DeepSeek-only review, without prices, other models, Word or SMTP."""
     from .tradingeconomics_news import collect_tradingeconomics
     from .translation_service import translate_snapshot
 
@@ -35,7 +35,7 @@ def run_news_translation(args):
     directory = Path(args.output_dir) / (as_of.strftime("%Y%m%d-%H%M%S") + "-translations-" + uuid4().hex[:8])
     directory.mkdir(parents=True, exist_ok=False)
     manifest = {"status": "started", "as_of": as_of.isoformat(), "send_requested": False,
-                "mode": "nvidia_translation_only"}
+                "mode": "deepseek_translation_only"}
     try:
         if args.snapshot:
             snapshot = Snapshot.model_validate_json(Path(args.snapshot).read_text(encoding="utf-8"))
@@ -154,7 +154,7 @@ def run(args):
                               f"lỗi {dict(reasons) or 'không'}")
                     translation_issues.append(Issue(
                         severity="error",
-                        code="TRANSLATION_INCOMPLETE", message=f"Bản dịch NVIDIA chưa đủ: {detail}."))
+                        code="TRANSLATION_INCOMPLETE", message=f"Bản dịch DeepSeek chưa đủ: {detail}."))
                 content = generate(snapshot, directory)
                 used = {ref.source_id for name in content.__class__.model_fields
                         for section in (getattr(content, name) if name == "highlights" else [getattr(content, name)])
@@ -263,7 +263,7 @@ def main(argv=None):
     modes.add_argument("--review", action="store_true",
                        help="Gửi cho người duyệt (REVIEW_RECIPIENTS), kể cả bản nháp còn lỗi, kèm danh sách lỗi")
     modes.add_argument("--create-only", "--dry-run", dest="dry_run", action="store_true", help="Create Word without sending email (default); no PDF")
-    modes.add_argument("--translate-news-only", action="store_true", help="NVIDIA translation review only; no other models or email")
+    modes.add_argument("--translate-news-only", action="store_true", help="DeepSeek translation review only; no other models or email")
     parser.add_argument("--news-file", help="Imported Trading Economics article JSON for translation review")
     parser.add_argument("--as-of", help="ISO timestamp including UTC offset")
     parser.add_argument("--snapshot", help="Replay stored snapshot JSON, without fetching sources")
