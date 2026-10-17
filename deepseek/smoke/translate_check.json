@@ -4,22 +4,32 @@
     {
       "source": "The Federal Reserve kept rates unchanged at 4.25%, while the Japanese yen depreciated past 150 per dollar on Tuesday.",
       "status": "checked",
-      "translation": "Cục Dự trữ Liên bang Mỹ giữ nguyên lãi suất ở mức 4.25%, trong khi đồng yên Nhật suy yếu vượt mức 150 yên đổi một USD vào thứ Ba."
+      "translation": "Cục Dự trữ Liên bang Mỹ giữ nguyên lãi suất ở mức 4,25%, trong khi USD-JPY vượt mức 150 cho thấy JPY đang suy yếu vào thứ Ba."
     },
     {
       "source": "Core inflation slowed to 2.8% in September, while headline inflation ticked up and Nonfarm Payrolls rose by 150,000.",
       "status": "checked",
-      "translation": "Lạm phát cơ bản giảm xuống 2.8% trong tháng 9, trong khi lạm phát danh nghĩa tăng nhẹ và Bảng lương phi nông nghiệp tăng thêm 150,000."
+      "translation": "Lạm phát cơ bản giảm xuống 2,8% trong tháng 9, trong khi lạm phát danh nghĩa tăng nhẹ và Bảng lương phi nông nghiệp tăng 150.000."
     },
     {
       "source": "The offshore yuan strengthened to 7.12 per dollar as China announced $500 billion in expansionary fiscal policies.",
       "status": "checked",
-      "translation": "Đồng nhân dân tệ offshore tăng lên 7.12 mỗi đô la khi Trung Quốc công bố 500 tỷ $ chính sách tài khóa mở rộng."
+      "translation": "Nhân dân tệ ngoại biên mạnh lên mức 7,12 nhân dân tệ đổi một USD khi Trung Quốc công bố 500 tỷ USD chính sách tài khóa mở rộng."
     },
     {
       "source": "ECB Chief Economist Philip Lane said further tightening may be needed in the first quarter, sending the euro up 0.4% to $1.1650.",
       "status": "checked",
-      "translation": "Kinh tế trưởng ECB Philip Lane cho biết có thể cần thắt chặt trong quý 1, khiến đồng euro tăng 0,4% lên $1.1650."
+      "translation": "Kinh tế trưởng ECB Philip Lane cho biết có thể cần thắt chặt thêm trong quý 1, khiến đồng euro tăng 0,4% lên 1,1650 USD."
+    },
+    {
+      "source": "Germany's current account surplus widened to €24.6 billion on Monday, and the offshore yuan traded flat around 7.1350 per dollar.",
+      "status": "checked",
+      "translation": "Thặng dư cán cân vãng lai của Đức mở rộng lên 24,6 tỷ EUR vào thứ Hai, và nhân dân tệ ngoại biên giao dịch đi ngang quanh mức 7,1350 nhân dân tệ đổi một USD."
+    },
+    {
+      "source": "Traders now price two further rate hikes by the Bank of Japan, while the yen weakened past 152.40 per dollar on Friday.",
+      "status": "checked",
+      "translation": "Các nhà giao dịch hiện định giá thêm hai lần tăng lãi suất của Ngân hàng Trung ương Nhật Bản, trong khi USD-JPY vượt mức 152,40 cho thấy JPY đang suy yếu vào thứ Sáu."
     }
   ],
   "attempts": [
@@ -27,7 +37,7 @@
       "model": "deepseek-flash",
       "attempt": 1,
       "http_status": 200,
-      "elapsed_seconds": 2.157,
+      "elapsed_seconds": 2.459,
       "status": "checked",
       "error": null,
       "python_postprocessed": true,
@@ -37,7 +47,7 @@
       "model": "deepseek-flash",
       "attempt": 1,
       "http_status": 200,
-      "elapsed_seconds": 1.224,
+      "elapsed_seconds": 1.287,
       "status": "checked",
       "error": null,
       "python_postprocessed": false,
@@ -47,7 +57,7 @@
       "model": "deepseek-flash",
       "attempt": 1,
       "http_status": 200,
-      "elapsed_seconds": 1.447,
+      "elapsed_seconds": 1.337,
       "status": "checked",
       "error": null,
       "python_postprocessed": false,
@@ -57,10 +67,30 @@
       "model": "deepseek-flash",
       "attempt": 1,
       "http_status": 200,
-      "elapsed_seconds": 1.186,
+      "elapsed_seconds": 1.167,
       "status": "checked",
       "error": null,
       "python_postprocessed": false,
+      "prompt_variant": "direct"
+    },
+    {
+      "model": "deepseek-flash",
+      "attempt": 1,
+      "http_status": 200,
+      "elapsed_seconds": 3.931,
+      "status": "checked",
+      "error": null,
+      "python_postprocessed": true,
+      "prompt_variant": "direct"
+    },
+    {
+      "model": "deepseek-flash",
+      "attempt": 1,
+      "http_status": 200,
+      "elapsed_seconds": 2.85,
+      "status": "checked",
+      "error": null,
+      "python_postprocessed": true,
       "prompt_variant": "direct"
     }
   ]
