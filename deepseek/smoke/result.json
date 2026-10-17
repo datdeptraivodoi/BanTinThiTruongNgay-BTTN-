@@ -1,0 +1,7 @@
+{
+  "base_url": "https://api.deepseek.com",
+  "key_present": false,
+  "models": [],
+  "chat": null,
+  "error": "DEEPSEEK_API_KEY_MISSING"
+}
