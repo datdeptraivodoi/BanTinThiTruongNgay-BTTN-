@@ -71,6 +71,10 @@ if [ -z "$(getval DEEPSEEK_API_KEY)" ]; then
     read -r -s -p "   Dán DEEPSEEK_API_KEY rồi Enter (bỏ trống nếu chưa có): " DK; echo
     [ -n "$DK" ] && setval DEEPSEEK_API_KEY "$DK"
 fi
+if [ -z "$(getval NVIDIA_API_KEY)" ]; then
+    read -r -s -p "   Dán NVIDIA_API_KEY (dịch dự phòng miễn phí khi DeepSeek lỗi) rồi Enter (bỏ trống nếu chưa có): " NK; echo
+    [ -n "$NK" ] && setval NVIDIA_API_KEY "$NK"
+fi
 if [ -z "$(getval TRADINGECONOMICS_API_KEY)" ]; then
     read -r -s -p "   Dán TRADINGECONOMICS_API_KEY rồi Enter (bỏ trống nếu không có): " TK; echo
     [ -n "$TK" ] && setval TRADINGECONOMICS_API_KEY "$TK"

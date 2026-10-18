@@ -150,3 +150,21 @@ def test_prompt_states_the_five_style_rules():
     prompt = system_prompt()
     for phrase in ["4,25%", "500 tỷ USD", "nhân dân tệ ngoại biên", "thắt chặt thêm", "USD-JPY vượt mức X"]:
         assert phrase in prompt
+
+
+def test_service_falls_back_to_riva_when_deepseek_out_of_balance(tmp_path):
+    from bttn.translation_service import FallbackTranslator
+    snapshot = Snapshot(as_of=AT)
+    snapshot.sources["news_te_eur"] = Source(
+        id="news_te_eur", url="https://tradingeconomics.com/euro-area/currency/news/123",
+        published_at=AT - timedelta(hours=1), retrieved_at=AT, text=ENGLISH, kind="news")
+    deepseek = Mock(attempts=[])
+    deepseek.translate.side_effect = TranslationError("DEEPSEEK_HTTP_402")
+    riva = Mock(attempts=[], api_key="nv")
+    riva.translate.return_value = VIETNAMESE
+    result = translate_snapshot(snapshot, tmp_path / "out", tmp_path / "cache",
+                                translator=FallbackTranslator(deepseek, riva))
+    article = result["articles"]["news_te_eur"]
+    assert article["status"] == "translated_backup" and article["record"]["provider"] == "deepseek+nvidia_riva"
+    assert result["backup"]["reason"] == "DEEPSEEK_HTTP_402"
+    assert not list((tmp_path / "cache").glob("*.json"))      # không lưu đệm: lần sau DeepSeek dịch lại
