@@ -15,6 +15,7 @@ ENV/
 
 # File Word & PDF sinh ra (Chỉ giữ lại template.docx)
 *.docx
+!templates/weekly/*.docx
 !template.docx
 *.pdf
 *.png
@@ -43,3 +44,8 @@ output/
 node_modules/
 trader_quotes.json
 scratch/
+
+# Bản tin tuần: lịch sử biểu đồ và lịch kinh tế lưu trên VPS (không commit)
+data/weekly/
+# Ảnh Reuters team tải lên cho bản tin tuần thì được commit
+!inputs/weekly/**

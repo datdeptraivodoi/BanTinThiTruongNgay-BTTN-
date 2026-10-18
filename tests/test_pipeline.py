@@ -186,7 +186,7 @@ def test_workflow_manual_only_and_vps_runs_1130_weekdays():
     assert 'cancel-in-progress: false' in text
     assert '--send' in text and '--create-only' in text and '--review' in text
     setup=(ROOT/'deploy/setup_vps_bttn.sh').read_text(encoding='utf-8')
-    assert '30 11 * * 1-5 /root/BTTN/deploy/run_bttn.sh' in setup     # VPS chạy 11:30 thứ 2 - thứ 6
+    assert '30 11 * * 1-4 /root/BTTN/deploy/run_bttn.sh' in setup     # VPS chạy 11:30 thứ 2 - thứ 5 (thứ 6 là bản tin tuần)
     runner=(ROOT/'deploy/run_bttn.sh').read_text(encoding='utf-8')
     assert '--review' in runner and '--send' in runner
 

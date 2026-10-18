@@ -203,3 +203,26 @@ Biểu đồ nội địa cũng chỉ dùng snapshot của kỳ báo cáo: lãi 
 | `policy_rates.json` | Lãi suất cơ bản FED/BOE/BOJ/RBA/ECB | Sau mỗi kỳ họp NHTW |
 
 File quá hạn không làm dừng gửi bản tin; email review liệt kê cảnh báo `FORECAST_STALE`, `CALENDAR_STALE`, `TERM_SOFR_STALE`.
+
+## Bản tin thị trường tuần (thứ Sáu)
+
+Phần riêng, không dùng chung code dựng Word với bản tin ngày:
+
+| | Bản tin ngày (BTTN) | Bản tin tuần |
+|---|---|---|
+| Lệnh chạy | `market_report.py` | `weekly_report.py` |
+| Code | `bttn/rendering.py` | `bttn/weekly/` |
+| File mẫu | `template.docx` | `templates/weekly/BT_TTT_template_VIE.docx`, `..._ENG.docx` |
+| Kết quả | `output/<lần chạy>/BTTN-YYYYMMDD.docx` | `output/weekly/BT_TTT2026.12.10-2026.16.10_VIE.docx` và `_ENG.docx` |
+| Lịch | 11:30 thứ Hai – thứ Năm | thứ Sáu (sẽ thêm khi xong phần nội dung) |
+
+Định dạng lấy nguyên từ file mẫu: mỗi đoạn mới nhân bản từ đoạn tương ứng trong mẫu (font, cỡ, màu, căn lề), biểu đồ Word gốc chỉ thay số liệu, ảnh biểu đồ giá thay đúng khung ảnh của mẫu, chia đúng 3 trang (hàng 0–5, 6–11, 12–15). Nội dung đưa vào bằng file JSON theo `bttn/weekly/content.py`.
+
+```bash
+python weekly_report.py --extract-sample                     # đọc 2 file mẫu thành JSON nội dung
+python weekly_report.py --friday 2026-10-16 \
+  --content-vi output/weekly/sample/content_vi.json \
+  --content-en output/weekly/sample/content_en.json         # dựng lại 2 file từ JSON
+```
+
+Nhãn tuần ("Tuần từ 12.10 – 16.10.2026" / "Week 42: 12.10 - 16.10.2026") và tiêu đề lịch sự kiện tuần kế tiếp được tính từ `--friday`.

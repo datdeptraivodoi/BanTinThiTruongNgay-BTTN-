@@ -46,7 +46,9 @@ async function main() {
   const count = 300;
   const results = {};
   
-  for (const [key, tvSym] of Object.entries(DEFAULT_SYMBOLS)) {
+  // Tham số tuỳ chọn: JSON {"KEY": "SÀN:MÃ"} để lấy mã khác (ví dụ bản tin tuần lấy BCOM).
+  const symbols = process.argv[2] ? JSON.parse(process.argv[2]) : DEFAULT_SYMBOLS;
+  for (const [key, tvSym] of Object.entries(symbols)) {
     const res = await fetchSymbol(key, tvSym, count);
     results[key] = res;
   }
