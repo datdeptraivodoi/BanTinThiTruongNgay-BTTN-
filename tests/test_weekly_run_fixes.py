@@ -96,3 +96,43 @@ def test_fx_range_skipped_when_quote_flat():
         d.itb_ask, d.itb_bid = v, v - 5
     f = WeeklyFacts(date(2026, 10, 12), date(2026, 10, 16), days, {}, [], {}, {})
     assert "dao động trong khoảng" not in str(fx_vi(f))
+
+
+class _Resp:
+    def __init__(self, status, content):
+        self.status_code, self._content = status, content
+
+    def json(self):
+        return {"choices": [{"finish_reason": "stop", "message": {"content": self._content}}]}
+
+
+def test_weekly_translation_uses_deepseek_first():
+    sent = []
+
+    class Session:
+        def post(self, url, headers, json, timeout, allow_redirects):
+            sent.append((url, json["model"]))
+            if "deepseek" in url:
+                return _Resp(200, "The SBV net withdrew VND 1,612.28 billion over five sessions.")
+            return _Resp(200, "wrong 9,999")
+
+    t = Translator(api_key="nv", deepseek_key="ds", session=Session(), sleep=lambda s: None)
+    out = t.sentence("NHNN hút ròng 1.612,28 tỷ đồng trong 5 phiên.", "vi", "en")
+    assert out.startswith("The SBV net withdrew VND 1,612.28 billion")
+    assert len(sent) == 1 and "deepseek" in sent[0][0]
+
+
+def test_weekly_translation_falls_back_to_riva_when_deepseek_changes_numbers():
+    class Session:
+        def post(self, url, headers, json, timeout, allow_redirects):
+            if "deepseek" in url:
+                return _Resp(200, "The SBV net withdrew VND 1,600 billion.")
+            return _Resp(200, "The SBV net withdrew VND 1,612.28 billion in 5 sessions.")
+
+    t = Translator(api_key="nv", deepseek_key="ds", session=Session(), sleep=lambda s: None)
+    assert "1,612.28" in t.sentence("NHNN hút ròng 1.612,28 tỷ đồng trong 5 phiên.", "vi", "en")
+
+
+def test_weekly_translation_without_deepseek_key_uses_nvidia():
+    t = Translator(api_key="nv", deepseek_key="")
+    assert t.provider == "nvidia"

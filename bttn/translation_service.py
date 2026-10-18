@@ -11,8 +11,14 @@ from uuid import uuid4
 
 from pydantic import AwareDatetime, Field
 
+from .deepseek_translation import (
+    MODEL,
+    RULES_VERSION,
+    DeepSeekTranslator,
+    TranslationError,
+    check_translation,
+)
 from .models import Snapshot, StrictModel, parse_as_of
-from .deepseek_translation import MODEL, RULES_VERSION, DeepSeekTranslator, TranslationError, check_translation
 from .tradingeconomics_news import TOPICS, collect_tradingeconomics, topic_for
 
 RETENTION_DAYS = 7
