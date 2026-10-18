@@ -12,12 +12,12 @@ import requests
 
 from .nvidia_translation import (  # noqa: F401  (re-exported for callers)
     GLOSSARY_EXAMPLES,
+    PROTECTED,
     TERMS,
     TranslationError,
     check_translation,
     is_vietnamese,
     normalize_fx_quote,
-    PROTECTED,
     normalize_terms,
     protect,
     protect_financial_terms,

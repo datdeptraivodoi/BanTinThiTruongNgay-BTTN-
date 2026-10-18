@@ -1,4 +1,6 @@
-"""Dịch chéo bản tin tuần bằng mô hình dịch NVIDIA (cùng mô hình BTTN đang dùng).
+"""Dịch chéo bản tin tuần bằng DeepSeek V4.1 Flash (cùng khóa DEEPSEEK_API_KEY với bản tin ngày BTTN).
+
+Không có DEEPSEEK_API_KEY thì dùng NVIDIA (riva-translate + mô hình ngôn ngữ dự phòng) như trước.
 
 Trang 1 viết tiếng Việt -> dịch sang tiếng Anh; trang 2 viết tiếng Anh -> dịch sang tiếng Việt.
 Dịch từng câu để giữ đúng cấu trúc; mọi con số của câu gốc phải còn nguyên trong bản dịch
@@ -20,6 +22,7 @@ from collections import Counter
 
 import requests
 
+from .. import deepseek_translation as deepseek
 from ..editorial import sentences as split_sentences
 from ..nvidia_translation import ENDPOINT, MODEL
 from .fit import count_lines, count_words
@@ -151,8 +154,10 @@ def glossary(text: str, lang: str) -> str:
 
 
 class Translator:
-    def __init__(self, api_key=None, *, session=None, sleep=time.sleep):
+    def __init__(self, api_key=None, *, session=None, sleep=time.sleep, deepseek_key=None):
         self.api_key = (api_key or os.getenv("NVIDIA_API_KEY") or "").strip()
+        self.deepseek_key = (deepseek_key if deepseek_key is not None else os.getenv("DEEPSEEK_API_KEY") or "").strip()
+        self.provider = "deepseek" if self.deepseek_key else "nvidia"
         self.session = session or requests.Session()
         self.sleep = sleep
         self.log = []
@@ -163,7 +168,15 @@ class Translator:
         return self._chat(MODEL, pair, text)
 
     def _llm(self, system: str, text: str, temperature: float = 0) -> str:
-        """Gọi mô hình ngôn ngữ của NVIDIA; mô hình bị rút (404/410) thì chuyển sang mô hình kế tiếp."""
+        """DeepSeek nếu có khóa; nếu không (hoặc DeepSeek lỗi) gọi mô hình ngôn ngữ của NVIDIA,
+        mô hình bị rút (404/410) thì chuyển sang mô hình kế tiếp."""
+        if self.deepseek_key:
+            try:
+                return self._deepseek(system, text, temperature).strip('"')
+            except (WeeklyTranslationError, requests.RequestException, KeyError, ValueError) as exc:
+                self.log.append({"pair": "llm", "status": "deepseek_failed", "error": str(exc)})
+                if not self.api_key or str(exc) == "AI_TIME_BUDGET":
+                    raise WeeklyTranslationError(str(exc)) from None
         first = os.getenv("NVIDIA_CONDENSE_MODEL")
         models = getattr(self, "_models", None) or [m for m in ((first,) if first else ()) + LLM_MODELS if m]
         last = None
@@ -184,12 +197,7 @@ class Translator:
     def _chat(self, model: str, system: str, text: str, temperature: float = 0) -> str:
         if not self.api_key:
             raise WeeklyTranslationError("NVIDIA_API_KEY_MISSING")
-        self.started = self.started or time.monotonic()
-        if time.monotonic() - self.started > TIME_BUDGET:
-            raise WeeklyTranslationError("AI_TIME_BUDGET")
-        self.calls += 1
-        if self.calls % 10 == 0:
-            LOG.info("AI: %d lượt gọi, %.0f giây", self.calls, time.monotonic() - self.started)
+        self._tick()
         resp = self.session.post(ENDPOINT, headers={"Authorization": "Bearer " + self.api_key},
                                  json={"model": model, "messages": [{"role": "system", "content": system},
                                                                     {"role": "user", "content": text}],
@@ -197,10 +205,32 @@ class Translator:
                                  timeout=(10, 45), allow_redirects=False)
         if resp.status_code != 200:
             raise WeeklyTranslationError(f"NVIDIA_HTTP_{resp.status_code}")
+        return self._content(resp)
+
+    def _deepseek(self, system: str, text: str, temperature: float = 0) -> str:
+        self._tick()
+        resp = self.session.post(deepseek.ENDPOINT, headers={"Authorization": "Bearer " + self.deepseek_key},
+                                 json={"model": deepseek.MODEL, "messages": [{"role": "system", "content": system},
+                                                                             {"role": "user", "content": text}],
+                                       "temperature": temperature, "max_tokens": 4096, "stream": False},
+                                 timeout=(10, 60), allow_redirects=False)
+        if resp.status_code != 200:
+            raise WeeklyTranslationError(f"DEEPSEEK_HTTP_{resp.status_code}")
+        return deepseek.strip_wrappers(self._content(resp))
+
+    def _content(self, resp) -> str:
         choice = resp.json()["choices"][0]
         if choice.get("finish_reason") != "stop":
             raise WeeklyTranslationError("TRANSLATION_INCOMPLETE")
-        return " ".join(choice["message"]["content"].split())
+        return re.sub(r"<think>.*?</think>", "", " ".join((choice["message"]["content"] or "").split()), flags=re.S).strip()
+
+    def _tick(self):
+        self.started = self.started or time.monotonic()
+        if time.monotonic() - self.started > TIME_BUDGET:
+            raise WeeklyTranslationError("AI_TIME_BUDGET")
+        self.calls += 1
+        if self.calls % 10 == 0:
+            LOG.info("AI: %d lượt gọi, %.0f giây", self.calls, time.monotonic() - self.started)
 
     def sentence(self, text: str, src: str, dst: str) -> str:
         return glossary(self._sentence(text, src, dst), dst)
@@ -209,8 +239,12 @@ class Translator:
         """Dịch một câu: mô hình dịch trước; sai số liệu thì nhờ mô hình ngôn ngữ dịch lại với yêu cầu giữ số."""
         pair = f"{src}-{dst}"
         last = None
-        attempts = (lambda: self._call(text, pair),
-                    lambda: self._llm(TRANSLATE_PROMPT[pair], text))
+        if self.deepseek_key:   # DeepSeek dịch trước, sai số thì thử riva-translate của NVIDIA
+            attempts = (lambda: self._llm(TRANSLATE_PROMPT[pair], text),) + ((lambda: self._call(text, pair),)
+                                                                            if self.api_key else ())
+        else:
+            attempts = (lambda: self._call(text, pair),
+                        lambda: self._llm(TRANSLATE_PROMPT[pair], text))
         for attempt, run in enumerate(attempts):
             try:
                 out = run()
