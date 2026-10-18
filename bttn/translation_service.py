@@ -19,6 +19,7 @@ from .deepseek_translation import (
     check_translation,
 )
 from .models import Snapshot, StrictModel, parse_as_of
+from .nvidia_translation import NvidiaTranslator
 from .tradingeconomics_news import TOPICS, collect_tradingeconomics, topic_for
 
 RETENTION_DAYS = 7
@@ -74,6 +75,47 @@ def split_article(text, maximum=2800):
         segments.append(remaining[:end].strip())
         remaining = remaining[end:].strip()
     return segments
+
+
+# DeepSeek lỗi không thử lại được trong lần chạy này (hết tiền, sai/thiếu khóa): chuyển hẳn sang Riva.
+DEEPSEEK_DOWN = ("DEEPSEEK_API_KEY_MISSING", "DEEPSEEK_HTTP_401", "DEEPSEEK_HTTP_402", "DEEPSEEK_HTTP_403")
+
+
+class FallbackTranslator:
+    """DeepSeek trước; đoạn nào DeepSeek không dịch được thì NVIDIA Riva (miễn phí) dịch.
+
+    Bản dịch Riva qua đúng các bước kiểm tra kỹ thuật như DeepSeek. Bài có đoạn dịch bằng Riva không
+    lưu vào bộ nhớ đệm, để lần chạy sau DeepSeek dịch lại khi đã hoạt động bình thường.
+    """
+
+    def __init__(self, primary, backup=None):
+        self.primary, self.backup = primary, backup
+        self.primary_down = None
+        self.used_backup = False
+        self.attempts = []
+
+    def translate(self, text):
+        error = None
+        if self.primary_down is None:
+            try:
+                return self._log(self.primary, lambda: self.primary.translate(text))
+            except TranslationError as exc:
+                error = exc
+                if str(exc) in DEEPSEEK_DOWN:
+                    self.primary_down = str(exc)
+        if self.backup is None or not getattr(self.backup, "api_key", ""):
+            raise error or TranslationError(self.primary_down)
+        result = self._log(self.backup, lambda: self.backup.translate(text))
+        self.used_backup = True
+        return result
+
+    def _log(self, client, call):
+        before = len(client.attempts)
+        try:
+            return call()
+        finally:
+            for item in client.attempts[before:]:
+                self.attempts.append({"provider": "deepseek" if client is self.primary else "nvidia_riva", **item})
 
 
 def check_segments(original, translated):
@@ -162,7 +204,7 @@ class TranslationStore:
         except (OSError, ValueError, TranslationError):
             return None
 
-    def save(self, source, translated):
+    def save(self, source, translated, *, provider="deepseek", persist=True):
         original = split_article(source.text)
         check_segments(original, translated)
         now = datetime.now(timezone.utc)
@@ -170,8 +212,10 @@ class TranslationStore:
             url=source.url, title=source.text.splitlines()[0][:300], published_at=source.published_at,
             source_sha256=hashlib.sha256(source.text.encode()).hexdigest(), original_text=source.text,
             original_segments=original, translated_segments=translated, created_at=now, modified_at=now,
+            provider=provider,
         )
-        atomic_write(self.path(cache_key(source)), record)
+        if persist:
+            atomic_write(self.path(cache_key(source)), record)
         return record
 
     def edit(self, key, translated):
@@ -199,7 +243,8 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
     directory.mkdir(parents=True, exist_ok=True)
     store = TranslationStore(cache_dir)
     store.cleanup()
-    translator = translator or DeepSeekTranslator(os.getenv("DEEPSEEK_API_KEY"))
+    translator = translator or FallbackTranslator(DeepSeekTranslator(os.getenv("DEEPSEEK_API_KEY")),
+                                                  NvidiaTranslator(os.getenv("NVIDIA_API_KEY")))
     result = {"provider": "deepseek", "model": MODEL, "review_only": allow_stale, "articles": {}, "failures": {}}
     for sid, source in snapshot.sources.items():
         topic = topic_for(source)
@@ -214,7 +259,17 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
             record = store.load(source)
             status = "cached" if record else "translated"
             if record is None:
-                record = store.save(source, [translator.translate(s) for s in split_article(source.text)])
+                fallback = isinstance(translator, FallbackTranslator)
+                start = translator.used_backup if fallback else False
+                if fallback:
+                    translator.used_backup = False
+                segments = [translator.translate(s) for s in split_article(source.text)]
+                backup = fallback and translator.used_backup
+                record = store.save(source, segments, provider="deepseek+nvidia_riva" if backup else "deepseek",
+                                    persist=not backup)
+                status = "translated_backup" if backup else status
+                if fallback:
+                    translator.used_backup = start or backup
             result["articles"][sid] = {"topic": topic, "cache_key": cache_key(source), "status": status,
                                        "record": record.model_dump(mode="json")}
         except TranslationError as exc:
@@ -223,6 +278,9 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
     result["missing_topics"] = [t for t in TOPICS if t not in present]
     result["pending_review"] = [sid for sid, a in result["articles"].items()
                                 if a["record"]["review_status"] != "approved"]
+    down = translator.primary_down if isinstance(translator, FallbackTranslator) else None
+    if down or any(a["status"] == "translated_backup" for a in result["articles"].values()):
+        result["backup"] = {"provider": "nvidia_riva", "reason": down or "DeepSeek không dịch được một số đoạn"}
     result["status"] = "checked" if not result["missing_topics"] and not result["failures"] else "incomplete"
     for name, data in [("translations.json", result), ("translation-attempts.json", translator.attempts)]:
         (directory / name).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

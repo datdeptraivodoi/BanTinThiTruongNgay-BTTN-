@@ -111,7 +111,10 @@ def generate_markdown_summary(
         lines.append("")
 
     if attempts_data:
-        lines.append("### Nhật ký dịch DeepSeek\n")
+        lines.append("### Nhật ký dịch DeepSeek (dự phòng NVIDIA Riva)\n")
+        if any(att.get("provider") == "nvidia_riva" for att in attempts_data):
+            lines.append("⚠️ DeepSeek không dịch được một số đoạn (hết số dư, lỗi khóa hoặc lỗi mạng); các đoạn đó do "
+                         "NVIDIA Riva dịch. Kiểm tra số dư DeepSeek và xem kỹ phần dịch.\n")
         lines.append("Các lần lỗi dưới đây có thể đã phục hồi khi thử lại; trạng thái cuối cùng nằm ở đầu trang.\n")
         lines.append("| Lần | Mô hình | Kết quả | Mã lỗi | Thời gian |")
         lines.append("| :---: | :--- | :--- | :--- | :---: |")
