@@ -8,3 +8,5 @@ def offline_chart_sources(monkeypatch):
     monkeypatch.setattr("bttn.candlestick.fetch_yahoo_fallback_candles", lambda key: [])
     # Test hồi quy giữ mplfinance để không cần Node/Chrome; chart TradingView có test riêng
     monkeypatch.setenv("BTTN_CHART_ENGINE", "mpl")
+    # Test không gọi AI thật dù máy chạy test có khóa DeepSeek trong môi trường
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
