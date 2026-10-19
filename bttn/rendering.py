@@ -31,12 +31,15 @@ BLUE = "0070C0"
 
 # Hình học bảng chính lấy từ file mẫu BT.TT.YYYY.MM.DD.template_placeholders.docx (đơn vị twip).
 # Ranh giới cột: trang 1 = 5157 | 4610 | 6110; trang 2 = 5297 | 5221 | 5359; trang 3 = 5323 | 5323 | 5231.
-TEMPLATE_GRID = [5157, 140, 26, 2600, 1844, 401, 350, 128, 5231]  # tổng 15877
+# Lưới cột của bảng chính đúng như file mẫu BT.TT.2026.10.19.docx: cột đầu rộng 34 dxa, các hàng 0–10
+# bắt đầu sau cột đó (gridBefore=1); hàng 11–13 dùng cả cột đầu. Tổng 15877.
+TEMPLATE_GRID = [34, 5157, 132, 8, 2626, 1844, 401, 350, 94, 5231]
+TEMPLATE_GRID_BEFORE = {i: 1 for i in range(11)}
 TEMPLATE_SPANS = {
     0: [4, 5], 1: [9], 2: [6, 3],
     3: [1, 4, 4], 4: [1, 4, 4], 5: [1, 4, 4],
-    6: [2, 5, 2], 7: [2, 5, 2], 8: [2, 5, 2], 9: [2, 7], 10: [2, 5, 2],
-    11: [3, 5, 1], 12: [3, 5, 1], 13: [9],
+    6: [3, 4, 2], 7: [3, 4, 2], 8: [3, 4, 2], 9: [3, 6], 10: [3, 4, 2],
+    11: [3, 6, 1], 12: [3, 6, 1], 13: [10],
 }
 TEMPLATE_ROW_HEIGHTS = {0: 475, 1: 1156, 2: 605, 3: 3024, 4: 2995, 5: 2794, 6: 475,
                         7: 5476, 8: 4324, 10: 475, 12: 4057, 13: 3518}
@@ -396,7 +399,7 @@ def render_contact_info(cell):
     return table
 
 
-def _blue_table(cell, headers, rows, ratios, aligns, styles):
+def _blue_table(cell, headers, rows, ratios, aligns, styles, *, size=10, line=1.0, border=None):
     """Bảng lồng kiểu mẫu: hàng tiêu đề nền 4F81BD chữ trắng; styles[i][j] = (bold, màu)."""
     width = int((cell.width or Inches(3.5)) - Inches(.08))
     widths = [int(width * r) for r in ratios]
@@ -411,9 +414,9 @@ def _blue_table(cell, headers, rows, ratios, aligns, styles):
         p.paragraph_format.keep_together = True
         p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(0)
-        p.paragraph_format.line_spacing = 1
+        p.paragraph_format.line_spacing = line
         r = p.add_run(text)
-        style_run(r, size=10)
+        style_run(r, size=size)
         r.bold = bold
         r.font.color.rgb = RGBColor.from_string(color)
         if shade:
@@ -440,6 +443,14 @@ def _blue_table(cell, headers, rows, ratios, aligns, styles):
             c.width = widths[j]
             bold, color = styles[i - 1][j]
             fill(c, str(val), aligns[j], bold, color)
+    if border:   # khung lưới như bảng dự báo trong file mẫu
+        borders = OxmlElement("w:tblBorders")
+        for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            e = OxmlElement("w:" + edge)
+            for k, v in (("val", "single"), ("sz", "8"), ("space", "0"), ("color", border)):
+                e.set(qn("w:" + k), v)
+            borders.append(e)
+        table._tbl.tblPr.append(borders)
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
     tail = cell.paragraphs[-1]
@@ -452,9 +463,34 @@ def _blue_table(cell, headers, rows, ratios, aligns, styles):
     return table
 
 
-def calendar_events(snapshot):
-    """Lịch sự kiện tuần từ config/economic_calendar.json; chỉ dùng khi tuần trong file chứa ngày bản tin."""
+CAL_TODAY, CAL_OTHER = "4F81BD", "8DB3E2"   # màu chữ: sự kiện ngày viết bản tin / ngày khác (file mẫu)
+CAL_MAX_ROWS = 14
+
+
+def _auto_calendar(monday):
+    """Lịch tuần lấy tự động (ForexFactory, như bản tin tuần) khi team chưa điền config cho tuần này."""
+    from .weekly.calendar import build_calendar
+
+    calendars, _ = build_calendar(monday)
+    out, current = [], None
+    for ev in calendars["vi"].events:
+        if ev.date:
+            try:
+                from datetime import datetime as _dt
+                current = _dt.strptime(ev.date, "%d.%m.%Y").date()
+            except ValueError:
+                continue
+        if current is not None:
+            out.append((current, ev.event, ev.country))
+    return out
+
+
+def calendar_events(snapshot, auto=None):
+    """Lịch sự kiện tuần chứa ngày bản tin. Ưu tiên config/economic_calendar.json (team điền theo file mẫu);
+    tuần trong file không khớp thì lấy lịch tự động. Trả về ((đầu tuần, cuối tuần), [(nhãn ngày, sự kiện,
+    nước, là ngày viết bản tin)])."""
     from datetime import date as _date
+    from datetime import timedelta as _td
     data = _config_json("economic_calendar.json")
     day = snapshot.as_of.date()
     try:
@@ -462,35 +498,52 @@ def calendar_events(snapshot):
         end = _date.fromisoformat(data["week_end"])
     except Exception:
         start = end = None
-    if not start or not (start <= day <= end):
-        snapshot.add_issue("CALENDAR_STALE", "config/economic_calendar.json chưa cập nhật lịch sự kiện cho tuần này")
-        return None, []
-    events, last = [], None
-    for ev in data.get("events", []):
+    rows = []
+    if start and start <= day <= end:
+        for ev in data.get("events", []):
+            try:
+                rows.append((_date.fromisoformat(ev["date"]), str(ev.get("event", "")), str(ev.get("country", ""))))
+            except Exception:
+                continue
+    else:
+        start = day - _td(days=day.weekday())
+        end = start + _td(days=4)
         try:
-            d = _date.fromisoformat(ev["date"])
+            rows = (auto or _auto_calendar)(start)
         except Exception:
-            continue
-        label = d.strftime("%d.%m.%Y") if d != last else ""
+            rows = []
+        if rows:
+            snapshot.add_issue("CALENDAR_AUTO", "config/economic_calendar.json chưa có tuần này; lịch sự kiện lấy tự động (ForexFactory), cần xem lại tên sự kiện")
+        else:
+            snapshot.add_issue("CALENDAR_STALE", "config/economic_calendar.json chưa cập nhật lịch sự kiện cho tuần này")
+            return None, []
+    events, last = [], None
+    for d, name, country in sorted(rows, key=lambda r: r[0])[:CAL_MAX_ROWS]:
+        events.append((d.strftime("%d.%m.%Y") if d != last else "", name, country, d == day))
         last = d
-        events.append((label, str(ev.get("event", "")), str(ev.get("country", "")), bool(ev.get("high_impact"))))
     return (start, end), events
 
 
 def render_calendar_events_table(cell, snapshot):
-    """Bảng Sự kiện quan trọng trên trang 2 (hàng 7 cột 0)."""
+    """Bảng Sự kiện quan trọng trên trang 2 (hàng 7 cột 0), đúng kiểu file mẫu: sự kiện của ngày viết bản tin
+    in đậm xanh đậm, các ngày khác chữ thường xanh nhạt."""
     week, events = calendar_events(snapshot)
     label = f"{week[0]:%d.%m} – {week[1]:%d.%m.%Y}" if week else "tuần này"
-    title = paragraph(cell, f"Sự kiện quan trọng ({label})", bold=True, color=NAVY)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title = cell.paragraphs[0] if len(cell.paragraphs) == 1 and not cell.paragraphs[0].text else cell.add_paragraph()
+    title.paragraph_format.left_indent = Pt(8.1)
     title.paragraph_format.space_before = Pt(0)
-    title.paragraph_format.space_after = Pt(1)
+    title.paragraph_format.space_after = Pt(6)
+    run = title.add_run(f"Sự kiện quan trọng ({label})")
+    style_run(run, font="Verdana", size=10)
+    run.font.bold = True
+    run.font.color.rgb = RGBColor.from_string("1F497D")
     if not events:
         events = [("—", "Chưa cập nhật lịch sự kiện", "—", False)]
     rows = [(d, e, c) for d, e, c, _ in events]
-    styles = [[(hi, NAVY if hi else "4F81BD")] * 3 for *_, hi in events]
+    styles = [[(today, CAL_TODAY if today else CAL_OTHER)] * 3 for *_, today in events]
     left, center = WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER
-    return _blue_table(cell, ["Ngày", "Sự kiện", "Nước"], rows, [0.26, 0.50, 0.24], [left, left, center], styles)
+    return _blue_table(cell, ["Ngày", "Sự kiện", "Nước"], rows, [0.218, 0.538, 0.244], [center, left, center], styles,
+                       line=1.2)
 
 
 def forecast_rows(snapshot):
@@ -518,11 +571,12 @@ def render_forecast_table(cell, snapshot):
     """Bảng 'Dự báo các chỉ số chính' (hàng 9, cột phải trang 2) theo file mẫu."""
     heading(cell, "Dự báo các chỉ số chính")
     rows = forecast_rows(snapshot)
-    styles = [[(True, "000000"), (False, NAVY), (False, NAVY), (False, NAVY)] for _ in rows]
+    # Màu chữ như file mẫu: tên chỉ số đậm đen; số dự báo và ghi chú chữ thường màu đen; khung xanh 548DD4.
+    styles = [[(True, "000000"), (False, "000000"), (False, "000000"), (False, "000000")] for _ in rows]
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
     # Tỷ lệ cột như mẫu: 2035 | 1345 | 1440 | 5310
     return _blue_table(cell, ["", "1 tháng", "6 tháng", "Ghi chú"], rows,
-                       [0.20, 0.13, 0.14, 0.53], [left, center, center, left], styles)
+                       [0.20, 0.13, 0.14, 0.53], [left, center, center, left], styles, size=SIZE, border="548DD4")
 
 
 def _config_json(name):
@@ -969,6 +1023,58 @@ def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_typ
     p.add_run().add_picture(str(path), width=Cm(width_cm), height=Cm(height_cm))
 
 
+NEWS_HEADING = "Tin tức nổi bật"
+SAMPLE_INDENT = Pt(8.1)        # 162 dxa: lề trái cột "Tin tức nổi bật" trong file mẫu
+SAMPLE_TOP_ROWS = (3, 4, 5, 7, 8, 11)
+
+
+def _spacer(cell, size=6):
+    """Dòng trống 6pt ở đầu ô như file mẫu (đẩy nội dung xuống khỏi mép ô)."""
+    first = cell._tc.find(qn("w:p"))
+    p = OxmlElement("w:p")
+    ppr = OxmlElement("w:pPr")
+    spacing = OxmlElement("w:spacing")
+    for k, v in (("before", "0"), ("after", "0"), ("line", str(size * 20)), ("lineRule", "exact")):
+        spacing.set(qn("w:" + k), v)
+    ppr.append(spacing)
+    p.append(ppr)
+    if first is not None:
+        first.addprevious(p)
+    else:
+        cell._tc.append(p)
+
+
+def apply_sample_layout(table):
+    """Căn lề theo file mẫu BT.TT.2026.10.19.docx, chạy sau bước chuẩn hóa chữ (vốn xóa thụt lề/giãn dòng)."""
+    # Hàng tiêu đề: chữ trái thụt 180 dxa, chữ phải cách mép phải 162–184 dxa như mẫu
+    for index in (0, 1, 2):
+        row_cells = cells(table.rows[index])
+        for ci, c in enumerate(row_cells):
+            for p in c.paragraphs:
+                if not p.text.strip():
+                    continue
+                if ci == 0 and index != 1:
+                    p.paragraph_format.first_line_indent = Pt(9)
+                else:
+                    p.paragraph_format.right_indent = Pt(8.1 if index == 0 else 9.2)
+    news = cells(table.rows[3])[0]
+    paras = [p for p in news.paragraphs if p.text.strip()]
+    for i, p in enumerate(paras):
+        p.paragraph_format.left_indent = SAMPLE_INDENT
+        if i == 0:                       # "Tin tức nổi bật:" Verdana 13 đậm như mẫu
+            for r in p.runs:
+                style_run(r, font="Verdana", size=13)
+                r.font.bold = True
+            p.paragraph_format.space_after = Pt(6)
+        else:
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p.paragraph_format.space_after = Pt(6)
+    for index in SAMPLE_TOP_ROWS:
+        for c in cells(table.rows[index]):
+            if c.text.strip() or c._tc.findall(".//" + qn("w:drawing")):
+                _spacer(c)
+
+
 def render(snapshot, content, template: Path, output: Path, is_draft: bool = False):
     if not template.is_file():
         raise ValueError("Required template.docx is missing")
@@ -1034,7 +1140,11 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
         spans = TEMPLATE_SPANS[index]
         if len(row._tr.tc_lst) != len(spans):
             raise ValueError("Unexpected template cell spans")
-        start = 0
+        start = TEMPLATE_GRID_BEFORE.get(index, 0)
+        if start:
+            before = OxmlElement("w:gridBefore")
+            before.set(qn("w:val"), str(start))
+            trPr.insert(0, before)
         for tc, span in zip(row._tr.tc_lst, spans):
             tc.grid_span = span
             tc.width = sum(TEMPLATE_GRID[start:start + span]) * 635
@@ -1168,6 +1278,7 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
                 style_run(r, size=10)
 
     normalize_typography(doc)
+    apply_sample_layout(table)
     split_pages(doc, table)
     # Remove orphan chart/image relationships now that all source charts were replaced.
     used = {value for node in doc.element.iter() for key, value in node.attrib.items()
@@ -1226,6 +1337,9 @@ def validate_docx(docx_path: Path):
             if fonts is None or any(fonts.get(qn("w:" + name)) not in (FONT, "Verdana") for name in ("ascii", "hAnsi", "eastAsia", "cs")):
                 raise ValueError("Word text must use Times New Roman or Verdana")
             allowed_sizes = (str(SIZE * 2), "16", "20", "24", "36", "18", "19", "2")
+            text = "".join(t.text or "" for t in run.iter(qn("w:t")))
+            if size is not None and size.get(qn("w:val")) == "26" and text.startswith(NEWS_HEADING):
+                continue   # tiêu đề "Tin tức nổi bật:" Verdana 13 như file mẫu
             if size is None or size.get(qn("w:val")) not in allowed_sizes:
                 raise ValueError(f"Word text must use 11 pt or allowed layout size (got {size.get(qn('w:val')) if size is not None else 'None'})")
 
@@ -1255,7 +1369,7 @@ def validate_pdf_layout(pdf_path: Path):
                         font_clean = span["font"].replace(" ", "").replace("-", "")
                         if "TimesNewRoman" not in font_clean and "Verdana" not in font_clean:
                             raise ValueError("PDF substituted Times New Roman; install the required font")
-                        allowed_pt = (SIZE, 8, 10, 12, 18, 9, 8.5)
+                        allowed_pt = (SIZE, 8, 10, 12, 18, 9, 8.5) + ((13,) if span["text"].startswith(NEWS_HEADING[:8]) else ())
                         if not any(abs(span["size"] - pt) < .3 for pt in allowed_pt):
                             raise ValueError(f"PDF contains visible text outside allowed sizes: {span['size']}")
                         x0, y0, x1, y1 = span["bbox"]

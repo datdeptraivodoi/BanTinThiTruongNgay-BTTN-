@@ -35,3 +35,28 @@ def derive_swaps(snapshot: Snapshot) -> None:
             trading_date=vnd_source.published_at.date(), tenor=tenor,
             basis="VNIBOR VND minus VNIBOR USD, same VIRA edition; USD Last is edition reference, not a dated fixing",
         )
+
+
+TROY_OZ_PER_LUONG = Decimal("1.20565")   # 1 lượng = 37,5 g = 1,20565 ounce
+
+
+def derive_gold_spread(snapshot: Snapshot) -> None:
+    """Chênh lệch giá vàng miếng SJC (bán ra) với giá vàng thế giới quy đổi theo tỷ giá bán USD của MB."""
+    gold, sjc = snapshot.observations.get("GOLD"), snapshot.observations.get("SJC_SELL")
+    rate = snapshot.observations.get("MB_SELL") or snapshot.observations.get("INTERBANK_ASK")
+    if not (gold and sjc and rate) or "GOLD_SPREAD" in snapshot.observations:
+        return
+    world = gold.value * rate.value * TROY_OZ_PER_LUONG / Decimal(1_000_000)
+    sid = "derived_gold_spread"
+    snapshot.sources[sid] = Source(
+        id=sid, url=snapshot.sources[sjc.source_id].url, published_at=snapshot.sources[sjc.source_id].published_at,
+        retrieved_at=snapshot.as_of, kind="derived",
+        text=f"SJC_SELL - GOLD x {rate.id} x 1,20565 / 1.000.000 (triệu đồng/lượng)",
+    )
+    snapshot.observations["GOLD_WORLD_VND"] = Observation(
+        id="GOLD_WORLD_VND", label="Vàng thế giới quy đổi", value=round(world, 2), unit="triệu đồng/lượng",
+        source_id=sid, trading_date=sjc.trading_date, basis="Giá vàng thế giới quy đổi theo tỷ giá bán USD")
+    snapshot.observations["GOLD_SPREAD"] = Observation(
+        id="GOLD_SPREAD", label="Chênh lệch vàng SJC – thế giới", value=round(sjc.value - world, 2),
+        unit="triệu đồng/lượng", source_id=sid, trading_date=sjc.trading_date,
+        basis="Giá bán vàng miếng SJC trừ giá vàng thế giới quy đổi")

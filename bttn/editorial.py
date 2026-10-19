@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import timedelta
 from pathlib import Path
 
+from .commodity_text import DOMESTIC_PRICE, coffee_lead, junk_reason
 from .fx_editorial import US_SECOND_OPENING, fx_opening
 from .models import Section, SentenceReference, create_draft_placeholder_content
 from .nvidia_translation import is_vietnamese
@@ -33,7 +34,9 @@ KEYWORDS = {
         "vốn cổ phần", "Bộ Tài chính", "World Bank", "wb", "tăng trưởng", "đầu tư công",
         "thuế", "đất", "đất bỏ hoang", "ngân sách", "chính phủ", "ngân hàng nhà nước",
     ],
-    "coffee": ["cà phê", "Arabica", "Robusta", "tồn kho", "Brazil"],
+    "fx_macro": ["cán cân thương mại", "xuất siêu", "nhập siêu", "thặng dư", "thâm hụt", "xuất khẩu",
+                 "nhập khẩu", "kiều hối", "FDI", "vốn đầu tư nước ngoài", "giải ngân"],
+    "coffee": ["cà phê", "Arabica", "Robusta", "tồn kho", "Brazil", "ICE", "USDA", "niên vụ", "xuất khẩu"],
     "Brent": ["Brent", "dầu", "OPEC", "năng lượng"],
     "gold": ["vàng", "kim loại"],
 }
@@ -96,7 +99,7 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
             is_indicator_comparison = bool(re.search(r"\b(?:thấp hơn|cao hơn|vượt|vượt quá)\s+(?:dự kiến|dự báo|kỳ vọng)\b", sentence, re.I))
             if DISALLOWED.search(sentence) and not is_official_forecast and not is_indicator_comparison:
                 reason = "forecast_or_instruction"
-            elif CONTEXT_DEPENDENT.search(sentence) and topic == "macro":
+            elif CONTEXT_DEPENDENT.search(sentence) and topic in ("macro", "fx_macro"):
                 # A sentence such as 'This reading was the weakest...' loses
                 # its antecedent when selection omits the actual GDP reading.
                 # Keep it in the full translation for review, not the digest.
@@ -105,7 +108,11 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
                 reason = "incomplete_or_short"
             elif not is_vietnamese(sentence):
                 reason = "not_vietnamese"
+            elif topic in {"coffee", "Brent", "gold"} and junk_reason(sentence):
+                reason = junk_reason(sentence)
             score = sum(word.casefold() in sentence.casefold() for word in KEYWORDS[topic])
+            if topic == "coffee" and DOMESTIC_PRICE.search(sentence):
+                score -= 2      # mẫu ưu tiên diễn biến thế giới (ICE, USDA, Brazil), không phải giá thu mua trong nước
             if topic == "macro":
                 if re.search(r"\b(?:World Bank|WB|Ngân hàng Thế giới)\b", sentence, re.I):
                     score += 12
@@ -327,9 +334,87 @@ def vira_candidates(snapshot, source_id, weights):
     return out
 
 
+# Mục tỷ giá USD-VND tập trung vào cung – cầu ngoại tệ (góp ý 19.10): cán cân thương mại, xuất khẩu, nhập khẩu,
+# kiều hối, FDI; sau đó chênh lệch giá vàng trong nước – thế giới và tỷ giá tự do.
+FX_THEMES = [
+    ("trade", r"cán cân thương mại|xuất siêu|nhập siêu|thặng dư thương mại|thâm hụt thương mại|kim ngạch xuất nhập khẩu", 6),
+    ("export", r"xuất khẩu", 4),
+    ("import", r"nhập khẩu", 4),
+    ("remittance", r"kiều hối", 5),
+    ("fdi", r"\bFDI\b|vốn đầu tư (?:trực tiếp )?nước ngoài|vốn ngoại", 4),
+]
+
+
+def _fx_theme(text):
+    for i, (name, pattern, weight) in enumerate(FX_THEMES):
+        if re.search(pattern, text, re.I):
+            return i, weight
+    return None, 0
+
+
+def usd_vnd_section(snapshot, records, *, exclude_sources=(), exclude_texts=()):
+    """Câu giá quote trong ngày + cán cân thương mại/XNK/kiều hối/FDI (không trùng tin nổi bật)
+    + chênh lệch giá vàng SJC – thế giới + tỷ giá tự do."""
+    today_str = snapshot.as_of.strftime("%d.%m.%Y")
+    obs = snapshot.observations
+    trend = ""
+    if "INTERBANK_BID" in obs and "INTERBANK_BID_PREV" in obs:
+        now, prev = obs["INTERBANK_BID"].value, obs["INTERBANK_BID_PREV"].value
+        trend = "tăng nhẹ" if now > prev else "giảm nhẹ" if now < prev else "đi ngang"
+    if "INTERBANK_BID" in obs and "INTERBANK_ASK" in obs:
+        quote_token, quote_keys = "{{INTERBANK_BID}}/{{INTERBANK_ASK}}", ["INTERBANK_BID", "INTERBANK_ASK"]
+    elif "MB_BUY" in obs and "MB_SELL" in obs:
+        quote_token, quote_keys = "{{MB_BUY}}/{{MB_SELL}}", ["MB_BUY", "MB_SELL"]
+    else:
+        quote_token, quote_keys = None, []
+    liquidity_phrase = ""
+    for sc in (Path(__file__).resolve().parents[1] / "data" / "teams_quotes_stream.json",
+               Path("D:/TyGia/teams_quotes_stream.json"), Path("/root/TyGia/teams_quotes_stream.json")):
+        if sc.is_file():
+            try:
+                liquidity_phrase = json.loads(sc.read_text(encoding="utf-8")).get("liquidity") or ""
+            except Exception:
+                liquidity_phrase = ""
+            if liquidity_phrase:
+                break
+    lead = []
+    if quote_token:
+        clause = f"tỷ giá USD-VND {trend}, " if trend else "tỷ giá USD-VND "
+        tail = f", {liquidity_phrase}" if liquidity_phrase else ""
+        lead = [Candidate(f"Phiên ngày {today_str}, {clause}dao động quanh mức {quote_token}{tail}.",
+                          obs[quote_keys[0]].source_id, quoted=False)]
+    closing = []
+    if "GOLD_SPREAD" in obs:
+        closing.append(Candidate("Giá vàng miếng SJC đang cao hơn giá vàng thế giới quy đổi khoảng "
+                                 "{{GOLD_SPREAD}} triệu đồng/lượng.", obs["GOLD_SPREAD"].source_id, quoted=False))
+    free = [c for c in vira_candidates(snapshot, "vira_fx", FX_WEIGHTS) if re.search(r"tự do|chợ đen", c.text, re.I)]
+    if free:
+        closing.append(free[0])
+    exclude_texts = {" ".join(t.casefold().split()) for t in exclude_texts}
+    pool = []
+    macro, _ = news_candidates(snapshot, records, "fx_macro")
+    vira_fx = [c for c in vira_candidates(snapshot, "vira_fx", FX_WEIGHTS) if not re.search(r"tự do|chợ đen", c.text, re.I)]
+    for c in vira_fx + macro:
+        theme, weight = _fx_theme(c.text)
+        if theme is None or c.source_id in exclude_sources or " ".join(c.text.casefold().split()) in exclude_texts:
+            continue
+        if not re.search(r"\d", c.text):          # câu phải có số liệu
+            continue
+        pool.append(Candidate(c.text, c.source_id, weight + min(c.score, 10) / 10, theme * 100 + c.index, c.quoted))
+    words = lambda items: count_words(resolve(" ".join(i.text for i in items), snapshot, safe=True))  # noqa: E731
+    low, high = rules()["word_limits"]["usd_vnd"]
+    fixed = words(lead) + words(closing)
+    while closing and fixed > high - 10:
+        closing.pop()
+        fixed = words(lead) + words(closing)
+    middle = choose_sentences(pool, snapshot, max(0, low - fixed), high - fixed, max_sentences=3)
+    middle.sort(key=lambda c: c.index)          # đúng thứ tự: thương mại, XK, NK, kiều hối, FDI
+    picked = lead + middle + closing
+    return make_section(snapshot, [picked]), {"selected": [asdict(c) for c in picked]}
+
+
 def domestic_sections(snapshot, records):
     result, audit = {}, {}
-    today_str = snapshot.as_of.strftime("%d.%m.%Y")
 
     # 1. Thị trường tiền tệ liên ngân hàng: câu nguyên văn từ "Bản tin Kinh tế - Tài chính ngày" của VIRA
     #    (lãi suất LNH, nghiệp vụ thị trường mở, trái phiếu). Không có VIRA thì chỉ dùng số liệu VNIBOR.
@@ -344,54 +429,10 @@ def domestic_sections(snapshot, records):
     result["interbank"] = make_section(snapshot, [picked])
     audit["interbank"] = {"selected": [asdict(c) for c in picked]}
 
-    # 2. Thị trường ngoại hối USD-VND: câu đầu từ quote của trader trong room (hoặc giá niêm yết MBBank),
-    #    phần còn lại là câu nguyên văn mục "Thị trường ngoại tệ" của VIRA và tin vĩ mô trong nước.
-    obs = snapshot.observations
-    trend = ""
-    if "INTERBANK_BID" in obs and "INTERBANK_BID_PREV" in obs:
-        now, prev = obs["INTERBANK_BID"].value, obs["INTERBANK_BID_PREV"].value
-        trend = "tăng nhẹ" if now > prev else "giảm nhẹ" if now < prev else "đi ngang"
-    if "INTERBANK_BID" in obs and "INTERBANK_ASK" in obs:
-        quote_token, quote_keys = "{{INTERBANK_BID}}/{{INTERBANK_ASK}}", ["INTERBANK_BID", "INTERBANK_ASK"]
-    elif "MB_BUY" in obs and "MB_SELL" in obs:
-        quote_token, quote_keys = "{{MB_BUY}}/{{MB_SELL}}", ["MB_BUY", "MB_SELL"]
-    else:
-        quote_token, quote_keys = None, []
-
-    liquidity_phrase = ""
-    stream_candidates = [
-        Path(__file__).resolve().parents[1] / "data" / "teams_quotes_stream.json",
-        Path("D:/TyGia/teams_quotes_stream.json"),
-        Path("/root/TyGia/teams_quotes_stream.json"),
-    ]
-    for sc in stream_candidates:
-        if sc.is_file():
-            try:
-                import json
-                s_data = json.loads(sc.read_text(encoding="utf-8"))
-                if s_data.get("liquidity"):
-                    liquidity_phrase = s_data.get("liquidity")
-                    break
-            except Exception:
-                pass
-
-    lead = []
-    if quote_token:
-        clause = f"tỷ giá USD-VND {trend}, " if trend else "tỷ giá USD-VND "
-        tail = f", {liquidity_phrase}" if liquidity_phrase else ""
-        s1 = f"Phiên ngày {today_str}, {clause}dao động quanh mức {quote_token}{tail}."
-        lead = [Candidate(s1, obs[quote_keys[0]].source_id, quoted=False)]
-    lead_words = count_words(resolve(" ".join(c.text for c in lead), snapshot, safe=True))
-    fx_pool = vira_candidates(snapshot, "vira_fx", FX_WEIGHTS)
-    macro, _ = news_candidates(snapshot, records, "macro")
-    low, high = rules()["word_limits"]["usd_vnd"]
-    rest = choose_sentences(fx_pool + [Candidate(c.text, c.source_id, c.score / 10, c.index) for c in macro[:10]],
-                            snapshot, max(0, low - lead_words), high - lead_words, max_sentences=3)
-    picked = lead + rest
-    result["usd_vnd"] = make_section(snapshot, [picked])
-    audit["usd_vnd"] = {"selected": [asdict(c) for c in picked]}
+    # 2. Thị trường ngoại hối USD-VND: dựng trong generate() sau khi chọn tin nổi bật, để không lặp tin.
+    result["usd_vnd"], audit["usd_vnd"] = usd_vnd_section(snapshot, records)
     coffee, rejected = news_candidates(snapshot, records, "coffee")
-    prefix = "Cập nhật giá cà phê thế giới,"
+    prefix = coffee_lead(snapshot)     # câu số liệu mở đầu như bản tin mẫu
     picked = choose_sentences(coffee, snapshot, *rules()["word_limits"]["coffee"], prefix=prefix)
     result["coffee"] = make_section(snapshot, [picked], [prefix])
     audit["coffee"] = {"selected": [asdict(c) for c in picked], "rejected": rejected}
@@ -456,6 +497,12 @@ def generate(snapshot, directory: Path):
             used.update(c.text for c in picked)
             used_sources.update(c.source_id for c in picked)
         audit[f"highlight_{index}"] = {"selected": [asdict(c) for c in picked], "rejected": rejected}
+
+    # Mục USD-VND không dùng lại tin đã lên "Tin tức nổi bật"
+    section, usd_audit = usd_vnd_section(snapshot, records, exclude_sources=used_sources, exclude_texts=used)
+    if all(p.strip() for p in section.paragraphs):
+        content.usd_vnd = section
+    audit["usd_vnd"] = {**audit.get("usd_vnd", {}), **usd_audit}
 
     # Highlight 2 (Tin 3) is gold: world gold + domestic SJC gold
     gold_obs = snapshot.observations.get("GOLD")

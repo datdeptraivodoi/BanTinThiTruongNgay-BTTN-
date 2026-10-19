@@ -96,12 +96,17 @@ def test_vira_sections_split_fx_and_money_market():
 
 def test_template_geometry_matches_uploaded_template():
     assert sum(TEMPLATE_GRID) == 15877
-    for spans in TEMPLATE_SPANS.values():
-        assert sum(spans) == len(TEMPLATE_GRID)
-    widths = lambda row: [sum(TEMPLATE_GRID[sum(TEMPLATE_SPANS[row][:i]):sum(TEMPLATE_SPANS[row][:i + 1])])  # noqa: E731
-                          for i in range(len(TEMPLATE_SPANS[row]))]
-    assert widths(3)[:2] == [5157, 4610]
-    assert widths(7)[:2] == [5297, 5221]
+    for row, spans in TEMPLATE_SPANS.items():
+        assert sum(spans) + rendering.TEMPLATE_GRID_BEFORE.get(row, 0) == len(TEMPLATE_GRID)
+    def widths(row):
+        start, out = rendering.TEMPLATE_GRID_BEFORE.get(row, 0), []
+        for span in TEMPLATE_SPANS[row]:
+            out.append(sum(TEMPLATE_GRID[start:start + span]))
+            start += span
+        return out
+    # Đúng độ rộng ô của file mẫu BT.TT.2026.10.19.docx
+    assert widths(3) == [5157, 4610, 6076]
+    assert widths(7) == [5297, 5221, 5325]
     assert widths(11) == [5323, 5323, 5231]
 
 
@@ -153,3 +158,50 @@ def test_eur_usd_has_europe_paragraph_then_us_paragraph(snap):
     assert "khu vực đồng euro" in first or "Đức" in first
     assert second.startswith("- Về phía kinh tế Mỹ,") and "của Mỹ" in second
     assert 185 <= count_words(resolve(first + " " + second, snap, safe=True)) <= 200, audit["eur_usd"]
+
+
+def test_calendar_highlights_the_bulletin_date(snap, monkeypatch):
+    """Góp ý 19.10: sự kiện của ngày viết bản tin in đậm xanh đậm, ngày khác chữ thường xanh nhạt."""
+    from datetime import timedelta
+    day = snap.as_of.date()
+    cfg = {"week_start": (day - timedelta(days=day.weekday())).isoformat(),
+           "week_end": (day - timedelta(days=day.weekday()) + timedelta(days=4)).isoformat(),
+           "events": [{"date": (day - timedelta(days=1)).isoformat(), "event": "Hôm qua", "country": "Mỹ"},
+                      {"date": day.isoformat(), "event": "Hôm nay 1", "country": "Việt Nam"},
+                      {"date": day.isoformat(), "event": "Hôm nay 2", "country": "Trung Quốc"},
+                      {"date": (day + timedelta(days=1)).isoformat(), "event": "Ngày mai", "country": "Anh Quốc"}]}
+    monkeypatch.setattr(rendering, "_config_json", lambda name: cfg)
+    _, events = calendar_events(snap)
+    assert [(e[1], e[3]) for e in events] == [("Hôm qua", False), ("Hôm nay 1", True), ("Hôm nay 2", True), ("Ngày mai", False)]
+    doc = Document()
+    cell = doc.add_table(rows=1, cols=1).cell(0, 0)
+    rendering.render_calendar_events_table(cell, snap)
+    rows = cell.tables[0].rows[1:]
+    runs = [r.cells[1].paragraphs[0].runs[0] for r in rows]
+    assert [bool(r.bold) for r in runs] == [False, True, True, False]
+    assert [str(r.font.color.rgb) for r in runs] == ["8DB3E2", "4F81BD", "4F81BD", "8DB3E2"]
+
+
+def test_calendar_falls_back_to_automatic_week(snap, monkeypatch):
+    from datetime import timedelta
+    monkeypatch.setattr(rendering, "_config_json", lambda name: {"week_start": "2020-01-06", "week_end": "2020-01-10"})
+    day = snap.as_of.date()
+    week, events = calendar_events(snap, auto=lambda monday: [(day, "CPI", "Mỹ"), (day + timedelta(days=1), "GDP", "Anh Quốc")])
+    assert week[0].weekday() == 0 and events[0][3] is True and events[1][3] is False
+    assert any(i.code == "CALENDAR_AUTO" for i in snap.issues)
+
+
+def test_forecast_table_colors_and_numbers_follow_sample(snap, monkeypatch):
+    """Góp ý 19.10: số trong bảng dự báo lấy theo file mẫu; tên đậm đen, số và ghi chú chữ thường đen."""
+    cfg = json.loads((ROOT / "config/forecasts.json").read_text(encoding="utf-8"))
+    cfg["updated"] = snap.as_of.date().isoformat()     # số giữ nguyên, chỉ đặt ngày trùng snapshot test
+    monkeypatch.setattr(rendering, "_config_json", lambda name: cfg)
+    doc = Document()
+    cell = doc.add_table(rows=1, cols=1).cell(0, 0)
+    rendering.render_forecast_table(cell, snap)
+    table = cell.tables[0]
+    assert [c.text for c in table.rows[1].cells] == ["USD-VND", "25,900", "26,150", "Thanh khoản ngoại tệ vẫn ở mức tốt, thâm hụt thu hẹp"]
+    label, value, note = (table.rows[2].cells[i].paragraphs[0].runs[0] for i in (0, 1, 3))
+    assert label.bold and not value.bold and not note.bold
+    assert {str(r.font.color.rgb) for r in (label, value, note)} == {"000000"}
+    assert table._tbl.tblPr.find(qn("w:tblBorders")) is not None

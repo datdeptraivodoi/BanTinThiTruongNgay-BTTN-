@@ -156,5 +156,5 @@ def test_renderer_uses_normal_prose_and_applies_font(snapshot, content, tmp_path
         if not list(run.iter(qn('w:t'))):
             continue
         props = run.find(qn('w:rPr'))
-        assert props.find(qn('w:sz')).get(qn('w:val')) in ('22', '16', '20', '24', '36', '18', '19', '2')
+        assert props.find(qn('w:sz')).get(qn('w:val')) in ('22', '16', '20', '24', '36', '18', '19', '2') + (('26',) if ''.join(t.text or '' for t in run.iter(qn('w:t'))).startswith('Tin tức nổi bật') else ())
         assert props.find(qn('w:rFonts')).get(qn('w:ascii')) in ('Times New Roman', 'Verdana')

@@ -4,6 +4,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from .commodity_text import COFFEE_OPENING, coffee_lead
 from .fx_editorial import US_SECOND_OPENING, fx_opening
 from .models import Issue, ReportContent, Snapshot, business_days_between, previous_weekday
 from .trader_quotes import validate_trader_observations
@@ -156,10 +157,10 @@ def format_value(obs, field: str = "value"):
             val = obs.series[-2].value
         if val is None:
             val = obs.value
-        places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") else 2
+        places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") or obs.id.startswith("GOLD_SPREAD") or obs.id == "GOLD_WORLD_VND" else 2
         return f"{val:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
     else:
-        places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") else 2
+        places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") or obs.id.startswith("GOLD_SPREAD") or obs.id == "GOLD_WORLD_VND" else 2
         return f"{obs.value:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
 
 
@@ -299,7 +300,7 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
             source_text = record.text if record else source.text if source else ""
             identity = (ref.paragraph, ref.source_id, ref.quote)
             paragraph_text = numeric_prose[ref.paragraph] if ref.paragraph < len(numeric_prose) else ""
-            prefix = "Cập nhật giá cà phê thế giới," if name == "coffee" else ""
+            prefix = coffee_lead(snapshot) if name == "coffee" else ""
             if prefix and paragraph_text.startswith(prefix):
                 paragraph_text = paragraph_text[len(prefix):].strip()
             if name == "eur_usd" and paragraph_text.startswith(US_SECOND_OPENING):  # cụm mở đoạn tin Mỹ
@@ -351,7 +352,7 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
             low, high = rules()["word_limits"][name]
         if not low <= count <= high:
             error("WORD_COUNT", f"{count} từ, yêu cầu {low}–{high}")
-        if name == "coffee" and not rendered.startswith("Cập nhật giá cà phê thế giới,"):
+        if name == "coffee" and not rendered.startswith(COFFEE_OPENING):
             error("OPENING", "Thiếu câu mở đầu cà phê")
         if name in {"eur_usd", "japan"} and (not section.paragraphs or not section.paragraphs[0].startswith(fx_opening(snapshot, name))):
             error("FX_OPENING", "Câu mở đầu phải đúng mẫu, ngày và placeholder tỷ giá")
