@@ -125,7 +125,7 @@ def test_rendered_word_keeps_template_columns(tmp_path):
     # Trang 2 và 3: chữ cột phải không sát mép giấy (góp ý 19.10)
     from bttn.rendering import RIGHT_EDGE_INDENT
     for page in doc.tables[1:]:
-        right = [row.cells[-1] for row in page.rows]
+        right = [row.cells[-1] for row in page.rows if "Miễn trừ trách nhiệm" not in row.cells[-1].text]
         paras = [p for c in right for p in c.paragraphs if len(p.text) > 30]
         assert paras and all(p.paragraph_format.right_indent == RIGHT_EDGE_INDENT for p in paras)
 

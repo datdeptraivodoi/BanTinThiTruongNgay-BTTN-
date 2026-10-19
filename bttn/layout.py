@@ -44,7 +44,8 @@ def compact_paragraph(p):
         r_fonts = sz_node.find(qn("w:rFonts")) if sz_node is not None else None
         font_name = r_fonts.get(qn("w:ascii")) if r_fonts is not None else run.font.name
         if font_name == "Verdana":
-            size = 18 if val == "36" else 12
+            # Verdana 18 (tiêu đề), 13 ("Tin tức nổi bật"), 10 (tiêu đề bảng trang 2–3 như bản mẫu), còn lại 12
+            size = {"36": 18, "26": 13, "20": 10}.get(val, 12)
             style_run(run, font="Verdana", size=size)
         elif val == "20":
             style_run(run, size=10)

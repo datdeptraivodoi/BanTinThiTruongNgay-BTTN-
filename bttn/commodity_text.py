@@ -11,7 +11,8 @@ import re
 
 COFFEE_OPENING = "Thị trường cà phê"
 CONNECTOR_START = re.compile(
-    r"^(?:Vì vậy|Do đó|Dù vậy|Tuy vậy|Cụ thể|Trên thực tế|Theo đó|Như vậy|Bên cạnh đó|Ngoài ra|Điều đó|Khi đó|Trong khi đó)\b", re.I)
+    r"^(?:Vì vậy|Vì thế|Do đó|Dù vậy|Tuy vậy|Tuy nhiên|Song|Mặt khác|Đồng thời|Hơn nữa|Thêm vào đó|Không chỉ vậy|"
+    r"Nhờ đó|Từ đó|Trước đó|Sau đó|Cụ thể|Trên thực tế|Theo đó|Như vậy|Bên cạnh đó|Ngoài ra|Điều đó|Khi đó|Trong khi đó)\b", re.I)
 DEMONSTRATIVE_SUBJECT = re.compile(r"^(?:\S+\s+){0,4}này\b", re.I)
 PAGE_JUNK = re.compile(r"TIN LIÊN QUAN|Xem thêm|Đọc thêm|Video:|Ảnh:|Nguồn:", re.I)
 DOMESTIC_PRICE = re.compile(r"đồng/kg|Đắk Lắk|Gia Lai|Lâm Đồng|Đắk Nông|Tây Nguyên", re.I)

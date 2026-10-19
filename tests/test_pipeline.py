@@ -1,5 +1,4 @@
 import json
-import re
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -583,12 +582,12 @@ def test_normalization_handles_missing_robusta(snapshot, content):
     assert ROBUSTA_MISSING_NOTICE in result
 
 
-def test_normalization_ensures_gold_two_sentences():
+def test_normalization_keeps_gold_to_one_sentence():
     from bttn.normalization import normalize_gold_sentences
 
     three_sentences = "Giá vàng thế giới đạt {{GOLD}} USD/oz. Nhà đầu tư theo dõi chính sách tiền tệ. Lực mua duy trì ổn định."
     normalized = normalize_gold_sentences(three_sentences)
-    assert len(re.findall(r"[.!?](?:\s|$)", normalized)) == 2
+    assert normalized == "Giá vàng thế giới đạt {{GOLD}} USD/oz."
 
 
 
