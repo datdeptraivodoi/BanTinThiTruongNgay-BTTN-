@@ -399,7 +399,7 @@ def render_contact_info(cell):
     return table
 
 
-def _blue_table(cell, headers, rows, ratios, aligns, styles, *, size=10, line=1.0):
+def _blue_table(cell, headers, rows, ratios, aligns, styles, *, size=10, line=1.0, border=None):
     """Bảng lồng kiểu mẫu: hàng tiêu đề nền 4F81BD chữ trắng; styles[i][j] = (bold, màu)."""
     width = int((cell.width or Inches(3.5)) - Inches(.08))
     widths = [int(width * r) for r in ratios]
@@ -443,6 +443,14 @@ def _blue_table(cell, headers, rows, ratios, aligns, styles, *, size=10, line=1.
             c.width = widths[j]
             bold, color = styles[i - 1][j]
             fill(c, str(val), aligns[j], bold, color)
+    if border:   # khung lưới như bảng dự báo trong file mẫu
+        borders = OxmlElement("w:tblBorders")
+        for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            e = OxmlElement("w:" + edge)
+            for k, v in (("val", "single"), ("sz", "8"), ("space", "0"), ("color", border)):
+                e.set(qn("w:" + k), v)
+            borders.append(e)
+        table._tbl.tblPr.append(borders)
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), str(round(width / 635)))
     table._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "dxa")
     tail = cell.paragraphs[-1]
@@ -563,11 +571,12 @@ def render_forecast_table(cell, snapshot):
     """Bảng 'Dự báo các chỉ số chính' (hàng 9, cột phải trang 2) theo file mẫu."""
     heading(cell, "Dự báo các chỉ số chính")
     rows = forecast_rows(snapshot)
-    styles = [[(True, "000000"), (False, NAVY), (False, NAVY), (False, NAVY)] for _ in rows]
+    # Màu chữ như file mẫu: tên chỉ số đậm đen; số dự báo và ghi chú chữ thường màu đen; khung xanh 548DD4.
+    styles = [[(True, "000000"), (False, "000000"), (False, "000000"), (False, "000000")] for _ in rows]
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
     # Tỷ lệ cột như mẫu: 2035 | 1345 | 1440 | 5310
     return _blue_table(cell, ["", "1 tháng", "6 tháng", "Ghi chú"], rows,
-                       [0.20, 0.13, 0.14, 0.53], [left, center, center, left], styles)
+                       [0.20, 0.13, 0.14, 0.53], [left, center, center, left], styles, size=SIZE, border="548DD4")
 
 
 def _config_json(name):

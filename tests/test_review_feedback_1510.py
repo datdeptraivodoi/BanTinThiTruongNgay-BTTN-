@@ -189,3 +189,19 @@ def test_calendar_falls_back_to_automatic_week(snap, monkeypatch):
     week, events = calendar_events(snap, auto=lambda monday: [(day, "CPI", "Mỹ"), (day + timedelta(days=1), "GDP", "Anh Quốc")])
     assert week[0].weekday() == 0 and events[0][3] is True and events[1][3] is False
     assert any(i.code == "CALENDAR_AUTO" for i in snap.issues)
+
+
+def test_forecast_table_colors_and_numbers_follow_sample(snap, monkeypatch):
+    """Góp ý 19.10: số trong bảng dự báo lấy theo file mẫu; tên đậm đen, số và ghi chú chữ thường đen."""
+    cfg = json.loads((ROOT / "config/forecasts.json").read_text(encoding="utf-8"))
+    cfg["updated"] = snap.as_of.date().isoformat()     # số giữ nguyên, chỉ đặt ngày trùng snapshot test
+    monkeypatch.setattr(rendering, "_config_json", lambda name: cfg)
+    doc = Document()
+    cell = doc.add_table(rows=1, cols=1).cell(0, 0)
+    rendering.render_forecast_table(cell, snap)
+    table = cell.tables[0]
+    assert [c.text for c in table.rows[1].cells] == ["USD-VND", "25,900", "26,150", "Thanh khoản ngoại tệ vẫn ở mức tốt, thâm hụt thu hẹp"]
+    label, value, note = (table.rows[2].cells[i].paragraphs[0].runs[0] for i in (0, 1, 3))
+    assert label.bold and not value.bold and not note.bold
+    assert {str(r.font.color.rgb) for r in (label, value, note)} == {"000000"}
+    assert table._tbl.tblPr.find(qn("w:tblBorders")) is not None
