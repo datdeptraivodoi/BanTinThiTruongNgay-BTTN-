@@ -303,13 +303,23 @@ def extract_vira_omo(raw_text: str) -> str:
     return " ".join(parts)
 
 
-VIRA_HEADERS = re.compile(r"^(?:Thị trường ngoại tệ|Thị trường tiền tệ LNH|Nghiệp vụ thị trường mở|"
+VIRA_HEADERS = re.compile(r"^(?:Thị trường ngoại tệ|Thị trường tiền tệ LNH|Nghiệp vụ thị trường mở|Thị trường mở|"
                           r"Thị trường trái phiếu|Đấu thầu TPCP|Thị trường TPCP)\s*:?\s*", re.I)
 INTERBANK_WEIGHTS = [
     (r"qua đêm|\bON\b|1 tuần|2 tuần|liên ngân hàng|LNH", 4),
     (r"hút ròng|bơm ròng", 5),
     (r"trúng thầu|đáo hạn|chào thầu|cầm cố", 2),
     (r"lợi suất|trái phiếu|TPCP", 3),
+]
+# Bản tổng hợp tuần (thứ Hai): ưu tiên câu thị trường mở như bản tin mẫu 19.10 (chào thầu, trúng thầu,
+# đáo hạn, bơm/hút ròng), rồi trái phiếu; bỏ câu "không chào thầu tín phiếu".
+WEEKLY_INTERBANK_WEIGHTS = [
+    (r"chào thầu \d", 8),
+    (r"hút ròng|bơm ròng", 7),
+    (r"trúng thầu", 5),
+    (r"đáo hạn", 4),
+    (r"lợi suất|trái phiếu|TPCP", 3),
+    (r"lưu hành", 2),
 ]
 FX_WEIGHTS = [
     (r"tự do|chợ đen", 5),
@@ -413,19 +423,43 @@ def usd_vnd_section(snapshot, records, *, exclude_sources=(), exclude_texts=()):
     return make_section(snapshot, [picked]), {"selected": [asdict(c) for c in picked]}
 
 
+def interbank_lead(snapshot):
+    """Câu mở đầu thứ Hai: lãi suất VND liên ngân hàng ON-2W theo VNIBOR mới nhất trên Market Watch của VIRA."""
+    obs = snapshot.observations
+    keys = [k for k in ("VND_ON", "VND_1W", "VND_2W") if k in obs]
+    if len(keys) < 2:
+        return []
+    low_key = min(keys, key=lambda k: obs[k].value)
+    high_key = max(keys, key=lambda k: obs[k].value)
+    day = obs[keys[0]].trading_date.strftime("%d.%m.%Y")
+    if obs[low_key].value == obs[high_key].value:
+        text = f"Phiên {day}, lãi suất VND liên ngân hàng các kỳ hạn ngắn ON-2W ở mức {{{{{low_key}}}}}%."
+    else:
+        text = (f"Phiên {day}, lãi suất VND liên ngân hàng các kỳ hạn ngắn ON-2W dao động trong vùng "
+                f"{{{{{low_key}}}}}%-{{{{{high_key}}}}}%.")
+    return [Candidate(text, obs[keys[0]].source_id, quoted=False)]
+
+
 def domestic_sections(snapshot, records):
     result, audit = {}, {}
 
     # 1. Thị trường tiền tệ liên ngân hàng: câu nguyên văn từ "Bản tin Kinh tế - Tài chính ngày" của VIRA
     #    (lãi suất LNH, nghiệp vụ thị trường mở, trái phiếu). Không có VIRA thì chỉ dùng số liệu VNIBOR.
-    interbank_candidates = vira_candidates(snapshot, "vira_daily", INTERBANK_WEIGHTS)
+    weekly = "Tong-hop" in getattr(snapshot.sources.get("vira_daily"), "url", "")
+    interbank_candidates = vira_candidates(snapshot, "vira_daily", WEEKLY_INTERBANK_WEIGHTS if weekly else INTERBANK_WEIGHTS)
+    lead = interbank_lead(snapshot) if weekly else []
+    if weekly:
+        # Bản tổng hợp tuần: bỏ câu lãi suất "Chốt ngày ..." (đã có câu số liệu VNIBOR mới nhất ở đầu đoạn)
+        interbank_candidates = [c for c in interbank_candidates
+                                if not re.search(r"lãi suất (?:VND|USD) LNH|không chào thầu", c.text)]
     if not interbank_candidates:
         c = observation_candidate(
             snapshot, "Lãi suất VND liên ngân hàng kỳ hạn qua đêm ở mức {{VND_ON}}%, kỳ hạn 1 tuần "
             "{{VND_1W}}% và kỳ hạn 1 tháng {{VND_1M}}%.", ["VND_ON", "VND_1W", "VND_1M"])
         interbank_candidates = [c] if c else []
     low, high = rules()["word_limits"]["interbank"]
-    picked = choose_sentences(interbank_candidates, snapshot, low, high)
+    used = count_words(resolve(" ".join(c.text for c in lead), snapshot, safe=True))
+    picked = lead + choose_sentences(interbank_candidates, snapshot, max(0, low - used), high - used)
     result["interbank"] = make_section(snapshot, [picked])
     audit["interbank"] = {"selected": [asdict(c) for c in picked]}
 

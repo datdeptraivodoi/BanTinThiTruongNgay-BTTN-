@@ -76,3 +76,39 @@ def test_coffee_opening_sentence_from_prices(snap):
     lead = resolve(coffee_lead(snap), snap)
     assert lead.startswith("Thị trường cà phê biến động mạnh, giá Arabica tại New York tăng 5,60% lên ")
     assert "trong khi giá Robusta tại London tăng 1,20% lên" in lead and lead.endswith("USD/tấn.")
+
+
+WEEKLY_1216 = (  # VIRA "Tổng hợp Kinh tế - Tài chính tuần 12/10 - 16/10/2026", đăng 08:23 thứ Hai 19/10
+    "Tóm lược thị trường trong nước từ 12/10 - 16/10/2026\n"
+    "Thị trường ngoại tệ: Trong tuần từ 12/10 - 16/10, tỷ giá trung tâm được NHNN điều chỉnh tăng – giảm đan xen qua các phiên. "
+    "Tỷ giá trên thị trường tự do tuần qua ít biến động. Chốt phiên 16/10, tỷ giá tự do giảm 40 đồng ở chiều mua vào và 50 đồng "
+    "ở chiều bán ra so với phiên cuối tuần trước đó, giao dịch tại 26.020 VND/USD và 26.120 VND/USD.\n"
+    "Thị trường tiền tệ LNH: Tuần từ 12/10 - 16/10, lãi suất VND LNH biến động tăng – giảm mạnh qua các phiên ở tất cả các kỳ hạn "
+    "từ 1M trở xuống. Chốt ngày 16/10, lãi suất VND LNH giao dịch ở mức: ON 4,50% (không thay đổi); 1W 4,60% (-0,55 đpt); "
+    "2W 4,70% (+0,70 đpt); 1M 5,50% (+0,30 đpt).\n"
+    "Thị trường mở: Trên thị trường mở tuần qua từ 12/10 - 16/10, ở kênh cầm cố, NHNN chào thầu 34.000 tỷ đồng với các kỳ hạn "
+    "7 ngày, 14 ngày, 35 ngày và 91 ngày, lãi suất duy trì ở mức 4,5%. Kết quả, có 17.281,85 tỷ đồng trúng thầu. "
+    "Trong tuần có 9.093,22 tỷ đồng đáo hạn trên kênh cầm cố.\nNHNN không chào thầu tín phiếu NHNN trong tuần từ 12/10 - 16/10.\n"
+    "Như vậy, tuần qua, NHNN bơm ròng 8.188,63 tỷ đồng ra thị trường qua kênh thị trường mở. "
+    "Có 104.932,98 tỷ đồng lưu hành trên kênh cầm cố.\n"
+    "Thị trường trái phiếu: Lợi suất TPCP chốt tuần qua ít biến động, chốt tuần gần như không thay đổi so với phiên cuối tuần "
+    "trước đó ở tất cả các kỳ hạn.\nThị trường chứng khoán: Tuần từ 12/10 - 16/10, thị trường chứng khoán khá tiêu cực."
+)
+
+
+def test_monday_uses_vira_weekly_summary(snap):
+    from bttn.sources import parse_vira_sections
+    sections = parse_vira_sections(WEEKLY_1216)
+    assert "NHNN chào thầu 34.000 tỷ đồng" in sections["lnh"] and "tự do" in sections["fx"]
+    at = snap.as_of
+    for sid, key in (("vira_daily", "lnh"), ("vira_fx", "fx")):
+        snap.sources[sid] = Source(id=sid, url="https://vira.org.vn/tin/Tong-hop-tin-kinh-te-tai-chinh-tuan/Tong-hop-12-10-16-10-2026-.html",
+                                   published_at=at - timedelta(hours=3), retrieved_at=at, text=sections[key],
+                                   kind="news", text_scope="excerpt")
+    result, audit = editorial.domestic_sections(snap, {})
+    text = resolve(" ".join(result["interbank"].paragraphs), snap)
+    assert text.startswith("Phiên ") and "lãi suất VND liên ngân hàng các kỳ hạn ngắn ON-2W" in text
+    assert "NHNN chào thầu 34.000 tỷ đồng" in text and "bơm ròng 8.188,63 tỷ đồng" in text
+    assert "Chốt ngày 16/10, lãi suất VND LNH" not in text
+    low, high = editorial.rules()["word_limits"]["interbank"]
+    assert low <= audit["interbank"]["word_count"] <= high

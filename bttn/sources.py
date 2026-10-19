@@ -686,7 +686,8 @@ def collect_sjc_gold(http, snapshot):
         )
 
 
-VIRA_SUBHEADINGS = re.compile(r"(?:(?<=[.!?:])|^)\s*(?:Nghiệp vụ thị trường mở|Thị trường trái phiếu|Thị trường TPCP)\s*:?\s+")
+VIRA_SUBHEADINGS = re.compile(r"(?:(?<=[.!?:])|^)\s*(?:Nghiệp vụ thị trường mở|Thị trường mở|Thị trường trái phiếu|Thị trường TPCP)\s*:?\s+")
+VIRA_WEEKLY_LIST = "https://vira.org.vn/tin/Tong-hop-tin-kinh-te-tai-chinh-tuan.html"
 
 
 def parse_vira_sections(text: str) -> dict:
@@ -737,7 +738,40 @@ def collect_vira_daily(http, snapshot):
             return
     except Exception as exc:
         LOG.debug("VIRA daily failed: %s", type(exc).__name__)
+    # Thứ Hai VIRA không ra bản tin ngày mà đăng "Tổng hợp Kinh tế - Tài chính tuần" của tuần trước.
+    if collect_vira_weekly(http, snapshot):
+        return
     snapshot.add_issue("VIRA_DAILY_MISSING", "Không đọc được đoạn VIRA có ngày xuất bản xác minh; không tạo lãi suất/OMO mẫu.")
+
+
+def collect_vira_weekly(http, snapshot) -> bool:
+    """Bản tổng hợp tuần của VIRA (đăng sáng thứ Hai): mục tiền tệ LNH, thị trường mở, trái phiếu, ngoại tệ."""
+    try:
+        soup = BeautifulSoup(http.get(VIRA_WEEKLY_LIST).text, "html.parser")
+        links = soup.find_all("a", href=re.compile(r"/tin/Tong-hop-tin-kinh-te-tai-chinh-tuan/Tong-hop.*\.html"))
+        for link in links[:3]:
+            url = urljoin(VIRA_WEEKLY_LIST, link["href"])
+            if urlparse(url).hostname != "vira.org.vn":
+                continue
+            detail = BeautifulSoup(http.get(url).text, "html.parser")
+            at = article_time(detail)
+            if not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=96):
+                continue
+            body = detail.select_one("#abody") or detail
+            sections = parse_vira_sections(body.get_text("\n", strip=True))
+            if len(sections.get("lnh", "").split()) < 35:
+                continue
+            for sid, key in (("vira_daily", "lnh"), ("vira_fx", "fx")):
+                text = sections.get(key, "")
+                if text:
+                    snapshot.sources[sid] = Source(id=sid, url=url, published_at=at,
+                        retrieved_at=datetime.now(timezone.utc), text=text, sha256=hashlib.sha256(text.encode()).hexdigest(),
+                        kind="news", text_scope="excerpt")
+            snapshot.add_issue("VIRA_WEEKLY", "Thứ Hai: mục liên ngân hàng/ngoại tệ dùng bản Tổng hợp tuần của VIRA")
+            return True
+    except Exception as exc:
+        LOG.debug("VIRA weekly failed: %s", type(exc).__name__)
+    return False
 
 
 def collect_china_news(http, snapshot):
