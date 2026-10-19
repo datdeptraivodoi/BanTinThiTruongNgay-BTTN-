@@ -17,7 +17,7 @@ def send_weekly(files: list[Path], friday_label: str, recipients: list[str], *, 
     msg["From"], msg["To"] = sender, ", ".join(recipients)
     subject = f"[MB TREASURY] BẢN TIN THỊ TRƯỜNG TUẦN {friday_label}"
     if review:
-        subject = "[REVIEW] " + subject + (f" (BẢN NHÁP: {len(issues)} vấn đề)" if issues else "")
+        subject = "[REVIEW] " + subject + (f" ({len(issues)} vấn đề cần xem)" if issues else "")
     msg["Subject"] = subject
     if review:
         lines = ["Bản tin thị trường tuần để review (chưa gửi danh sách nhận chính thức).", ""]

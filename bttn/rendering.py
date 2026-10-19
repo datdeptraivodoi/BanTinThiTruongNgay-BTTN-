@@ -1172,8 +1172,6 @@ def render(snapshot, content, template: Path, output: Path, is_draft: bool = Fal
     date_text = f"{weekday_str}, ngày {snapshot.as_of.strftime('%d.%m.%Y')}"
     if snapshot.purpose == "fixture":
         date_text = "KIỂM THỬ · " + date_text
-    elif is_draft:
-        date_text = "BẢN NHÁP · " + date_text
     p_date = header[1].paragraphs[0]
     p_date.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p_date.paragraph_format.space_before = Pt(0)

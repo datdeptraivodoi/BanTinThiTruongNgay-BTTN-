@@ -53,7 +53,7 @@ def send_report(snapshot, attachments: list[Path], state_dir: Path, recipients: 
     message["To"] = ", ".join(recipients)
     subject = f"[MB TREASURY] BẢN TIN THỊ TRƯỜNG NGÀY - {snapshot.as_of:%d/%m/%Y}"
     if review:
-        subject = "[REVIEW] " + subject + (f" (BẢN NHÁP: {len(issues)} vấn đề)" if issues else "")
+        subject = "[REVIEW] " + subject + (f" ({len(issues)} vấn đề cần xem)" if issues else "")
     message["Subject"] = subject
     message["Message-ID"] = f"<bttn-{key}@{sender.split('@')[-1]}>"
     if review:
