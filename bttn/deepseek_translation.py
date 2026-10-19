@@ -32,6 +32,13 @@ DEFAULT_MODEL = "deepseek-flash"
 MODEL = (os.getenv("DEEPSEEK_MODEL") or DEFAULT_MODEL).strip()
 RULES_VERSION = "deepseek-en-vi-finance-v2"
 
+# OpenCode (https://opencode.ai): API kiểu OpenAI, có bản DeepSeek V4.1 Flash miễn phí (cùng model với DeepSeek
+# trả phí ở trên). Chỉ dùng các model OpenCode ghi là không lưu dữ liệu, không dùng để huấn luyện.
+OPENCODE_BASE_URL = os.getenv("OPENCODE_BASE_URL", "https://opencode.ai/inference/openai/v1").rstrip("/")
+OPENCODE_ENDPOINT = OPENCODE_BASE_URL + "/chat/completions"
+OPENCODE_MODEL = (os.getenv("OPENCODE_MODEL") or "deepseek-v4.1-flash-free").strip()
+OPENCODE_BACKUP_MODEL = (os.getenv("OPENCODE_BACKUP_MODEL") or "glm-5.3-flash-free").strip()
+
 # DeepSeek-specific wording on top of the shared TERMS (which the checks still enforce).
 TERM_OVERRIDES = {"further tightening": "thắt chặt thêm", "offshore yuan": "nhân dân tệ ngoại biên"}
 
@@ -143,16 +150,18 @@ def strip_wrappers(text):
 
 
 class DeepSeekTranslator:
-    def __init__(self, api_key, *, model=None, session=None, sleep=time.sleep):
+    def __init__(self, api_key, *, model=None, session=None, sleep=time.sleep, endpoint=None, prefix="DEEPSEEK"):
         self.api_key = (api_key or "").strip()
         self.model = model or MODEL
+        self.endpoint = endpoint or ENDPOINT
+        self.prefix = prefix              # mã lỗi: DEEPSEEK_HTTP_402, OPENCODE_HTTP_429...
         self.session = session or requests.Session()
         self.sleep = sleep
         self.attempts = []
 
     def translate(self, text):
         if not self.api_key:
-            raise TranslationError("DEEPSEEK_API_KEY_MISSING")
+            raise TranslationError(f"{self.prefix}_API_KEY_MISSING")
         if not text.strip() or len(text) > 3000:
             raise TranslationError("TRANSLATION_SEGMENT_SIZE")
         fixed = translate_fixed_title(text)
@@ -176,14 +185,14 @@ class DeepSeekTranslator:
             result = None
             try:
                 response = self.session.post(
-                    ENDPOINT, headers={"Authorization": "Bearer " + self.api_key},
+                    self.endpoint, headers={"Authorization": "Bearer " + self.api_key},
                     json={"model": self.model, "messages": messages, "temperature": 0,
                           "max_tokens": 8192, "stream": False},
                     timeout=(10, 120), allow_redirects=False,
                 )
                 status = response.status_code
                 if status != 200:
-                    raise TranslationError(f"DEEPSEEK_HTTP_{status}")
+                    raise TranslationError(f"{self.prefix}_HTTP_{status}")
                 try:
                     choice = response.json()["choices"][0]
                     if choice.get("finish_reason") != "stop":
@@ -198,9 +207,9 @@ class DeepSeekTranslator:
                     check_translation(text, result)
                     check_style(text, result)
                 except (KeyError, IndexError, TypeError, ValueError):
-                    raise TranslationError("DEEPSEEK_RESPONSE_INVALID") from None
+                    raise TranslationError(f"{self.prefix}_RESPONSE_INVALID") from None
             except requests.RequestException:
-                error = TranslationError("DEEPSEEK_NETWORK")
+                error = TranslationError(f"{self.prefix}_NETWORK")
             except TranslationError as exc:
                 error = exc
             finally:
@@ -214,7 +223,7 @@ class DeepSeekTranslator:
                 })
             if error is None:
                 return result
-            retryable = status in (429, 500, 502, 503, 504) or str(error) == "DEEPSEEK_NETWORK"
+            retryable = status in (429, 500, 502, 503, 504) or str(error) == f"{self.prefix}_NETWORK"
             # At most one fresh translation for a rejected output, same provider, no repair text.
             retryable = retryable or (str(error).startswith("TRANSLATION_") and attempt == 0)
             if not retryable or attempt == 2:
@@ -222,4 +231,10 @@ class DeepSeekTranslator:
             if str(error).startswith("TRANSLATION_"):
                 messages = [{"role": "system", "content": system_prompt()}, {"role": "user", "content": masked}]
             self.sleep(min(2 ** attempt, 4))
-        raise TranslationError("DEEPSEEK_UNAVAILABLE")
+        raise TranslationError(f"{self.prefix}_UNAVAILABLE")
+
+
+def opencode_translator(model=None, **kwargs):
+    """DeepSeek V4.1 Flash miễn phí qua OpenCode (khóa OPENCODE_API_KEY); cùng lời nhắc và các bước kiểm tra."""
+    return DeepSeekTranslator(os.getenv("OPENCODE_API_KEY"), model=model or OPENCODE_MODEL,
+                              endpoint=OPENCODE_ENDPOINT, prefix="OPENCODE", **kwargs)

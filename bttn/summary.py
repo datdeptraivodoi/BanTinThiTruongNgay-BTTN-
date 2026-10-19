@@ -111,16 +111,20 @@ def generate_markdown_summary(
         lines.append("")
 
     if attempts_data:
-        lines.append("### Nhật ký dịch DeepSeek (dự phòng NVIDIA Riva)\n")
-        if any(att.get("provider") == "nvidia_riva" for att in attempts_data):
-            lines.append("⚠️ DeepSeek không dịch được một số đoạn (hết số dư, lỗi khóa hoặc lỗi mạng); các đoạn đó do "
-                         "NVIDIA Riva dịch. Kiểm tra số dư DeepSeek và xem kỹ phần dịch.\n")
+        lines.append("### Nhật ký dịch (DeepSeek miễn phí qua OpenCode → DeepSeek trả phí → GLM miễn phí → NVIDIA Riva)\n")
+        providers = {att.get("provider") for att in attempts_data if att.get("status") == "checked"}
+        if providers & {"nvidia_riva", "opencode_glm"}:
+            lines.append("⚠️ DeepSeek (miễn phí và trả phí) không dịch được một số đoạn (hết lượt miễn phí, hết số dư, "
+                         "lỗi khóa hoặc lỗi mạng); các đoạn đó do model dự phòng dịch. Xem kỹ phần dịch.\n")
+        if "deepseek" in providers:
+            lines.append("ℹ️ Bản DeepSeek miễn phí qua OpenCode không dịch được một số đoạn, đã dùng DeepSeek trả phí.\n")
         lines.append("Các lần lỗi dưới đây có thể đã phục hồi khi thử lại; trạng thái cuối cùng nằm ở đầu trang.\n")
-        lines.append("| Lần | Mô hình | Kết quả | Mã lỗi | Thời gian |")
-        lines.append("| :---: | :--- | :--- | :--- | :---: |")
+        lines.append("| Lần | Nhà cung cấp | Mô hình | Kết quả | Mã lỗi | Thời gian |")
+        lines.append("| :---: | :--- | :--- | :--- | :--- | :---: |")
         for att in attempts_data:
             elapsed_sec = att.get("elapsed_seconds", 0)
-            lines.append(f"| {att.get('attempt', '—')} | `{att.get('model', '—')}` | {att.get('status', '—')} | `{att.get('error') or '—'}` | {elapsed_sec}s |")
+            lines.append(f"| {att.get('attempt', '—')} | {att.get('provider', '—')} | `{att.get('model', '—')}` | "
+                         f"{att.get('status', '—')} | `{att.get('error') or '—'}` | {elapsed_sec}s |")
         lines.append("")
 
     # 5. Source Freshness Table

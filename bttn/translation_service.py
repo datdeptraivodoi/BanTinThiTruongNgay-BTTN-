@@ -77,45 +77,92 @@ def split_article(text, maximum=2800):
     return segments
 
 
-# DeepSeek lỗi không thử lại được trong lần chạy này (hết tiền, sai/thiếu khóa): chuyển hẳn sang Riva.
-DEEPSEEK_DOWN = ("DEEPSEEK_API_KEY_MISSING", "DEEPSEEK_HTTP_401", "DEEPSEEK_HTTP_402", "DEEPSEEK_HTTP_403")
+# Lỗi không thử lại được trong lần chạy này (hết tiền, sai/thiếu khóa, bị chặn): bỏ hẳn bước đó, sang bước sau.
+DOWN_SUFFIXES = ("_API_KEY_MISSING", "_HTTP_401", "_HTTP_402", "_HTTP_403")
+DEEPSEEK_DOWN = tuple("DEEPSEEK" + s for s in DOWN_SUFFIXES)
 
 
-class FallbackTranslator:
-    """DeepSeek trước; đoạn nào DeepSeek không dịch được thì NVIDIA Riva (miễn phí) dịch.
+class ChainTranslator:
+    """Dịch theo thứ tự các bước [(tên, client, cache)]; đoạn nào bước trước không dịch được thì bước sau dịch.
 
-    Bản dịch Riva qua đúng các bước kiểm tra kỹ thuật như DeepSeek. Bài có đoạn dịch bằng Riva không
-    lưu vào bộ nhớ đệm, để lần chạy sau DeepSeek dịch lại khi đã hoạt động bình thường.
+    Mặc định: DeepSeek V4.1 Flash miễn phí qua OpenCode → DeepSeek trả phí (cùng model) → GLM miễn phí qua
+    OpenCode → NVIDIA Riva. Bước nào hết tiền/sai khóa thì bỏ hẳn cho cả lần chạy. Bản dịch có đoạn do bước
+    "không cache" dịch (model khác DeepSeek V4.1 Flash) không lưu vào bộ nhớ đệm, để lần sau DeepSeek dịch lại.
     """
 
-    def __init__(self, primary, backup=None):
-        self.primary, self.backup = primary, backup
-        self.primary_down = None
+    def __init__(self, steps):
+        self.steps = [(name, client, cache) for name, client, cache in steps if client is not None]
+        self.down = {}
         self.used_backup = False
+        self.used = set()
         self.attempts = []
+
+    @property
+    def primary_down(self):
+        return next(iter(self.down.values()), None)
 
     def translate(self, text):
         error = None
-        if self.primary_down is None:
+        for name, client, cache in self.steps:
+            if name in self.down:
+                continue
+            if not getattr(client, "api_key", ""):
+                self.down[name] = f"{name.upper()}_API_KEY_MISSING"
+                continue
             try:
-                return self._log(self.primary, lambda: self.primary.translate(text))
+                result = self._log(name, client, lambda c=client: c.translate(text))
             except TranslationError as exc:
                 error = exc
-                if str(exc) in DEEPSEEK_DOWN:
-                    self.primary_down = str(exc)
-        if self.backup is None or not getattr(self.backup, "api_key", ""):
-            raise error or TranslationError(self.primary_down)
-        result = self._log(self.backup, lambda: self.backup.translate(text))
-        self.used_backup = True
-        return result
+                if str(exc).endswith(DOWN_SUFFIXES):
+                    self.down[name] = str(exc)
+                continue
+            self.used.add(name)
+            if not cache:
+                self.used_backup = True
+            return result
+        raise error or TranslationError(self.primary_down or "TRANSLATION_NO_PROVIDER")
 
-    def _log(self, client, call):
+    def provider_label(self, names):
+        return "+".join(n for n, _, _ in self.steps if n in names) or "deepseek"
+
+    def _log(self, name, client, call):
         before = len(client.attempts)
         try:
             return call()
         finally:
             for item in client.attempts[before:]:
-                self.attempts.append({"provider": "deepseek" if client is self.primary else "nvidia_riva", **item})
+                self.attempts.append({"provider": name, **item})
+
+
+class FallbackTranslator(ChainTranslator):
+    """Hai bước: DeepSeek, rồi NVIDIA Riva (miễn phí). Giữ cho các lệnh/kiểm thử cũ."""
+
+    def __init__(self, primary, backup=None):
+        super().__init__([("deepseek", primary, True), ("nvidia_riva", backup, False)])
+        self.primary, self.backup = primary, backup
+
+    def translate(self, text):
+        if self.backup is not None and not getattr(self.backup, "api_key", ""):
+            # Không có Riva: lỗi của DeepSeek trả thẳng ra như trước
+            if "deepseek" in self.down:
+                raise TranslationError(self.down["deepseek"])
+            try:
+                return self._log("deepseek", self.primary, lambda: self.primary.translate(text))
+            except TranslationError as exc:
+                if str(exc) in DEEPSEEK_DOWN:
+                    self.down["deepseek"] = str(exc)
+                raise
+        return super().translate(text)
+
+
+def default_translator():
+    from .deepseek_translation import OPENCODE_BACKUP_MODEL, opencode_translator
+    return ChainTranslator([
+        ("opencode", opencode_translator(), True),                         # DeepSeek V4.1 Flash miễn phí
+        ("deepseek", DeepSeekTranslator(os.getenv("DEEPSEEK_API_KEY")), True),
+        ("opencode_glm", opencode_translator(OPENCODE_BACKUP_MODEL), False),
+        ("nvidia_riva", NvidiaTranslator(os.getenv("NVIDIA_API_KEY")), False),
+    ])
 
 
 def check_segments(original, translated):
@@ -243,8 +290,7 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
     directory.mkdir(parents=True, exist_ok=True)
     store = TranslationStore(cache_dir)
     store.cleanup()
-    translator = translator or FallbackTranslator(DeepSeekTranslator(os.getenv("DEEPSEEK_API_KEY")),
-                                                  NvidiaTranslator(os.getenv("NVIDIA_API_KEY")))
+    translator = translator or default_translator()
     result = {"provider": "deepseek", "model": MODEL, "review_only": allow_stale, "articles": {}, "failures": {}}
     for sid, source in snapshot.sources.items():
         topic = topic_for(source)
@@ -259,16 +305,22 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
             record = store.load(source)
             status = "cached" if record else "translated"
             if record is None:
-                fallback = isinstance(translator, FallbackTranslator)
-                start = translator.used_backup if fallback else False
-                if fallback:
+                chain = isinstance(translator, ChainTranslator)
+                start = translator.used_backup if chain else False
+                if chain:
                     translator.used_backup = False
+                    before_used, translator.used = translator.used, set()
                 segments = [translator.translate(s) for s in split_article(source.text)]
-                backup = fallback and translator.used_backup
-                record = store.save(source, segments, provider="deepseek+nvidia_riva" if backup else "deepseek",
-                                    persist=not backup)
+                backup = chain and translator.used_backup
+                provider = "deepseek"
+                if chain:
+                    provider = translator.provider_label(translator.used)
+                    if isinstance(translator, FallbackTranslator):
+                        provider = "deepseek+nvidia_riva" if backup else "deepseek"
+                    translator.used = before_used | translator.used
+                record = store.save(source, segments, provider=provider, persist=not backup)
                 status = "translated_backup" if backup else status
-                if fallback:
+                if chain:
                     translator.used_backup = start or backup
             result["articles"][sid] = {"topic": topic, "cache_key": cache_key(source), "status": status,
                                        "record": record.model_dump(mode="json")}
@@ -278,9 +330,15 @@ def translate_snapshot(snapshot, directory, cache_dir, *, translator=None, allow
     result["missing_topics"] = [t for t in TOPICS if t not in present]
     result["pending_review"] = [sid for sid, a in result["articles"].items()
                                 if a["record"]["review_status"] != "approved"]
-    down = translator.primary_down if isinstance(translator, FallbackTranslator) else None
-    if down or any(a["status"] == "translated_backup" for a in result["articles"].values()):
-        result["backup"] = {"provider": "nvidia_riva", "reason": down or "DeepSeek không dịch được một số đoạn"}
+    down = translator.primary_down if isinstance(translator, ChainTranslator) else None
+    if isinstance(translator, ChainTranslator):
+        result["providers_used"] = sorted(translator.used)
+        result["providers_down"] = dict(translator.down)
+    if any(a["status"] == "translated_backup" for a in result["articles"].values()) or (
+            isinstance(translator, FallbackTranslator) and down):
+        result["backup"] = {"provider": "nvidia_riva" if isinstance(translator, FallbackTranslator) else
+                            "+".join(sorted(translator.used - {"opencode", "deepseek"})) or "nvidia_riva",
+                            "reason": down or "DeepSeek không dịch được một số đoạn"}
     result["status"] = "checked" if not result["missing_topics"] and not result["failures"] else "incomplete"
     for name, data in [("translations.json", result), ("translation-attempts.json", translator.attempts)]:
         (directory / name).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
