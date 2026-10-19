@@ -1033,9 +1033,10 @@ NEWS_HEADING = "Tin tức nổi bật"
 BIG_HEADINGS = ("Thông tin liên hệ", "Miễn trừ trách nhiệm")     # Times 14 đậm như bản mẫu
 SAMPLE_INDENT = Pt(8.1)        # 162 dxa: lề trái cột "Tin tức nổi bật" trong file mẫu
 SAMPLE_TOP_ROWS = (3, 4, 5, 7, 8, 11)
-# Trang 2 và 3: cột phải kéo tới mép giấy (lề phải trang = 0), nên chữ trong cột này thụt phải 0,6 cm
-# (cộng lề ô 5,4pt) để không sát mép khi in (góp ý 19.10). Ảnh biểu đồ giữ nguyên kích thước.
-RIGHT_EDGE_INDENT = Pt(17)
+# Trang 2 và 3: cột phải kéo tới mép giấy (lề phải trang = 0), nên chữ trong cột này thụt phải 162 dxa như tiêu đề
+# và dòng "Dự kiến" của bản mẫu. Thụt 17pt (bản trước) làm cột Châu Á/cà phê hẹp lại, chữ nhảy thêm dòng và đẩy
+# bảng dự báo sang trang 3 (góp ý 20.10). Ảnh biểu đồ giữ nguyên kích thước.
+RIGHT_EDGE_INDENT = Pt(8.1)
 RIGHT_EDGE_ROWS = (7, 8, 11, 12)
 
 
@@ -1093,6 +1094,33 @@ def _calendar_line_spacing(table):
                 fmt.space_before = fmt.space_after = Pt(0)
 
 
+COMMODITY_ROW = 195            # dxa: chiều cao mỗi dòng bảng giá hàng hóa trong bản mẫu (kể cả dòng phân cách)
+COMMODITY_LAST_ROW = 255
+
+
+def _commodity_rows(cell):
+    """Bảng giá hàng hóa: chiều cao dòng như bản mẫu (bước chuẩn hóa xóa chiều cao dòng của bảng lồng, dòng phân
+    cách bị ép còn ~1pt nên bảng ngắn hơn mẫu và cuối trang 3 trống một khoảng)."""
+    tables = [t for t in cell._tc.findall(qn("w:tbl")) if "Các chỉ số" in "".join(x.text or "" for x in t.iter(qn("w:t")))]
+    if not tables:
+        return
+    rows = tables[0].findall(qn("w:tr"))
+    for i, tr in enumerate(rows):
+        text = "".join(x.text or "" for x in tr.iter(qn("w:t"))).strip()
+        trpr = tr.get_or_add_trPr()
+        for old in trpr.findall(qn("w:trHeight")):
+            trpr.remove(old)
+        height = OxmlElement("w:trHeight")
+        if i == 0:
+            height.set(qn("w:val"), str(2 * COMMODITY_ROW))          # tiêu đề hai dòng
+        elif not text:
+            height.set(qn("w:val"), str(COMMODITY_ROW))              # dòng phân cách nền xanh
+            height.set(qn("w:hRule"), "exact")
+        else:
+            height.set(qn("w:val"), str(COMMODITY_LAST_ROW if i == len(rows) - 1 else COMMODITY_ROW))
+        trpr.append(height)
+
+
 CONTACT_STYLES = {0: (10, True, "0070C0"), 1: (9, True, "000000"), 2: (9, False, "000000"), 3: (8.5, False, "000000")}
 
 
@@ -1133,10 +1161,12 @@ def _disclaimer(cell):
     for p in paras[:-1]:
         nxt = p._p.getnext()
         if nxt is not None and nxt.tag == qn("w:p") and not Paragraph(nxt, None).text.strip():
-            continue
-        blank = OxmlElement("w:p")
-        p._p.addnext(blank)
+            blank = nxt              # dòng trống sẵn có trong template (bị bước chuẩn hóa ép còn 1pt)
+        else:
+            blank = OxmlElement("w:p")
+            p._p.addnext(blank)
         bp = Paragraph(blank, None)
+        bp.paragraph_format.left_indent = bp.paragraph_format.right_indent = Pt(0)
         bp.paragraph_format.space_before = bp.paragraph_format.space_after = Pt(0)
         bp.paragraph_format.line_spacing = 1
         mark = OxmlElement("w:rPr")          # dòng trống cao theo cỡ chữ 10 của đoạn
@@ -1144,7 +1174,10 @@ def _disclaimer(cell):
             el = OxmlElement(tag)
             el.set(qn("w:val"), "20")
             mark.append(el)
-        bp._p.get_or_add_pPr().append(mark)
+        ppr = bp._p.get_or_add_pPr()
+        for old_mark in ppr.findall(qn("w:rPr")):
+            ppr.remove(old_mark)
+        ppr.append(mark)
 
 
 def apply_sample_layout(table):
@@ -1176,6 +1209,7 @@ def apply_sample_layout(table):
         p.paragraph_format.space_after = Pt(0)
     _sample_headings(table)
     _calendar_line_spacing(table)
+    _commodity_rows(cells(table.rows[11])[0])
     _contact_block(cells(table.rows[11])[0])
     _disclaimer(cells(table.rows[13])[0])
     for index in RIGHT_EDGE_ROWS:

@@ -88,3 +88,25 @@ def test_gold_is_one_world_sentence_without_silver():
     result, audit = editorial.domestic_sections(s, {})
     gold = resolve(result["energy_metals"].paragraphs[1], s)
     assert gold.count(". ") == 0 and "bạc" not in gold and gold.startswith("Giá vàng quốc tế")
+
+
+def test_page3_rows_and_disclaimer_blank_lines_match_sample(tmp_path):
+    """Góp ý 20.10: cuối trang 3 trống vì dòng bảng giá hàng hóa và dòng trống giữa các đoạn miễn trừ bị ép còn 1pt."""
+    doc = _render(tmp_path)
+    cell = doc.tables[2].rows[1].cells[0]
+    table = cell.tables[0]
+    heights = [tr.trPr.find(qn("w:trHeight")).get(qn("w:val")) for tr in table._tbl.findall(qn("w:tr"))]
+    assert heights[0] == "390" and set(heights[1:-1]) == {"195"} and heights[-1] == "255"
+    disclaimer = doc.tables[2].rows[3].cells[0]
+    blanks = [p for p in disclaimer.paragraphs if not p.text.strip()]
+    assert len(blanks) >= 3
+    for p in blanks:
+        rule = p.paragraph_format.line_spacing
+        assert rule == 1 or rule is None, rule        # dòng đơn cỡ 10, không còn 1pt
+        assert p._p.pPr.find(qn("w:rPr")).find(qn("w:sz")).get(qn("w:val")) == "20"
+
+
+def test_right_column_indent_matches_sample_and_china_is_short(tmp_path):
+    from bttn.rendering import RIGHT_EDGE_INDENT
+    assert RIGHT_EDGE_INDENT.pt == 8.1          # 162 dxa như tiêu đề và dòng "Dự kiến" của bản mẫu
+    assert editorial.rules()["word_limits"]["china"] == [50, 62]

@@ -4,7 +4,7 @@
   "highlight_word_limits": [[35, 45], [35, 45], [12, 45]],
   "word_limits": {
     "interbank": [80, 95], "usd_vnd": [77, 82], "eur_usd": [185, 200],
-    "japan": [100, 140], "china": [50, 70], "coffee": [130, 135],
+    "japan": [100, 140], "china": [50, 62], "coffee": [130, 135],
     "energy_metals": [110, 135]
   },
   "bond_liquidity": {"low": 10000, "high": 20000, "unit": "tỷ đồng/ngày, GTGD outright bình quân theo báo cáo tuần VBMA"},
