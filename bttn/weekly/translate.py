@@ -1,4 +1,5 @@
-"""Dịch chéo bản tin tuần bằng DeepSeek V4.1 Flash (cùng khóa DEEPSEEK_API_KEY với bản tin ngày BTTN).
+"""Dịch chéo bản tin tuần bằng DeepSeek V4.1 Flash: bản miễn phí qua OpenCode (OPENCODE_API_KEY) trước, rồi bản trả phí
+(DEEPSEEK_API_KEY, cùng khóa với bản tin ngày BTTN), rồi GLM miễn phí qua OpenCode.
 
 Không có DEEPSEEK_API_KEY thì dùng NVIDIA (riva-translate + mô hình ngôn ngữ dự phòng) như trước.
 
@@ -154,10 +155,18 @@ def glossary(text: str, lang: str) -> str:
 
 
 class Translator:
-    def __init__(self, api_key=None, *, session=None, sleep=time.sleep, deepseek_key=None):
+    def __init__(self, api_key=None, *, session=None, sleep=time.sleep, deepseek_key=None, opencode_key=None):
         self.api_key = (api_key or os.getenv("NVIDIA_API_KEY") or "").strip()
         self.deepseek_key = (deepseek_key if deepseek_key is not None else os.getenv("DEEPSEEK_API_KEY") or "").strip()
-        self.provider = "deepseek" if self.deepseek_key else "nvidia"
+        self.opencode_key = (opencode_key if opencode_key is not None else os.getenv("OPENCODE_API_KEY") or "").strip()
+        # Thứ tự: DeepSeek V4.1 Flash miễn phí qua OpenCode → DeepSeek trả phí → GLM miễn phí qua OpenCode → NVIDIA
+        self.llm_providers = [p for p in (
+            ("opencode", deepseek.OPENCODE_ENDPOINT, self.opencode_key, deepseek.OPENCODE_MODEL),
+            ("deepseek", deepseek.ENDPOINT, self.deepseek_key, deepseek.MODEL),
+            ("opencode_glm", deepseek.OPENCODE_ENDPOINT, self.opencode_key, deepseek.OPENCODE_BACKUP_MODEL),
+        ) if p[2]]
+        self.down = set()
+        self.provider = self.llm_providers[0][0] if self.llm_providers else "nvidia"
         self.session = session or requests.Session()
         self.sleep = sleep
         self.log = []
@@ -170,13 +179,21 @@ class Translator:
     def _llm(self, system: str, text: str, temperature: float = 0) -> str:
         """DeepSeek nếu có khóa; nếu không (hoặc DeepSeek lỗi) gọi mô hình ngôn ngữ của NVIDIA,
         mô hình bị rút (404/410) thì chuyển sang mô hình kế tiếp."""
-        if self.deepseek_key:
+        last_exc = None
+        for name, endpoint, key, model in self.llm_providers:
+            if name in self.down:
+                continue
             try:
-                return self._deepseek(system, text, temperature).strip('"')
+                return self._openai(name, endpoint, key, model, system, text, temperature).strip('"')
             except (WeeklyTranslationError, requests.RequestException, KeyError, ValueError) as exc:
-                self.log.append({"pair": "llm", "status": "deepseek_failed", "error": str(exc)})
-                if not self.api_key or str(exc) == "AI_TIME_BUDGET":
+                last_exc = exc
+                self.log.append({"pair": "llm", "status": f"{name}_failed", "model": model, "error": str(exc)})
+                if str(exc) == "AI_TIME_BUDGET":
                     raise WeeklyTranslationError(str(exc)) from None
+                if str(exc).endswith(("_HTTP_401", "_HTTP_402", "_HTTP_403")):
+                    self.down.add(name)        # hết tiền / sai khóa: bỏ nhà cung cấp này cho cả lần chạy
+        if last_exc is not None and not self.api_key:
+            raise WeeklyTranslationError(str(last_exc)) from None
         first = os.getenv("NVIDIA_CONDENSE_MODEL")
         models = getattr(self, "_models", None) or [m for m in ((first,) if first else ()) + LLM_MODELS if m]
         last = None
@@ -207,16 +224,22 @@ class Translator:
             raise WeeklyTranslationError(f"NVIDIA_HTTP_{resp.status_code}")
         return self._content(resp)
 
-    def _deepseek(self, system: str, text: str, temperature: float = 0) -> str:
+    def _openai(self, name: str, endpoint: str, key: str, model: str, system: str, text: str,
+                temperature: float = 0) -> str:
+        """Gọi API kiểu OpenAI (DeepSeek hoặc OpenCode)."""
         self._tick()
-        resp = self.session.post(deepseek.ENDPOINT, headers={"Authorization": "Bearer " + self.deepseek_key},
-                                 json={"model": deepseek.MODEL, "messages": [{"role": "system", "content": system},
-                                                                             {"role": "user", "content": text}],
+        resp = self.session.post(endpoint, headers={"Authorization": "Bearer " + key},
+                                 json={"model": model, "messages": [{"role": "system", "content": system},
+                                                                    {"role": "user", "content": text}],
                                        "temperature": temperature, "max_tokens": 4096, "stream": False},
                                  timeout=(10, 60), allow_redirects=False)
         if resp.status_code != 200:
-            raise WeeklyTranslationError(f"DEEPSEEK_HTTP_{resp.status_code}")
+            prefix = "OPENCODE" if name.startswith("opencode") else "DEEPSEEK"
+            raise WeeklyTranslationError(f"{prefix}_HTTP_{resp.status_code}")
         return deepseek.strip_wrappers(self._content(resp))
+
+    def _deepseek(self, system: str, text: str, temperature: float = 0) -> str:
+        return self._openai("deepseek", deepseek.ENDPOINT, self.deepseek_key, deepseek.MODEL, system, text, temperature)
 
     def _content(self, resp) -> str:
         choice = resp.json()["choices"][0]
@@ -239,7 +262,7 @@ class Translator:
         """Dịch một câu: mô hình dịch trước; sai số liệu thì nhờ mô hình ngôn ngữ dịch lại với yêu cầu giữ số."""
         pair = f"{src}-{dst}"
         last = None
-        if self.deepseek_key:   # DeepSeek dịch trước, sai số thì thử riva-translate của NVIDIA
+        if self.llm_providers:   # DeepSeek (miễn phí qua OpenCode, rồi trả phí) dịch trước, sai số thì thử Riva
             attempts = (lambda: self._llm(TRANSLATE_PROMPT[pair], text),) + ((lambda: self._call(text, pair),)
                                                                             if self.api_key else ())
         else:
