@@ -51,7 +51,7 @@ def test_review_email_subject_and_issue_list(tmp_path, monkeypatch):
     ledger = delivery.send_report(snapshot, [docx], tmp_path / "state", ["r@example.com"], review=True, issues=issues)
     msg = server.send_message.call_args.args[0]
     assert msg["Subject"].startswith("[REVIEW] [MB TREASURY] BẢN TIN THỊ TRƯỜNG NGÀY")
-    assert "(BẢN NHÁP: 1 vấn đề)" in msg["Subject"]
+    assert "(1 vấn đề cần xem)" in msg["Subject"]
     body = msg.get_body(preferencelist=("plain",)).get_content()
     assert "STALE_SOURCE: VIRA chưa có ấn bản hôm nay" in body
     assert "-review-" in ledger.name
