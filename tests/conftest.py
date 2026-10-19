@@ -10,3 +10,5 @@ def offline_chart_sources(monkeypatch):
     monkeypatch.setenv("BTTN_CHART_ENGINE", "mpl")
     # Test không gọi AI thật dù máy chạy test có khóa DeepSeek trong môi trường
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    # Lịch tự động (ForexFactory) không gọi mạng trong test
+    monkeypatch.setattr("bttn.rendering._auto_calendar", lambda monday: [])
