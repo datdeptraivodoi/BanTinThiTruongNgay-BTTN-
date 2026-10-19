@@ -578,7 +578,7 @@ def test_normalization_handles_missing_robusta(snapshot, content):
     ]
     normalize_coffee_section(content.coffee, snapshot)
     result = content.coffee.paragraphs[0]
-    assert result.startswith("Cập nhật giá cà phê thế giới,")
+    assert result.startswith("Thị trường cà phê")
     assert "1.950" not in result
     assert ROBUSTA_MISSING_NOTICE in result
 

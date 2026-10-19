@@ -871,7 +871,7 @@ def collect_china_news(http, snapshot):
 
 
 def collect_snapshot(http, as_of):
-    from .calculations import derive_swaps
+    from .calculations import derive_gold_spread, derive_swaps
     from .trader_quotes import collect_trader_quotes
     from .tradingeconomics_news import collect_tradingeconomics
     from .vira import collect_vira
@@ -896,4 +896,8 @@ def collect_snapshot(http, as_of):
         except Exception as exc:
             snapshot.add_issue(f"{name}_SOURCE", f"{name}: {type(exc).__name__}: {exc}")
     derive_swaps(snapshot)
+    try:
+        derive_gold_spread(snapshot)
+    except Exception as exc:  # noqa: BLE001 - thiếu số liệu thì chỉ bỏ câu chênh lệch vàng
+        snapshot.add_issue("GOLD_SPREAD", f"{type(exc).__name__}: {exc}")
     return snapshot

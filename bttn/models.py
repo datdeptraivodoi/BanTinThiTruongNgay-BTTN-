@@ -160,7 +160,7 @@ def create_draft_placeholder_content(snapshot: Snapshot, reason: str = "") -> Re
             source_ids=ref_src,
         ),
         coffee=Section(
-            paragraphs=["Cập nhật giá cà phê thế giới, [Phần nhận xét thị trường cà phê chưa hoàn tất. Vui lòng tham khảo bảng giá hàng hóa nông sản.]"],
+            paragraphs=["Thị trường cà phê: [Phần nhận xét thị trường cà phê chưa hoàn tất. Vui lòng tham khảo bảng giá hàng hóa nông sản.]"],
             source_ids=ref_src,
         ),
         energy_metals=Section(
@@ -216,7 +216,7 @@ def sanitize_content_for_draft_render(
             label = sec_name.replace("_", "-").upper()
             if sec_name == "coffee":
                 sec.paragraphs = [
-                    "Cập nhật giá cà phê thế giới, [Phần nhận xét thị trường cà phê chưa hoàn tất do lỗi kiểm định nội dung. Bảng số liệu đã được đối soát đầy đủ.]"
+                    "Thị trường cà phê: [Phần nhận xét thị trường cà phê chưa hoàn tất do lỗi kiểm định nội dung. Bảng số liệu đã được đối soát đầy đủ.]"
                 ]
             elif sec_name == "eur_usd":
                 sec.paragraphs = [

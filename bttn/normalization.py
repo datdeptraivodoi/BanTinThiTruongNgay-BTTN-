@@ -220,12 +220,14 @@ def normalize_coffee_section(section: Section, snapshot: Snapshot) -> None:
     text = " ".join(paragraphs)
     text = re.sub(r"\s*\(\s*Nguồn\s*:\s*giacaphe\.com\s*\)", "", text, flags=re.I)
 
-    # Ensure coffee opening
-    opening = "Cập nhật giá cà phê thế giới,"
-    if not text.startswith(opening):
-        # Strip any variant opening
+    # Câu mở đầu số liệu như bản tin mẫu: "Thị trường cà phê ..., giá Arabica tại New York ..."
+    from .commodity_text import COFFEE_OPENING, coffee_lead
+    if not text.startswith(COFFEE_OPENING):
         text = re.sub(r"^Cập nhật\s+[^,]+,\s*", "", text, flags=re.I)
-        text = f"{opening} {text.lstrip()}"
+        lead = coffee_lead(snapshot)
+        if text and text[:1].islower():
+            text = text[:1].upper() + text[1:]
+        text = f"{lead} {text.lstrip()}".strip() if lead else text
 
     # Handle Robusta
     if not has_robusta:
