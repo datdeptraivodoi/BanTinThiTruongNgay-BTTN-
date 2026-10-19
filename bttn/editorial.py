@@ -440,6 +440,52 @@ def interbank_lead(snapshot):
     return [Candidate(text, obs[keys[0]].source_id, quoted=False)]
 
 
+def weekly_omo_candidates(snapshot):
+    """Câu thị trường mở gọn như bản tin mẫu 19.10 từ số liệu bản tổng hợp tuần VIRA (đã gắn nguồn)."""
+    obs = snapshot.observations
+    if "OMO_OFFER" not in obs:
+        return []
+    rate = " với lãi suất duy trì ở mức {{OMO_RATE}}%" if "OMO_RATE" in obs else ""
+    plan = [("OMO_OFFER", f"Tuần qua, NHNN chào thầu {{{{OMO_OFFER}}}} tỷ đồng{rate}.", 8),
+            ("OMO_WON", "Kết quả, có {{OMO_WON}} tỷ đồng trúng thầu.", 5),
+            ("OMO_MATURED", "Trong tuần có {{OMO_MATURED}} tỷ đồng đáo hạn trên kênh cầm cố.", 4),
+            ("OMO_NET_INJECT", "NHNN bơm ròng {{OMO_NET_INJECT}} tỷ đồng.", 7),
+            ("OMO_NET_ABSORB", "NHNN hút ròng {{OMO_NET_ABSORB}} tỷ đồng.", 7),
+            ("OMO_OUTSTANDING", "Có {{OMO_OUTSTANDING}} tỷ đồng lưu hành trên kênh cầm cố.", 2)]
+    return [Candidate(text, obs[key].source_id, score, index, quoted=False)
+            for index, (key, text, score) in enumerate(plan) if key in obs]
+
+
+def bond_sentence(snapshot):
+    """Câu cuối mục liên ngân hàng: lợi suất TPCP 7 & 10 năm (VIRA) và thanh khoản (VBMA), như bản tin mẫu 19.10."""
+    from .bonds import liquidity_label, outright_from_source
+
+    obs = snapshot.observations
+    keys = [k for k in ("BOND_VN_7Y", "BOND_VN_10Y") if k in obs]
+    if len(keys) < 2:
+        return []
+    deltas = [(obs[k].value - obs[k].prev_value) * 100 for k in keys if obs[k].prev_value is not None]
+    move = ""
+    if len(deltas) == 2:
+        biggest = max(abs(d) for d in deltas)
+        if biggest < 3:
+            move = " đi ngang"
+        elif all(d >= 0 for d in deltas):
+            move = " tăng nhẹ" if biggest < 10 else " tăng"
+        elif all(d <= 0 for d in deltas):
+            move = " giảm nhẹ" if biggest < 10 else " giảm"
+        else:
+            move = " biến động trái chiều"
+    low_key, high_key = sorted(keys, key=lambda k: obs[k].value)
+    level = (f"quanh mức {{{{{low_key}}}}}%" if obs[low_key].value == obs[high_key].value
+             else f"quanh mức {{{{{low_key}}}}}%-{{{{{high_key}}}}}%")
+    text = f"Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm{move}{',' if move else ''} {level}"
+    outright = outright_from_source(snapshot)
+    if outright:
+        text += f", thanh khoản {liquidity_label(outright[0], rules().get('bond_liquidity'))}"
+    return [Candidate(text + ".", obs[keys[0]].source_id, quoted=False)]
+
+
 def domestic_sections(snapshot, records):
     result, audit = {}, {}
 
@@ -457,9 +503,18 @@ def domestic_sections(snapshot, records):
             snapshot, "Lãi suất VND liên ngân hàng kỳ hạn qua đêm ở mức {{VND_ON}}%, kỳ hạn 1 tuần "
             "{{VND_1W}}% và kỳ hạn 1 tháng {{VND_1M}}%.", ["VND_ON", "VND_1W", "VND_1M"])
         interbank_candidates = [c] if c else []
+    omo = weekly_omo_candidates(snapshot) if weekly else []
+    if omo:       # thứ Hai: câu thị trường mở viết gọn từ số liệu VIRA thay cho câu trích nguyên văn dài
+        interbank_candidates = omo + [c for c in interbank_candidates
+                                      if not re.search(r"thị trường mở|chào thầu|trúng thầu|đáo hạn|bơm ròng|hút ròng|"
+                                                       r"lưu hành", c.text, re.I)]
+    bond = bond_sentence(snapshot)
+    if bond:      # câu trái phiếu riêng ở cuối đoạn; bỏ câu trái phiếu của VIRA để không lặp
+        interbank_candidates = [c for c in interbank_candidates
+                                if not re.search(r"lợi suất|trái phiếu|TPCP", c.text, re.I)]
     low, high = rules()["word_limits"]["interbank"]
-    used = count_words(resolve(" ".join(c.text for c in lead), snapshot, safe=True))
-    picked = lead + choose_sentences(interbank_candidates, snapshot, max(0, low - used), high - used)
+    used = count_words(resolve(" ".join(c.text for c in lead + bond), snapshot, safe=True))
+    picked = lead + choose_sentences(interbank_candidates, snapshot, max(0, low - used), high - used) + bond
     result["interbank"] = make_section(snapshot, [picked])
     audit["interbank"] = {"selected": [asdict(c) for c in picked]}
 

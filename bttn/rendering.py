@@ -399,9 +399,12 @@ def render_contact_info(cell):
     return table
 
 
-def _blue_table(cell, headers, rows, ratios, aligns, styles, *, size=10, line=1.0, border=None):
-    """Bảng lồng kiểu mẫu: hàng tiêu đề nền 4F81BD chữ trắng; styles[i][j] = (bold, màu)."""
-    width = int((cell.width or Inches(3.5)) - Inches(.08))
+def _blue_table(cell, headers, rows, ratios, aligns, styles, *, size=10, line=1.0, border=None, inset=None):
+    """Bảng lồng kiểu mẫu: hàng tiêu đề nền 4F81BD chữ trắng; styles[i][j] = (bold, màu).
+
+    inset: phần bớt khỏi bề rộng ô (mặc định 0,08 inch); bảng ở cột sát mép phải trang bớt thêm để
+    không chạm mép giấy."""
+    width = int((cell.width or Inches(3.5)) - (Inches(.08) if inset is None else inset))
     widths = [int(width * r) for r in ratios]
     table = cell.add_table(rows=len(rows) + 1, cols=len(headers))
     table.autofit = False
@@ -576,7 +579,8 @@ def render_forecast_table(cell, snapshot):
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
     # Tỷ lệ cột như mẫu: 2035 | 1345 | 1440 | 5310
     return _blue_table(cell, ["", "1 tháng", "6 tháng", "Ghi chú"], rows,
-                       [0.20, 0.13, 0.14, 0.53], [left, center, center, left], styles, size=SIZE, border="548DD4")
+                       [0.20, 0.13, 0.14, 0.53], [left, center, center, left], styles, size=SIZE, border="548DD4",
+                       inset=Pt(5.4) + RIGHT_EDGE_INDENT + Pt(5.4))
 
 
 def _config_json(name):
@@ -1026,6 +1030,10 @@ def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_typ
 NEWS_HEADING = "Tin tức nổi bật"
 SAMPLE_INDENT = Pt(8.1)        # 162 dxa: lề trái cột "Tin tức nổi bật" trong file mẫu
 SAMPLE_TOP_ROWS = (3, 4, 5, 7, 8, 11)
+# Trang 2 và 3: cột phải kéo tới mép giấy (lề phải trang = 0), nên chữ trong cột này thụt phải 0,6 cm
+# (cộng lề ô 5,4pt) để không sát mép khi in (góp ý 19.10). Ảnh biểu đồ giữ nguyên kích thước.
+RIGHT_EDGE_INDENT = Pt(17)
+RIGHT_EDGE_ROWS = (7, 8, 11, 12, 13)      # 13: miễn trừ trách nhiệm (toàn chiều ngang)
 
 
 def _spacer(cell, size=6):
@@ -1069,6 +1077,10 @@ def apply_sample_layout(table):
         else:
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             p.paragraph_format.space_after = Pt(6)
+    for index in RIGHT_EDGE_ROWS:
+        for p in cells(table.rows[index])[-1].paragraphs:
+            if p.text.strip() and not p._p.findall(".//" + qn("w:drawing")):
+                p.paragraph_format.right_indent = RIGHT_EDGE_INDENT
     for index in SAMPLE_TOP_ROWS:
         for c in cells(table.rows[index]):
             if c.text.strip() or c._tc.findall(".//" + qn("w:drawing")):
