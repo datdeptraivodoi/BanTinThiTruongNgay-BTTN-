@@ -159,6 +159,10 @@ def format_value(obs, field: str = "value"):
             val = obs.value
         places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") or obs.id.startswith("GOLD_SPREAD") or obs.id == "GOLD_WORLD_VND" else 2
         return f"{val:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
+    elif obs.id.startswith("OMO_"):
+        # Như VIRA: 34.000 tỷ, 17.281,85 tỷ, lãi suất 4,5%
+        places = 0 if obs.value == obs.value.to_integral() else 1 if obs.value * 10 == (obs.value * 10).to_integral() else 2
+        return f"{obs.value:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))
     else:
         places = 4 if obs.id in {"EURUSD", "USDCNY", "USDCNH"} else 0 if obs.unit == "VND/USD" else 1 if obs.id.startswith("SJC_") or obs.id.startswith("GOLD_SPREAD") or obs.id == "GOLD_WORLD_VND" else 2
         return f"{obs.value:,.{places}f}".translate(str.maketrans({",": ".", ".": ","}))

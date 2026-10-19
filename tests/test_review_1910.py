@@ -76,3 +76,122 @@ def test_coffee_opening_sentence_from_prices(snap):
     lead = resolve(coffee_lead(snap), snap)
     assert lead.startswith("Thị trường cà phê biến động mạnh, giá Arabica tại New York tăng 5,60% lên ")
     assert "trong khi giá Robusta tại London tăng 1,20% lên" in lead and lead.endswith("USD/tấn.")
+
+
+WEEKLY_1216 = (  # VIRA "Tổng hợp Kinh tế - Tài chính tuần 12/10 - 16/10/2026", đăng 08:23 thứ Hai 19/10
+    "Tóm lược thị trường trong nước từ 12/10 - 16/10/2026\n"
+    "Thị trường ngoại tệ: Trong tuần từ 12/10 - 16/10, tỷ giá trung tâm được NHNN điều chỉnh tăng – giảm đan xen qua các phiên. "
+    "Tỷ giá trên thị trường tự do tuần qua ít biến động. Chốt phiên 16/10, tỷ giá tự do giảm 40 đồng ở chiều mua vào và 50 đồng "
+    "ở chiều bán ra so với phiên cuối tuần trước đó, giao dịch tại 26.020 VND/USD và 26.120 VND/USD.\n"
+    "Thị trường tiền tệ LNH: Tuần từ 12/10 - 16/10, lãi suất VND LNH biến động tăng – giảm mạnh qua các phiên ở tất cả các kỳ hạn "
+    "từ 1M trở xuống. Chốt ngày 16/10, lãi suất VND LNH giao dịch ở mức: ON 4,50% (không thay đổi); 1W 4,60% (-0,55 đpt); "
+    "2W 4,70% (+0,70 đpt); 1M 5,50% (+0,30 đpt).\n"
+    "Thị trường mở: Trên thị trường mở tuần qua từ 12/10 - 16/10, ở kênh cầm cố, NHNN chào thầu 34.000 tỷ đồng với các kỳ hạn "
+    "7 ngày, 14 ngày, 35 ngày và 91 ngày, lãi suất duy trì ở mức 4,5%. Kết quả, có 17.281,85 tỷ đồng trúng thầu. "
+    "Trong tuần có 9.093,22 tỷ đồng đáo hạn trên kênh cầm cố.\nNHNN không chào thầu tín phiếu NHNN trong tuần từ 12/10 - 16/10.\n"
+    "Như vậy, tuần qua, NHNN bơm ròng 8.188,63 tỷ đồng ra thị trường qua kênh thị trường mở. "
+    "Có 104.932,98 tỷ đồng lưu hành trên kênh cầm cố.\n"
+    "Thị trường trái phiếu: Lợi suất TPCP chốt tuần qua ít biến động, chốt tuần gần như không thay đổi so với phiên cuối tuần "
+    "trước đó ở tất cả các kỳ hạn.\nThị trường chứng khoán: Tuần từ 12/10 - 16/10, thị trường chứng khoán khá tiêu cực."
+)
+
+
+def test_monday_uses_vira_weekly_summary(snap):
+    from bttn.sources import parse_vira_sections
+    sections = parse_vira_sections(WEEKLY_1216)
+    assert "NHNN chào thầu 34.000 tỷ đồng" in sections["lnh"] and "tự do" in sections["fx"]
+    at = snap.as_of
+    for sid, key in (("vira_daily", "lnh"), ("vira_fx", "fx")):
+        snap.sources[sid] = Source(id=sid, url="https://vira.org.vn/tin/Tong-hop-tin-kinh-te-tai-chinh-tuan/Tong-hop-12-10-16-10-2026-.html",
+                                   published_at=at - timedelta(hours=3), retrieved_at=at, text=sections[key],
+                                   kind="news", text_scope="excerpt")
+    result, audit = editorial.domestic_sections(snap, {})
+    text = resolve(" ".join(result["interbank"].paragraphs), snap)
+    assert text.startswith("Phiên ") and "lãi suất VND liên ngân hàng các kỳ hạn ngắn ON-2W" in text
+    assert "NHNN chào thầu 34.000 tỷ đồng" in text and "bơm ròng 8.188,63 tỷ đồng" in text
+    assert "Chốt ngày 16/10, lãi suất VND LNH" not in text
+    low, high = editorial.rules()["word_limits"]["interbank"]
+    assert low <= audit["interbank"]["word_count"] <= high
+
+
+def _add_bonds(snap, *, liquidity=True):
+    at = snap.as_of
+    url = "https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay/Ban-tin-Kinh-te-Tai-chinh-ngay-16-10-2026-.html"
+    snap.sources["vira_bonds"] = Source(id="vira_bonds", url=url, published_at=at - timedelta(days=3), retrieved_at=at,
+                                        text="Lợi suất TPCP ... chốt phiên: 7Y 4,34%; 10Y 4,46%", kind="market")
+    for key, v, prev in (("BOND_VN_7Y", "4.34", "4.33"), ("BOND_VN_10Y", "4.46", "4.45")):
+        snap.observations[key] = Observation(id=key, label=key, value=Decimal(v), unit="%", source_id="vira_bonds",
+                                             trading_date=at.date() - timedelta(days=4), basis="test",
+                                             prev_value=Decimal(prev))
+    if liquidity:
+        snap.sources["vbma_bonds"] = Source(
+            id="vbma_bonds", url="https://vbma.org.vn/storage/reports/October2026/x.pdf",
+            published_at=at - timedelta(days=10), retrieved_at=at, kind="market",
+            text="GTGD outright trung bình ngày tuần 05/10 - 09/10/2026: 14475 tỷ đồng (-10.6% so với tuần trước)")
+
+
+def test_parse_vbma_outright_and_liquidity_label():
+    from bttn.bonds import liquidity_label, parse_outright
+    text = ("GTGD outright trung bình ngày là 14,475 tỷ đồng (giảm 10.6% so với kỳ trước) và GTGD repo "
+            "trung bình ngày là 5,551 tỷ đồng (giảm 33.2% so với kỳ trước).")
+    assert parse_outright(text) == (Decimal("14475"), Decimal("-10.6"))
+    assert liquidity_label(Decimal("14475")) == "vừa"
+    assert liquidity_label(Decimal("8000")) == "thấp" and liquidity_label(Decimal("25000")) == "cao"
+
+
+def test_bond_sentence_like_sample(snap):
+    _add_bonds(snap)
+    text = resolve(editorial.bond_sentence(snap)[0].text, snap)
+    assert text == "Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm đi ngang, quanh mức 4,34%-4,46%, thanh khoản vừa."
+    del snap.sources["vbma_bonds"]
+    assert "thanh khoản" not in editorial.bond_sentence(snap)[0].text
+
+
+def test_interbank_ends_with_bond_sentence_within_limits(snap):
+    from bttn.sources import parse_vira_sections
+    _add_bonds(snap)
+    sections = parse_vira_sections(WEEKLY_1216)
+    at = snap.as_of
+    for sid, key in (("vira_daily", "lnh"), ("vira_fx", "fx")):
+        snap.sources[sid] = Source(id=sid, url="https://vira.org.vn/tin/Tong-hop-tin-kinh-te-tai-chinh-tuan/Tong-hop-12-10-16-10-2026-.html",
+                                   published_at=at - timedelta(hours=3), retrieved_at=at, text=sections[key],
+                                   kind="news", text_scope="excerpt")
+    from bttn.sources import vira_weekly_omo
+    assert vira_weekly_omo(snap, sections["lnh"], at.date() - timedelta(days=3)) == 6
+    result, audit = editorial.domestic_sections(snap, {})
+    text = resolve(" ".join(result["interbank"].paragraphs), snap)
+    assert text.endswith("quanh mức 4,34%-4,46%, thanh khoản vừa.")
+    assert "Tuần qua, NHNN chào thầu 34.000 tỷ đồng với lãi suất duy trì ở mức 4,5%." in text
+    assert "NHNN bơm ròng 8.188,63 tỷ đồng." in text and text.count("trái phiếu") == 1
+    low, high = editorial.rules()["word_limits"]["interbank"]
+    assert low <= audit["interbank"]["word_count"] <= high, text
+
+
+def test_collect_bond_market_from_vira_and_vbma(monkeypatch, snap):
+    from types import SimpleNamespace
+
+    from bttn import bonds
+
+    def page(day, y7, y10):
+        return (f'<html><head><meta property="article:published_time" content="2026-09-{day}T08:00:00+07:00"></head>'
+                f'<body><div id="abody">Thị trường tiền tệ LNH: Lợi suất TPCP trên thị trường thứ cấp biến động trái chiều, '
+                f'chốt phiên: 3Y 3,72%; 5Y 4,29%; 7Y {y7}%; 10Y {y10}%; 15Y 4,57%.</div></body></html>')
+    base = "https://vira.org.vn/tin/Ban-tin-Kinh-te-Tai-chinh-ngay/"
+    pages = {
+        bonds.VIRA_DAILY_LIST: f'<a href="{base}Ban-tin-24.html">a</a><a href="{base}Ban-tin-23.html">b</a>',
+        base + "Ban-tin-24.html": page(24, "4,34", "4,46"),
+        base + "Ban-tin-23.html": page(23, "4,20", "4,30"),
+        bonds.VBMA_LIST: '<a href="/storage/reports/September2026/14092026 - 18092026 BAO CAO TUAN TTTP.pdf">r</a>',
+    }
+
+    class FakeHttp:
+        def get(self, url, **kw):
+            return SimpleNamespace(text=pages.get(url, ""), content=b"%PDF")
+
+    monkeypatch.setattr(bonds, "pdf_text", lambda data: "GTGD outright trung bình ngày là 25,100 tỷ đồng (tăng 12.5% so với kỳ trước)")
+    bonds.collect_bond_market(FakeHttp(), snap)
+    assert snap.observations["BOND_VN_7Y"].value == Decimal("4.34")
+    assert snap.observations["BOND_VN_10Y"].prev_value == Decimal("4.30")
+    assert str(snap.observations["BOND_VN_7Y"].trading_date) == "2026-09-23"
+    text = resolve(editorial.bond_sentence(snap)[0].text, snap)
+    assert text == "Trên thị trường trái phiếu, lợi tức kỳ hạn 7 & 10 năm tăng, quanh mức 4,34%-4,46%, thanh khoản cao."

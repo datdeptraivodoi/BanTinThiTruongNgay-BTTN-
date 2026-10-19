@@ -7,6 +7,7 @@
     "japan": [100, 140], "china": [50, 70], "coffee": [130, 135],
     "energy_metals": [125, 135]
   },
+  "bond_liquidity": {"low": 10000, "high": 20000, "unit": "tỷ đồng/ngày, GTGD outright bình quân theo báo cáo tuần VBMA"},
   "energy_metals_parts": {"brent": [90, 95], "gold": [35, 40]},
   "required_observations": [
     "VND_ON", "VND_1W", "VND_1M", "VND_3M", "VND_6M",

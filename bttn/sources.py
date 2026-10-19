@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 
 from .calculations import percentage
 from .http import Http
-from .models import Observation, Point, Snapshot, Source, previous_weekday
+from .models import VN_TZ, Observation, Point, Snapshot, Source, previous_weekday
 
 LOG = logging.getLogger("bttn.sources")
 ROOT = Path(__file__).resolve().parents[1]
@@ -686,7 +686,8 @@ def collect_sjc_gold(http, snapshot):
         )
 
 
-VIRA_SUBHEADINGS = re.compile(r"(?:(?<=[.!?:])|^)\s*(?:Nghiệp vụ thị trường mở|Thị trường trái phiếu|Thị trường TPCP)\s*:?\s+")
+VIRA_SUBHEADINGS = re.compile(r"(?:(?<=[.!?:])|^)\s*(?:Nghiệp vụ thị trường mở|Thị trường mở|Thị trường trái phiếu|Thị trường TPCP)\s*:?\s+")
+VIRA_WEEKLY_LIST = "https://vira.org.vn/tin/Tong-hop-tin-kinh-te-tai-chinh-tuan.html"
 
 
 def parse_vira_sections(text: str) -> dict:
@@ -737,7 +738,72 @@ def collect_vira_daily(http, snapshot):
             return
     except Exception as exc:
         LOG.debug("VIRA daily failed: %s", type(exc).__name__)
+    # Thứ Hai VIRA không ra bản tin ngày mà đăng "Tổng hợp Kinh tế - Tài chính tuần" của tuần trước.
+    if collect_vira_weekly(http, snapshot):
+        return
     snapshot.add_issue("VIRA_DAILY_MISSING", "Không đọc được đoạn VIRA có ngày xuất bản xác minh; không tạo lãi suất/OMO mẫu.")
+
+
+OMO_PATTERNS = {
+    "OMO_OFFER": (r"NHNN chào thầu ([\d.,]+) tỷ đồng", "tỷ đồng", "NHNN chào thầu trên kênh cầm cố trong tuần"),
+    "OMO_RATE": (r"chào thầu (?:[^.]|\.(?=\d))*?lãi suất (?:duy trì ở mức|ở mức|là) ([\d,]+)\s*%", "%", "Lãi suất chào thầu kênh cầm cố"),
+    "OMO_WON": (r"có ([\d.,]+) tỷ đồng trúng thầu", "tỷ đồng", "Khối lượng trúng thầu trong tuần"),
+    "OMO_MATURED": (r"có ([\d.,]+) tỷ đồng đáo hạn", "tỷ đồng", "Khối lượng đáo hạn trên kênh cầm cố trong tuần"),
+    "OMO_NET_INJECT": (r"NHNN bơm ròng ([\d.,]+) tỷ đồng", "tỷ đồng", "NHNN bơm ròng qua thị trường mở trong tuần"),
+    "OMO_NET_ABSORB": (r"NHNN hút ròng ([\d.,]+) tỷ đồng", "tỷ đồng", "NHNN hút ròng qua thị trường mở trong tuần"),
+    "OMO_OUTSTANDING": (r"Có ([\d.,]+) tỷ đồng lưu hành trên kênh cầm cố", "tỷ đồng", "Khối lượng lưu hành trên kênh cầm cố"),
+}
+
+
+def _vn_number(text: str) -> Decimal:
+    return Decimal(text.replace(".", "").replace(",", "."))
+
+
+def vira_weekly_omo(snapshot, text: str, week_end) -> int:
+    """Số liệu thị trường mở trong bản tổng hợp tuần của VIRA thành số liệu có nguồn (vira_daily), để câu thị
+    trường mở được viết gọn như bản tin mẫu mà mọi con số vẫn gắn với nguồn."""
+    flat = " ".join(text.split())
+    count = 0
+    for key, (pattern, unit, basis) in OMO_PATTERNS.items():
+        m = re.search(pattern, flat, re.I)
+        if not m:
+            continue
+        snapshot.observations[key] = Observation(id=key, label=basis, value=_vn_number(m.group(1)), unit=unit,
+                                                 source_id="vira_daily", trading_date=week_end,
+                                                 basis=f"{basis} (VIRA tổng hợp tuần)")
+        count += 1
+    return count
+
+
+def collect_vira_weekly(http, snapshot) -> bool:
+    """Bản tổng hợp tuần của VIRA (đăng sáng thứ Hai): mục tiền tệ LNH, thị trường mở, trái phiếu, ngoại tệ."""
+    try:
+        soup = BeautifulSoup(http.get(VIRA_WEEKLY_LIST).text, "html.parser")
+        links = soup.find_all("a", href=re.compile(r"/tin/Tong-hop-tin-kinh-te-tai-chinh-tuan/Tong-hop.*\.html"))
+        for link in links[:3]:
+            url = urljoin(VIRA_WEEKLY_LIST, link["href"])
+            if urlparse(url).hostname != "vira.org.vn":
+                continue
+            detail = BeautifulSoup(http.get(url).text, "html.parser")
+            at = article_time(detail)
+            if not timedelta(0) <= snapshot.as_of - at <= timedelta(hours=96):
+                continue
+            body = detail.select_one("#abody") or detail
+            sections = parse_vira_sections(body.get_text("\n", strip=True))
+            if len(sections.get("lnh", "").split()) < 35:
+                continue
+            for sid, key in (("vira_daily", "lnh"), ("vira_fx", "fx")):
+                text = sections.get(key, "")
+                if text:
+                    snapshot.sources[sid] = Source(id=sid, url=url, published_at=at,
+                        retrieved_at=datetime.now(timezone.utc), text=text, sha256=hashlib.sha256(text.encode()).hexdigest(),
+                        kind="news", text_scope="excerpt")
+            vira_weekly_omo(snapshot, sections.get("lnh", ""), previous_weekday(at.astimezone(VN_TZ).date()))
+            snapshot.add_issue("VIRA_WEEKLY", "Thứ Hai: mục liên ngân hàng/ngoại tệ dùng bản Tổng hợp tuần của VIRA")
+            return True
+    except Exception as exc:
+        LOG.debug("VIRA weekly failed: %s", type(exc).__name__)
+    return False
 
 
 def collect_china_news(http, snapshot):
@@ -871,6 +937,7 @@ def collect_china_news(http, snapshot):
 
 
 def collect_snapshot(http, as_of):
+    from .bonds import collect_bond_market
     from .calculations import derive_gold_spread, derive_swaps
     from .trader_quotes import collect_trader_quotes
     from .tradingeconomics_news import collect_tradingeconomics
@@ -889,6 +956,7 @@ def collect_snapshot(http, as_of):
         ("MACRO_NEWS", collect_vietnam_macro_news),
         ("SJC_GOLD", collect_sjc_gold),
         ("VIRA_DAILY", collect_vira_daily),
+        ("BONDS", collect_bond_market),
         ("TRADER_QUOTES", collect_trader_quotes),
     ]:
         try:
