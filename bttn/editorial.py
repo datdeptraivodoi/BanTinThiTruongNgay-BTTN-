@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import timedelta
 from pathlib import Path
 
-from .commodity_text import DOMESTIC_PRICE, coffee_lead, junk_reason
+from .commodity_text import CONNECTOR_START, DEMONSTRATIVE_SUBJECT, DOMESTIC_PRICE, coffee_lead, junk_reason
 from .fx_editorial import US_SECOND_OPENING, fx_opening
 from .models import Section, SentenceReference, create_draft_placeholder_content
 from .nvidia_translation import is_vietnamese
@@ -64,6 +64,27 @@ class Candidate:
     quoted: bool = True
 
 
+def strip_heading(sentence: str, title: str) -> str:
+    """Bỏ tiêu đề bài/tít phụ bị dính vào đầu câu đầu tiên (vd. "Việt Nam xuất siêu sang EU 36 tỷ USD Thương mại
+    Việt Nam – EU tăng trưởng ..."): một tin nổi bật không được trông như hai tin ghép lại (góp ý 19.10)."""
+    flat = " ".join(sentence.split())
+    if title and len(title.split()) >= 4 and flat.casefold().startswith(title.casefold() + " "):
+        rest = flat[len(title) + 1:].lstrip(" .:-–")
+        if rest[:1].isupper():
+            return rest
+    return flat
+
+
+def _content_words(text: str) -> set:
+    return {w for w in re.findall(r"\w+", text.casefold()) if len(w) > 2 and not w.isdigit()}
+
+
+def related(a: str, b: str, threshold: float = 0.3) -> bool:
+    """Hai đoạn tin nói về cùng một chuyện (trùng nhiều từ nội dung)."""
+    x, y = _content_words(a), _content_words(b)
+    return bool(x and y) and len(x & y) / min(len(x), len(y)) >= threshold
+
+
 def news_candidates(snapshot, records, topic, *, allow_stale=False):
     candidates, rejected, seen = [], [], set()
     ordered = sorted(snapshot.sources.items(), key=lambda p: (-p[1].published_at.timestamp(), p[0]))
@@ -89,8 +110,10 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
             continue
         parts = text.split("\n\n", 1)
         body = parts[1] if len(parts) == 2 else text
+        title = " ".join(parts[0].split()) if len(parts) == 2 else ""
         body = re.sub(r"\s*\(\s*Nguồn\s*:\s*giacaphe\.com\s*\)", "", body, flags=re.I)
         for index, sentence in enumerate(sentences(body)):
+            sentence = strip_heading(sentence, title)
             identity = " ".join(sentence.casefold().split())
             if identity in seen:
                 continue
@@ -99,7 +122,8 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
             is_indicator_comparison = bool(re.search(r"\b(?:thấp hơn|cao hơn|vượt|vượt quá)\s+(?:dự kiến|dự báo|kỳ vọng)\b", sentence, re.I))
             if DISALLOWED.search(sentence) and not is_official_forecast and not is_indicator_comparison:
                 reason = "forecast_or_instruction"
-            elif CONTEXT_DEPENDENT.search(sentence) and topic in ("macro", "fx_macro"):
+            elif topic in ("macro", "fx_macro") and (CONTEXT_DEPENDENT.search(sentence) or CONNECTOR_START.search(sentence)
+                                                      or DEMONSTRATIVE_SUBJECT.search(sentence)):
                 # A sentence such as 'This reading was the weakest...' loses
                 # its antecedent when selection omits the actual GDP reading.
                 # Keep it in the full translation for review, not the digest.
@@ -258,20 +282,20 @@ def observation_candidate(snapshot, text, keys):
 
 
 def gold_data_sentences(snapshot):
-    """Hai câu vàng (35–40 từ) chỉ từ số liệu thật: vàng thế giới và SJC. Thiếu số liệu thì bỏ trống."""
+    """Một câu vàng ngắn chỉ từ số liệu thật (góp ý 19.10: mục vàng ngắn nhất có thể, nhường chỗ cho dầu)."""
     gold = snapshot.observations.get("GOLD")
-    if not gold or "SJC_BUY" not in snapshot.observations or "SJC_SELL" not in snapshot.observations:
+    if not gold:
         return []
     pct = gold.daily_pct
     if pct is None or abs(pct) < 0.05:
-        move = "gần như đi ngang, giao dịch"
+        move = "dao động"
     else:
-        move = ("tăng" if pct > 0 else "giảm") + " {{GOLD_abs_pct}}% so với phiên trước, " + ("lên" if pct > 0 else "xuống")
-    first = f"Giá vàng thế giới phiên gần nhất {move} quanh mức {{{{GOLD}}}} USD/ounce."
-    second = ("Trong nước, giá vàng miếng SJC niêm yết ở mức {{SJC_BUY}} - {{SJC_SELL}} "
-              "triệu đồng/lượng (mua vào - bán ra).")
-    return [Candidate(first, gold.source_id, quoted=False),
-            Candidate(second, snapshot.observations["SJC_BUY"].source_id, quoted=False)]
+        move = ("tăng" if pct > 0 else "giảm") + " {{GOLD_abs_pct}}%, " + ("lên" if pct > 0 else "xuống")
+    return [Candidate(f"Giá vàng quốc tế {move} quanh mức {{{{GOLD}}}} USD/ounce.", gold.source_id, quoted=False)]
+
+
+GOLD_WORLD = re.compile(r"thế giới|quốc tế|ounce|/oz|\bFed\b|USD", re.I)
+SILVER = re.compile(r"\bbạc\b|silver|bạch kim|palladium", re.I)
 
 
 def extract_vira_omo(raw_text: str) -> str:
@@ -529,12 +553,15 @@ def domestic_sections(snapshot, records):
     gold, rejected_gold = news_candidates(snapshot, records, "gold")
     limits = rules().get("energy_metals_parts", {"brent": [90, 95], "gold": [35, 40]})
     g_low, g_high = limits["gold"]
-    gold_picked = choose_sentences(gold, snapshot, g_low, g_high, max_sentences=2)
+    # Vàng: một câu về giá vàng thế giới, không nhắc giá bạc (mẫu: "Giá vàng quốc tế dao động quanh
+    # $4.179,38/oz sau khi dữ liệu lạm phát tháng 9 của Mỹ cao hơn dự báo.")
+    gold = [c for c in gold if GOLD_WORLD.search(c.text) and not SILVER.search(c.text)]
+    gold_picked = choose_sentences(gold, snapshot, g_low, g_high, max_sentences=1)
     gold_words = count_words(resolve(" ".join(c.text for c in gold_picked), snapshot, safe=True))
-    if len(gold_picked) != 2 or not g_low <= gold_words <= g_high:
+    if len(gold_picked) != 1 or not g_low <= gold_words <= g_high:
         gold_picked = gold_data_sentences(snapshot)
     b_low, b_high = limits["brent"]
-    oil = [c for c in oil if c.text not in {g.text for g in gold_picked}]
+    oil = [c for c in oil if c.text not in {g.text for g in gold_picked} and not SILVER.search(c.text)]
     oil_picked = choose_sentences(oil, snapshot, b_low, b_high)
     if not oil_picked and "BRENT" in snapshot.observations:
         cand_oil1 = observation_candidate(snapshot, "Giá dầu Brent thế giới biến động quanh mức {{BRENT}} USD/thùng.", ["BRENT"])
@@ -564,6 +591,7 @@ def generate(snapshot, directory: Path):
     macro, rejected = news_candidates(snapshot, records, "macro")
     used = set()
     used_sources = set()
+    picked_texts = []
     for index in range(2):
         picked = []
         available_sources = sorted(
@@ -573,6 +601,9 @@ def generate(snapshot, directory: Path):
         for sid in available_sources:
             source_candidates = [c for c in macro if c.source_id == sid and c.text not in used]
             cand_picked = choose_sentences(source_candidates, snapshot, *highlight_limits(index))
+            # Tin 1 và tin 2 phải là hai tin khác nhau, không phải hai bài về cùng một chuyện
+            if cand_picked and any(related(" ".join(c.text for c in cand_picked), prev) for prev in picked_texts):
+                continue
             if cand_picked:
                 picked = cand_picked
                 break
@@ -583,6 +614,7 @@ def generate(snapshot, directory: Path):
             picked = choose_sentences(pool, snapshot, *highlight_limits(index))
         if picked:
             content.highlights[index] = make_section(snapshot, [picked])
+            picked_texts.append(" ".join(c.text for c in picked))
             used.update(c.text for c in picked)
             used_sources.update(c.source_id for c in picked)
         audit[f"highlight_{index}"] = {"selected": [asdict(c) for c in picked], "rejected": rejected}

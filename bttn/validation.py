@@ -369,8 +369,8 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
                 error("ENERGY_STRUCTURE", "Cần một đoạn Brent và một đoạn vàng")
             else:
                 gold = resolve(section.paragraphs[1], snapshot)
-                if len(re.findall(r"[.!?](?:\s|$)", gold)) != 2:
-                    error("GOLD_SENTENCES", "Đoạn vàng phải có đúng hai câu")
+                if len(re.findall(r"[.!?](?:\s|$)", gold)) != 1:     # góp ý 19.10: vàng chỉ một câu ngắn
+                    error("GOLD_SENTENCES", "Đoạn vàng phải có đúng một câu")
                 parts = rules().get("energy_metals_parts", {"brent": [90, 95], "gold": [35, 40]})
                 for label, text, key in (("Brent", section.paragraphs[0], "brent"), ("vàng", section.paragraphs[1], "gold")):
                     n = count_words(resolve(text, snapshot, safe=True))

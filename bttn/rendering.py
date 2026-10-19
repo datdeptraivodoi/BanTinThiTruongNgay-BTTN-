@@ -12,6 +12,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Pt, RGBColor
+from docx.text.paragraph import Paragraph
 
 from .domestic_charts import render_bond_yield_chart, render_interbank_chart, render_usdvnd_chart
 from .forecasts import (
@@ -27,6 +28,7 @@ from .trader_quotes import TENORS, trader_observation
 from .validation import format_value, resolve
 
 NAVY = "245794"
+HEADING = "1F497D"          # màu tiêu đề mục trong bản mẫu BT.TT.2026.10.19
 BLUE = "0070C0"
 
 # Hình học bảng chính lấy từ file mẫu BT.TT.YYYY.MM.DD.template_placeholders.docx (đơn vị twip).
@@ -75,7 +77,7 @@ def paragraph(cell, text, bold=False, color=BLUE):
 
 
 def heading(cell, title):
-    paragraph(cell, title, bold=True, color=NAVY)
+    paragraph(cell, title, bold=True, color=HEADING)
 
 
 def grid(cell, headers, rows, ratios=None):
@@ -122,7 +124,7 @@ def value(snapshot, key):
 
 
 def render_swap_table(cell, snapshot):
-    title = paragraph(cell, "Lãi suất SWAP", bold=True, color=NAVY)
+    title = paragraph(cell, "Lãi suất SWAP", bold=True, color=HEADING)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     headers = ["Kỳ hạn", "Mua %", "Bán %"]
     rows = [
@@ -195,7 +197,7 @@ def render_commodities_table(cell, snapshot):
     """Render page 3 commodities table with size 10pt Times New Roman matching X9:AA32 in Excel."""
     date_str_dot = snapshot.as_of.strftime("%d.%m.%Y")
     date_str_slash = snapshot.as_of.strftime("%d/%m/%Y")
-    title = paragraph(cell, f"Bảng giá hàng hóa ngày {date_str_dot}", bold=True, color=NAVY)
+    title = paragraph(cell, f"Bảng giá hàng hóa ngày {date_str_dot}", bold=True, color=HEADING)
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
     title.paragraph_format.space_after = Pt(2)
 
@@ -344,7 +346,7 @@ def render_contact_info(cell):
     r_title = p_title.add_run("Thông tin liên hệ")
     style_run(r_title, size=11)
     r_title.bold = True
-    r_title.font.color.rgb = RGBColor.from_string(NAVY)
+    r_title.font.color.rgb = RGBColor.from_string(HEADING)
 
     width = int((cell.width or Inches(3.5)) - Inches(.08))
     col_w = int(width / 2)
@@ -649,7 +651,7 @@ def render_international_money_market(cell, snapshot=None):
     r_h1 = p_h1.add_run("Thị trường tiền tệ quốc tế")
     style_run(r_h1, size=11)
     r_h1.bold = True
-    r_h1.font.color.rgb = RGBColor.from_string(NAVY)
+    r_h1.font.color.rgb = RGBColor.from_string(HEADING)
 
     # 2. Table: Lãi suất cơ bản
     policy_headers = ["Lãi suất cơ bản", "Giá trị", "Thay đổi"]
@@ -743,7 +745,7 @@ def render_international_money_market(cell, snapshot=None):
     r_s = p_sofr.add_run("LIBOR – SOFR")
     style_run(r_s, size=10)
     r_s.bold = True
-    r_s.font.color.rgb = RGBColor.from_string(NAVY)
+    r_s.font.color.rgb = RGBColor.from_string(HEADING)
 
     # 5. Table: SOFR - Vnibor
     sofr_rows = term_sofr_rows(snapshot) if snapshot is not None else [
@@ -790,7 +792,7 @@ def render_international_money_market(cell, snapshot=None):
     r_h2 = p_h2.add_run("Thị trường chứng khoán thế giới")
     style_run(r_h2, size=11)
     r_h2.bold = True
-    r_h2.font.color.rgb = RGBColor.from_string(NAVY)
+    r_h2.font.color.rgb = RGBColor.from_string(HEADING)
 
     # 7. Table: Thị trường chứng khoán thế giới
     stock_headers = ["", "Giá trị", "Thay đổi"]
@@ -873,7 +875,7 @@ def render_international_money_market(cell, snapshot=None):
 
 
 def render_sbv_block(cell, snapshot):
-    title = paragraph(cell, "Tỷ giá USD-VND của NHNN", bold=True, color=NAVY)
+    title = paragraph(cell, "Tỷ giá USD-VND của NHNN", bold=True, color=HEADING)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     styled_table(cell, [
         ["Tỷ giá Trung Tâm", "Sàn", "Trần"],
@@ -881,7 +883,7 @@ def render_sbv_block(cell, snapshot):
         ["", "Mua", "Bán"],
         ["", value(snapshot, "SBV_BUY"), value(snapshot, "SBV_SELL")],
     ], [.44, .28, .28], blue_cells={(0, 0), (0, 1), (0, 2), (1, 0), (2, 1), (2, 2)})
-    title = paragraph(cell, "Tỷ giá USD-VND ngân hàng\n(tham khảo)", bold=True, color=NAVY)
+    title = paragraph(cell, "Tỷ giá USD-VND ngân hàng\n(tham khảo)", bold=True, color=HEADING)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     def pair(suffix):
@@ -1028,12 +1030,13 @@ def plot_candlestick_cell(cell, title, snapshot, key, directory, name, chart_typ
 
 
 NEWS_HEADING = "Tin tức nổi bật"
+BIG_HEADINGS = ("Thông tin liên hệ", "Miễn trừ trách nhiệm")     # Times 14 đậm như bản mẫu
 SAMPLE_INDENT = Pt(8.1)        # 162 dxa: lề trái cột "Tin tức nổi bật" trong file mẫu
 SAMPLE_TOP_ROWS = (3, 4, 5, 7, 8, 11)
 # Trang 2 và 3: cột phải kéo tới mép giấy (lề phải trang = 0), nên chữ trong cột này thụt phải 0,6 cm
 # (cộng lề ô 5,4pt) để không sát mép khi in (góp ý 19.10). Ảnh biểu đồ giữ nguyên kích thước.
 RIGHT_EDGE_INDENT = Pt(17)
-RIGHT_EDGE_ROWS = (7, 8, 11, 12, 13)      # 13: miễn trừ trách nhiệm (toàn chiều ngang)
+RIGHT_EDGE_ROWS = (7, 8, 11, 12)
 
 
 def _spacer(cell, size=6):
@@ -1050,6 +1053,98 @@ def _spacer(cell, size=6):
         first.addprevious(p)
     else:
         cell._tc.append(p)
+
+
+# Tiêu đề bảng trang 2–3 trong bản mẫu: Verdana 10 đậm 1F497D, thụt trái 162 dxa
+VERDANA_TITLES = ("Sự kiện quan trọng", "Thị trường tiền tệ quốc tế", "Thị trường chứng khoán thế giới",
+                  "Bảng giá hàng hóa ngày")
+CALENDAR_LINE = 1.2            # dòng lịch sự kiện: Multiple 1.2, trước/sau 0 pt
+
+
+def _restyle(p, *, font=FONT, size=SIZE, bold=None, color=None):
+    for r in p.runs:
+        style_run(r, font=font, size=size)
+        if bold is not None:
+            r.font.bold = bold
+        if color:
+            r.font.color.rgb = RGBColor.from_string(color)
+
+
+def _sample_headings(table):
+    for node in table._tbl.iter(qn("w:p")):
+        p = Paragraph(node, None)
+        text = p.text.strip()
+        if text.startswith(VERDANA_TITLES):
+            _restyle(p, font="Verdana", size=10, bold=True, color=HEADING)
+            p.paragraph_format.left_indent = SAMPLE_INDENT
+            p.paragraph_format.space_after = Pt(2)
+
+
+def _calendar_line_spacing(table):
+    """Bảng lịch sự kiện (hàng 7, cột trái): các dòng sự kiện giãn dòng 1.2 như bản mẫu, hàng tiêu đề dòng đơn."""
+    cell = cells(table.rows[7])[0]
+    for tbl in cell._tc.findall(qn("w:tbl")):
+        for i, tr in enumerate(tbl.findall(qn("w:tr"))):
+            if i == 0:
+                continue
+            for node in tr.iter(qn("w:p")):
+                fmt = Paragraph(node, None).paragraph_format
+                fmt.line_spacing = CALENDAR_LINE
+                fmt.space_before = fmt.space_after = Pt(0)
+
+
+CONTACT_STYLES = {0: (10, True, "0070C0"), 1: (9, True, "000000"), 2: (9, False, "000000"), 3: (8.5, False, "000000")}
+
+
+def _contact_block(cell):
+    """Thông tin liên hệ như bản mẫu: tiêu đề Times 14 đậm, cách bảng giá hàng hóa và khối tên một khoảng;
+    tên xanh đậm 10, chức danh đậm 9, điện thoại 9, email 8,5."""
+    for p in cell.paragraphs:
+        if p.text.strip() == "Thông tin liên hệ":
+            _restyle(p, size=14, bold=True, color=HEADING)
+            p.paragraph_format.space_before = Pt(12)
+            p.paragraph_format.space_after = Pt(10)
+            p.paragraph_format.left_indent = SAMPLE_INDENT
+    for tbl in cell._tc.findall(qn("w:tbl")):
+        texts = "".join(t.text or "" for t in tbl.iter(qn("w:t")))
+        if "Email:" not in texts:
+            continue
+        for tc in tbl.iter(qn("w:tc")):
+            paras = [Paragraph(n, None) for n in tc.findall(qn("w:p"))]
+            paras = [p for p in paras if p.text.strip()]
+            for i, p in enumerate(paras):
+                size, bold, color = CONTACT_STYLES.get(i, CONTACT_STYLES[3])
+                _restyle(p, size=size, bold=bold, color=color)
+                p.paragraph_format.left_indent = SAMPLE_INDENT
+
+
+def _disclaimer(cell):
+    """Miễn trừ trách nhiệm như bản mẫu: tiêu đề Times 14 đậm, mỗi đoạn cách nhau một dòng trống, lề trái 90 /
+    phải 270 dxa, để khối chữ kéo xuống sát cuối trang 3."""
+    paras = [p for p in cell.paragraphs if p.text.strip()]
+    if not paras:
+        return
+    _restyle(paras[0], size=14, bold=True, color=HEADING)
+    paras[0].paragraph_format.left_indent = SAMPLE_INDENT
+    for p in paras[1:]:
+        p.paragraph_format.left_indent = Pt(4.5)
+        p.paragraph_format.right_indent = Pt(13.5)
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    for p in paras[:-1]:
+        nxt = p._p.getnext()
+        if nxt is not None and nxt.tag == qn("w:p") and not Paragraph(nxt, None).text.strip():
+            continue
+        blank = OxmlElement("w:p")
+        p._p.addnext(blank)
+        bp = Paragraph(blank, None)
+        bp.paragraph_format.space_before = bp.paragraph_format.space_after = Pt(0)
+        bp.paragraph_format.line_spacing = 1
+        mark = OxmlElement("w:rPr")          # dòng trống cao theo cỡ chữ 10 của đoạn
+        for tag in ("w:sz", "w:szCs"):
+            el = OxmlElement(tag)
+            el.set(qn("w:val"), "20")
+            mark.append(el)
+        bp._p.get_or_add_pPr().append(mark)
 
 
 def apply_sample_layout(table):
@@ -1073,10 +1168,16 @@ def apply_sample_layout(table):
             for r in p.runs:
                 style_run(r, font="Verdana", size=13)
                 r.font.bold = True
-            p.paragraph_format.space_after = Pt(6)
+                r.font.color.rgb = RGBColor.from_string(NAVY)     # bản mẫu: 245794
         else:
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            p.paragraph_format.space_after = Pt(6)
+        # Bản mẫu không giãn đoạn ở đây (Word áp after=0, dòng đơn của TableGrid); giãn 6pt làm trang 1 bị đẩy
+        # xuống và tràn sang trang sau (góp ý 19.10).
+        p.paragraph_format.space_after = Pt(0)
+    _sample_headings(table)
+    _calendar_line_spacing(table)
+    _contact_block(cells(table.rows[11])[0])
+    _disclaimer(cells(table.rows[13])[0])
     for index in RIGHT_EDGE_ROWS:
         for p in cells(table.rows[index])[-1].paragraphs:
             if p.text.strip() and not p._p.findall(".//" + qn("w:drawing")):
@@ -1346,10 +1447,12 @@ def validate_docx(docx_path: Path):
             size = properties.find(qn("w:sz")) if properties is not None else None
             if fonts is None or any(fonts.get(qn("w:" + name)) not in (FONT, "Verdana") for name in ("ascii", "hAnsi", "eastAsia", "cs")):
                 raise ValueError("Word text must use Times New Roman or Verdana")
-            allowed_sizes = (str(SIZE * 2), "16", "20", "24", "36", "18", "19", "2")
+            allowed_sizes = (str(SIZE * 2), "16", "17", "20", "24", "36", "18", "19", "2")
             text = "".join(t.text or "" for t in run.iter(qn("w:t")))
             if size is not None and size.get(qn("w:val")) == "26" and text.startswith(NEWS_HEADING):
                 continue   # tiêu đề "Tin tức nổi bật:" Verdana 13 như file mẫu
+            if size is not None and size.get(qn("w:val")) == "28" and text.strip() in BIG_HEADINGS:
+                continue   # "Thông tin liên hệ", "Miễn trừ trách nhiệm" Times 14 như file mẫu
             if size is None or size.get(qn("w:val")) not in allowed_sizes:
                 raise ValueError(f"Word text must use 11 pt or allowed layout size (got {size.get(qn('w:val')) if size is not None else 'None'})")
 
@@ -1379,7 +1482,8 @@ def validate_pdf_layout(pdf_path: Path):
                         font_clean = span["font"].replace(" ", "").replace("-", "")
                         if "TimesNewRoman" not in font_clean and "Verdana" not in font_clean:
                             raise ValueError("PDF substituted Times New Roman; install the required font")
-                        allowed_pt = (SIZE, 8, 10, 12, 18, 9, 8.5) + ((13,) if span["text"].startswith(NEWS_HEADING[:8]) else ())
+                        allowed_pt = (SIZE, 8, 10, 12, 18, 9, 8.5) + ((13,) if span["text"].startswith(NEWS_HEADING[:8]) else ()) \
+                            + ((14,) if span["text"].strip().startswith(tuple(h[:8] for h in BIG_HEADINGS)) else ())
                         if not any(abs(span["size"] - pt) < .3 for pt in allowed_pt):
                             raise ValueError(f"PDF contains visible text outside allowed sizes: {span['size']}")
                         x0, y0, x1, y1 = span["bbox"]

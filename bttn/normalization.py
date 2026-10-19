@@ -5,7 +5,7 @@ Ensures strict compliance with BTTN editorial rules:
 2. Converts calendar and tenor digits into words ('1 tháng' -> 'một tháng', 'tháng 11' -> 'tháng mười một').
 3. Maps literal observation numbers into permitted {{OBSERVATION_ID}} placeholders.
 4. Handles missing Robusta coffee data safely without hallucinations.
-5. Enforces structural rules (opening phrases, paragraph counts, gold 2-sentence structure).
+5. Enforces structural rules (opening phrases, paragraph counts, gold one-sentence structure).
 6. Ensures section.source_ids contains the valid provenance for every placeholder token used.
 7. Fine-tunes word counts to satisfy strict editorial ranges.
 """
@@ -240,21 +240,9 @@ def normalize_coffee_section(section: Section, snapshot: Snapshot) -> None:
 
 
 def normalize_gold_sentences(text: str) -> str:
-    """Ensures gold paragraph has exactly two sentences ending in [.!?]."""
+    """Đoạn vàng chỉ một câu ngắn (góp ý 19.10): giữ câu đầu, bỏ các câu sau (vd. giá bạc)."""
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
-    if len(sentences) == 2:
-        return text
-    elif len(sentences) > 2:
-        # Combine excess sentences into sentence 2
-        first = sentences[0]
-        second = sentences[1].rstrip(".!?")
-        third = " ".join(s.rstrip(".!?") for s in sentences[2:])
-        return f"{first} {second}, trong khi {third}."
-    elif len(sentences) == 1:
-        # Split or add second sentence
-        first = sentences[0].rstrip(".!?")
-        return f"{first}. Diễn biến giá vàng tiếp tục nhận được sự quan sát chặt chẽ từ thị trường quốc tế."
-    return text
+    return sentences[0] if sentences else text
 
 
 def ensure_section_provenance(section: Section, snapshot: Snapshot) -> None:

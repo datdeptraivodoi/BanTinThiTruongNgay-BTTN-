@@ -150,7 +150,7 @@ def test_domestic_paragraphs_without_vira_do_not_invent_figures(monkeypatch):
     assert "1.546,74" not in text and "25.783/26.170" not in text and "NHNN hút ròng 9.195,95" not in text
 
 
-def test_gold_data_sentences_fit_35_to_40_words():
+def test_gold_data_sentence_is_one_short_sentence():
     from decimal import Decimal
 
     from bttn.editorial import gold_data_sentences
@@ -164,8 +164,8 @@ def test_gold_data_sentences_fit_35_to_40_words():
     for pct in (None, 0.52, -1.2):
         snap.observations["GOLD"].daily_pct = pct
         text = resolve(" ".join(c.text for c in gold_data_sentences(snap)), snap)
-        assert 35 <= count_words(text) <= 40, text
-        assert "-1,20" not in text
+        assert 8 <= count_words(text) <= 25 and text.count(".") >= 1 and text.endswith("USD/ounce."), text
+        assert "-1,20" not in text and "bạc" not in text
 
 
 def test_underlength_verified_prose_is_preserved_for_draft_review():
