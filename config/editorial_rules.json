@@ -3,13 +3,13 @@
   "forecasts_enabled": false,
   "highlight_word_limits": [[35, 45], [35, 45], [12, 45]],
   "word_limits": {
-    "interbank": [80, 95], "usd_vnd": [77, 82], "eur_usd": [165, 190],
+    "interbank": [80, 95], "usd_vnd": [77, 82], "eur_usd": [185, 195],
     "japan": [110, 130], "china": [50, 62], "coffee": [105, 115],
     "energy_metals": [105, 125]
   },
   "bond_liquidity": {"low": 10000, "high": 20000, "unit": "tỷ đồng/ngày, GTGD outright bình quân theo báo cáo tuần VBMA"},
   "energy_metals_parts": {"brent": [90, 105], "gold": [8, 20]},
-  "eur_usd_parts": {"europe": [100, 125], "us": [25, 40]},
+  "eur_usd_parts": {"europe": [115, 125], "us": [28, 40]},
   "required_observations": [
     "VND_ON", "VND_1W", "VND_1M", "VND_3M", "VND_6M",
     "USD_ON", "USD_1W", "USD_1M", "USD_3M", "USD_6M", "BOND_Vietnam",

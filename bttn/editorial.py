@@ -91,6 +91,11 @@ def related(a: str, b: str, threshold: float = 0.3) -> bool:
 
 
 FOREIGN_TOPICS = {"USD", "EUR", "JPY", "China"}
+DOMESTIC_NEWS = re.compile(
+    r"Việt Nam|trong nước|\bNHNN\b|Ngân hàng Nhà nước|Chính phủ|Thủ tướng|Quốc hội|\bBộ (?:Tài chính|Công Thương|"
+    r"Xây dựng|Nông nghiệp|Kế hoạch)|Cục Thống kê|Tổng cục|\bUBND\b|TP\.\s?HCM|Hà Nội|Đà Nẵng|Cần Thơ|Hải Phòng|"
+    r"\btỉnh\b|\bthành phố\b|địa phương|chủ đầu tư|khu công nghiệp|khu công nghệ cao|doanh nghiệp")
+FOREIGN_NEWS = re.compile(r"\b(?:Mỹ|Trump|Trung Quốc|EU|châu Âu|Nhật Bản|Nga|Ukraine|Fed|ECB|Israel|Iran|Liechtenstein)\b")
 FOREIGN_CONTEXT = re.compile(
     r"^(?:Vì vậy|Vì thế|Do đó|Điều đó|Như vậy|Theo đó|Khi đó|Nhờ đó|Từ đó|Cụ thể|Tuy nhiên|Song|"
     r"(?:Những |Các )?(?:phát biểu|bình luận|nhận định|tuyên bố) (?:này|đó|của (?:ông|bà|họ))|Ông|Bà|Họ)\b")
@@ -173,20 +178,15 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
             if topic == "coffee" and DOMESTIC_PRICE.search(sentence):
                 score -= 2      # mẫu ưu tiên diễn biến thế giới (ICE, USDA, Brazil), không phải giá thu mua trong nước
             if topic == "macro":
-                if re.search(r"\b(?:World Bank|WB|Ngân hàng Thế giới)\b", sentence, re.I):
-                    score += 12
-                    if re.search(r"\b(?:7,4%|dự báo tăng trưởng|tăng trưởng cả năm)\b", sentence, re.I):
-                        score += 20
-                elif re.search(r"\b(?:Bộ Tài chính|thuế|0,2%)\b", sentence, re.I):
-                    score += 6
-                    if re.search(r"\b(?:0,2%|đất bỏ hoang)\b", sentence, re.I):
-                        score += 10
-                    if re.search(r"gấp gần 7 lần|cao gần 7 lần", sentence, re.I):
-                        score += 10
-                elif re.search(r"\b(?:gdp|lạm phát|fdi)\b", sentence, re.I):
-                    score += 4
-                if re.search(r"\b(?:Đà Nẵng|Cần Thơ|Quảng Trị|Quảng Ngãi|Bảo Hà|Lai Châu|PNJ)\b", sentence, re.I):
-                    score -= 5
+                # Tin nổi bật ưu tiên tin trong nước (góp ý 20.10): câu nói về kinh tế, chính sách, địa phương,
+                # doanh nghiệp Việt Nam được cộng điểm; tin thuần nước ngoài (Mỹ, Trump, EU...) bị trừ mạnh.
+                domestic = DOMESTIC_NEWS.search(sentence)
+                if domestic:
+                    score += 8
+                elif FOREIGN_NEWS.search(sentence):
+                    score -= 10
+                if re.search(r"\b(?:gdp|lạm phát|fdi|giải ngân|đầu tư công|xuất khẩu|nhập khẩu)\b", sentence, re.I):
+                    score += 3
             if country is None and score <= 0:
                 reason = reason or "off_topic"
             if reason:
@@ -298,9 +298,17 @@ def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=Fals
             groups = ({c.source_id for c in us_candidates}, {c.source_id for c in candidates})
             # Như bản 20.10 đã duyệt: đoạn châu Âu là chính (~150 từ kể cả câu tỷ giá), đoạn Mỹ 1–2 câu (~40 từ).
             parts = rules().get("eur_usd_parts", {"europe": [100, 125], "us": [25, 40]})
+            words = lambda items: count_words(resolve(" ".join(c.text for c in items), snapshot, safe=True))  # noqa: E731
+            fixed = count_words(resolve(opening + " " + US_SECOND_OPENING, snapshot, safe=True))
             eu_pick = choose_sentences(candidates, snapshot, *parts["europe"])
-            us_pick = choose_sentences(us_candidates, snapshot, *parts["us"], max_sentences=2)
+            used = fixed + words(eu_pick)
+            # Đoạn Mỹ bù cho đủ tổng 185–195 từ; ưu tiên 1–2 câu, thiếu thì cho thêm câu
+            us_low, us_high = max(parts["us"][0], low - used), max(parts["us"][1], high - used)
+            us_pick = (choose_sentences(us_candidates, snapshot, us_low, high - used, max_sentences=2)
+                       or choose_sentences(us_candidates, snapshot, us_low, min(us_high, high - used)))
             picked = eu_pick + us_pick
+            if not low <= used + words(us_pick) <= high:
+                eu_pick = []                     # không đủ chữ theo cách phân bổ ưu tiên: phân bổ tự do bên dưới
             if not eu_pick or not us_pick:   # thiếu hẳn một phía thì phân bổ tự do giữa hai phía
                 prefix = opening + " " + US_SECOND_OPENING
                 picked = choose_sentences(us_candidates + candidates, snapshot, low, high,

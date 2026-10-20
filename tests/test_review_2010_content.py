@@ -83,7 +83,21 @@ def test_us_paragraph_lowercases_common_first_word():
 
 def test_word_limits_follow_approved_2010_bulletin():
     limits = editorial.rules()["word_limits"]
-    assert limits["eur_usd"] == [165, 190] and limits["coffee"] == [105, 115]
+    assert limits["eur_usd"] == [185, 195] and limits["coffee"] == [105, 115]
     assert limits["japan"] == [110, 130] and limits["china"] == [50, 62]
     assert limits["energy_metals"] == [105, 125]
-    assert editorial.rules()["eur_usd_parts"] == {"europe": [100, 125], "us": [25, 40]}
+    assert editorial.rules()["eur_usd_parts"] == {"europe": [115, 125], "us": [28, 40]}
+
+
+def test_highlights_prefer_domestic_news():
+    s = _snap()
+    _news(s, "macro_news_vn", "Giải ngân đầu tư công",
+          "Đến ngày 15/10, Quảng Ngãi có nhiều chủ đầu tư đã giải ngân 100% kế hoạch vốn, nhưng vẫn còn 23 đơn vị "
+          "dưới mức bình quân cả nước về giải ngân vốn đầu tư công.")
+    _news(s, "macro_news_us", "Lệnh trừng phạt",
+          "Hôm thứ Sáu, ông Trump đã ký một sắc lệnh hành pháp miễn áp dụng các lệnh trừng phạt và thuế quan "
+          "chủ chốt theo đạo luật được gọi là Đạo luật Graham về tăng trưởng.")
+    cands, _ = editorial.news_candidates(s, {}, "macro")
+    order = [c.source_id for c in cands]
+    assert "macro_news_vn" in order
+    assert "macro_news_us" not in order or order.index("macro_news_vn") < order.index("macro_news_us")

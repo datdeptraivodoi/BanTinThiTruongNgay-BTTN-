@@ -154,7 +154,9 @@ def test_eur_usd_has_europe_paragraph_then_us_paragraph(snap):
           "Sản lượng công nghiệp của Đức giảm 1,1% so với tháng trước, kém hơn mức kỳ vọng của thị trường. "
           "Chỉ số niềm tin kinh tế ZEW của Đức giảm xuống mức thấp nhất trong sáu tháng gần đây. "
           "Doanh số bán lẻ của khu vực đồng euro tăng 0,3% so với tháng trước nhờ chi tiêu cho dịch vụ. "
-          "Tỷ lệ thất nghiệp của khu vực đồng euro ổn định ở mức 6,3% trong tháng 8 vừa qua. ")
+          "Tỷ lệ thất nghiệp của khu vực đồng euro ổn định ở mức 6,3% trong tháng 8 vừa qua. "
+          "Lạm phát dịch vụ của khu vực đồng euro vẫn ở mức cao trong khi tăng trưởng tiền lương chưa hạ nhiệt "
+          "rõ rệt trong quý ba. ")
     records = dict([te("united-states", 1, 3, us), te("euro-area", 2, 5, eu), te("germany", 3, 20, eu)])
     result, audit = foreign_sections(snap, records)
     section = result["eur_usd"]
