@@ -309,6 +309,7 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
                 paragraph_text = paragraph_text[len(prefix):].strip()
             if name == "eur_usd" and paragraph_text.startswith(US_SECOND_OPENING):  # cụm mở đoạn tin Mỹ
                 paragraph_text = paragraph_text[len(US_SECOND_OPENING):].strip()
+                paragraph_text = paragraph_text[:1].upper() + paragraph_text[1:]   # câu đầu được viết thường
             valid = (source is not None and source.kind == "news" and ref.source_id in section.source_ids
                      and source.text_scope in ("article", "excerpt")
                      and (topic_for(source) is None or record is not None)
@@ -319,7 +320,9 @@ def validate_content(content: ReportContent, snapshot: Snapshot, *, translations
                 error("SENTENCE_SOURCE", "Câu trích dẫn bị sửa, cắt hoặc không khớp nguồn/bản dịch")
                 continue
             seen_refs.add(identity)
-            numeric_prose[ref.paragraph] = numeric_prose[ref.paragraph].replace(ref.quote, "", 1)
+            lowered = ref.quote[:1].lower() + ref.quote[1:]
+            target = ref.quote if ref.quote in numeric_prose[ref.paragraph] else lowered
+            numeric_prose[ref.paragraph] = numeric_prose[ref.paragraph].replace(target, "", 1)
         without_tokens = TOKEN.sub("", " ".join(numeric_prose))
         without_dates = ALLOWED_DATE_FORMAT.sub("", without_tokens)
         if name == "interbank":

@@ -163,7 +163,9 @@ def test_eur_usd_has_europe_paragraph_then_us_paragraph(snap):
     assert first.startswith("Trong phiên giao dịch hôm qua, tính đến ngày")
     assert "khu vực đồng euro" in first or "Đức" in first
     assert second.startswith("- Về phía kinh tế Mỹ,") and "của Mỹ" in second
-    assert 185 <= count_words(resolve(first + " " + second, snap, safe=True)) <= 200, audit["eur_usd"]
+    from bttn.editorial import rules
+    low, high = rules()["word_limits"]["eur_usd"]
+    assert low <= count_words(resolve(first + " " + second, snap, safe=True)) <= high, audit["eur_usd"]
 
 
 def test_calendar_highlights_the_bulletin_date(snap, monkeypatch):
