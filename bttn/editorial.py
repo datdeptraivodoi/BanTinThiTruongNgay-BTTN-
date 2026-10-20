@@ -42,12 +42,17 @@ KEYWORDS = {
 }
 
 
+ABBREVIATION = re.compile(r"\b(?:U\.S\.|U\.K\.|U\.N\.|E\.U\.|(?:Mr|Ms|Mrs|Dr|St|Mt|Ft|Jr|Sr|Inc|Corp|Ltd|Co|No|"
+                          r"vs|Gov|Sen|Rep|Gen|Prof|Lt|Col|Capt)\.(?=\s+\S))")
+
+
 def sentences(text):
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n+", text) if p.strip()]
     result = []
     for para in paragraphs:
         cleaned = " ".join(para.split())
-        cleaned = re.sub(r"\b(?:U\.S\.|U\.K\.|Mr\.|Ms\.|Dr\.)", lambda m: m[0].replace(".", "∯"), cleaned)
+        # Chữ viết tắt không phải hết câu ("St. Petersburg" bị cắt thành câu "Petersburg vào Chủ Nhật..." – 20.10)
+        cleaned = ABBREVIATION.sub(lambda m: m[0].replace(".", "∯"), cleaned)
         for s in re.split(r"(?<=[.!?])\s+", cleaned):
             s = s.replace("∯", ".").strip()
             if s:
@@ -83,6 +88,33 @@ def related(a: str, b: str, threshold: float = 0.3) -> bool:
     """Hai đoạn tin nói về cùng một chuyện (trùng nhiều từ nội dung)."""
     x, y = _content_words(a), _content_words(b)
     return bool(x and y) and len(x & y) / min(len(x), len(y)) >= threshold
+
+
+FOREIGN_TOPICS = {"USD", "EUR", "JPY", "China"}
+DOMESTIC_NEWS = re.compile(
+    r"Việt Nam|trong nước|\bNHNN\b|Ngân hàng Nhà nước|Chính phủ|Thủ tướng|Quốc hội|\bBộ (?:Tài chính|Công Thương|"
+    r"Xây dựng|Nông nghiệp|Kế hoạch)|Cục Thống kê|Tổng cục|\bUBND\b|TP\.\s?HCM|Hà Nội|Đà Nẵng|Cần Thơ|Hải Phòng|"
+    r"\btỉnh\b|\bthành phố\b|địa phương|chủ đầu tư|khu công nghiệp|khu công nghệ cao|doanh nghiệp")
+FOREIGN_NEWS = re.compile(r"\b(?:Mỹ|Trump|Trung Quốc|EU|châu Âu|Nhật Bản|Nga|Ukraine|Fed|ECB|Israel|Iran|Liechtenstein)\b")
+FOREIGN_CONTEXT = re.compile(
+    r"^(?:Vì vậy|Vì thế|Do đó|Điều đó|Như vậy|Theo đó|Khi đó|Nhờ đó|Từ đó|Cụ thể|Tuy nhiên|Song|"
+    r"(?:Những |Các )?(?:phát biểu|bình luận|nhận định|tuyên bố) (?:này|đó|của (?:ông|bà|họ))|Ông|Bà|Họ)\b")
+TOPIC_REQUIRED = {
+    "coffee": re.compile(r"cà phê|Arabica|Robusta|\bICE\b|USDA|Brazil|Braxin|Colombia|Ethiopia|niên vụ|vụ mùa|tồn kho", re.I),
+    "Brent": re.compile(r"dầu|Brent|WTI|OPEC|nhiên liệu|khí đốt|LNG|xăng", re.I),
+    "gold": re.compile(r"giá vàng|vàng (?:thế giới|quốc tế|giao ngay|kỳ hạn)", re.I),
+}
+TOPIC_EXCLUDED = {
+    # Chú thích ảnh ("Giá cà phê robusta trên sàn London trong phiên giao dịch ngày 19/10.") và câu định nghĩa
+    "coffee": re.compile(r"^Giá cà phê \w+ trên sàn [^.,]+ trong phiên giao dịch ngày \d+/\d+\.?$", re.I),
+    "Brent": re.compile(r"^[^,]{0,40}\blà (?:một|nơi)\b", re.I),
+    "gold": re.compile(r"vàng kỹ thuật số|token|tiền số|stablecoin|tiền mã hóa", re.I),
+}
+
+
+def near_duplicate(a: str, b: str) -> bool:
+    x, y = _content_words(a), _content_words(b)
+    return min(len(x), len(y)) >= 6 and len(x & y) / min(len(x), len(y)) >= 0.6
 
 
 def news_candidates(snapshot, records, topic, *, allow_stale=False):
@@ -134,24 +166,27 @@ def news_candidates(snapshot, records, topic, *, allow_stale=False):
                 reason = "not_vietnamese"
             elif topic in {"coffee", "Brent", "gold"} and junk_reason(sentence):
                 reason = junk_reason(sentence)
+            elif topic in FOREIGN_TOPICS and (FOREIGN_CONTEXT.search(sentence) or DEMONSTRATIVE_SUBJECT.search(sentence)):
+                reason = "context_dependent"       # "Những phát biểu của ông...", "Điều đó..." mất chủ thể
+            elif topic in TOPIC_REQUIRED and not TOPIC_REQUIRED[topic].search(sentence):
+                reason = "off_topic"               # vd. câu xuất nhập khẩu trong bài cà phê
+            elif topic in TOPIC_EXCLUDED and TOPIC_EXCLUDED[topic].search(sentence):
+                reason = "off_topic"
+            elif any(near_duplicate(sentence, c.text) for c in candidates):
+                reason = "near_duplicate"          # hai bài cùng đưa một ý (PCE "thước đo lạm phát Fed ưa thích")
             score = sum(word.casefold() in sentence.casefold() for word in KEYWORDS[topic])
             if topic == "coffee" and DOMESTIC_PRICE.search(sentence):
                 score -= 2      # mẫu ưu tiên diễn biến thế giới (ICE, USDA, Brazil), không phải giá thu mua trong nước
             if topic == "macro":
-                if re.search(r"\b(?:World Bank|WB|Ngân hàng Thế giới)\b", sentence, re.I):
-                    score += 12
-                    if re.search(r"\b(?:7,4%|dự báo tăng trưởng|tăng trưởng cả năm)\b", sentence, re.I):
-                        score += 20
-                elif re.search(r"\b(?:Bộ Tài chính|thuế|0,2%)\b", sentence, re.I):
-                    score += 6
-                    if re.search(r"\b(?:0,2%|đất bỏ hoang)\b", sentence, re.I):
-                        score += 10
-                    if re.search(r"gấp gần 7 lần|cao gần 7 lần", sentence, re.I):
-                        score += 10
-                elif re.search(r"\b(?:gdp|lạm phát|fdi)\b", sentence, re.I):
-                    score += 4
-                if re.search(r"\b(?:Đà Nẵng|Cần Thơ|Quảng Trị|Quảng Ngãi|Bảo Hà|Lai Châu|PNJ)\b", sentence, re.I):
-                    score -= 5
+                # Tin nổi bật ưu tiên tin trong nước (góp ý 20.10): câu nói về kinh tế, chính sách, địa phương,
+                # doanh nghiệp Việt Nam được cộng điểm; tin thuần nước ngoài (Mỹ, Trump, EU...) bị trừ mạnh.
+                domestic = DOMESTIC_NEWS.search(sentence)
+                if domestic:
+                    score += 8
+                elif FOREIGN_NEWS.search(sentence):
+                    score -= 10
+                if re.search(r"\b(?:gdp|lạm phát|fdi|giải ngân|đầu tư công|xuất khẩu|nhập khẩu)\b", sentence, re.I):
+                    score += 3
             if country is None and score <= 0:
                 reason = reason or "off_topic"
             if reason:
@@ -208,6 +243,15 @@ def make_section(snapshot, groups, prefixes=None):
     return Section(paragraphs=paragraphs, source_ids=sorted(source_ids) or ["missing_source"], sentence_refs=refs)
 
 
+COMMON_INITIAL = re.compile(r"^(?:Những|Các|Thị trường|Giá|Chỉ số|Lợi suất|Số liệu|Doanh số|Điều kiện|Tỷ lệ|Lạm phát|"
+                            r"Nhiều|Một|Theo|Trong|Sau|Hôm|Nhà đầu tư|Đồng|Kỳ vọng|Báo cáo|Dữ liệu|Lãi suất)\b")
+
+
+def lower_initial(text: str) -> str:
+    """Viết thường chữ đầu câu khi câu đứng sau cụm mở đoạn có dấu phẩy, trừ tên riêng (Fed, Mỹ, ông Powell...)."""
+    return text[:1].lower() + text[1:] if COMMON_INITIAL.search(text) else text
+
+
 def eur_usd_section(snapshot, opening, picked, eu_ids):
     """Đoạn 1: câu tỷ giá + tin châu Âu. Đoạn 2: "- Về phía kinh tế Mỹ," + tin Mỹ.
 
@@ -218,7 +262,8 @@ def eur_usd_section(snapshot, opening, picked, eu_ids):
     paragraphs = [" ".join([opening] + [c.text for c in eu]).strip()]
     refs = [SentenceReference(paragraph=0, source_id=c.source_id, quote=c.text) for c in eu if c.quoted]
     if us:
-        paragraphs.append(" ".join([US_SECOND_OPENING] + [c.text for c in us]))
+        first = lower_initial(us[0].text)       # "- Về phía kinh tế Mỹ, thị trường..." (không viết hoa sau dấu phẩy)
+        paragraphs.append(" ".join([US_SECOND_OPENING, first] + [c.text for c in us[1:]]))
         refs += [SentenceReference(paragraph=1, source_id=c.source_id, quote=c.text) for c in us if c.quoted]
     source_ids = {c.source_id for c in picked}
     for key in TOKEN.findall(" ".join(paragraphs)):
@@ -251,11 +296,25 @@ def foreign_sections(snapshot, records, *, require_quotes=True, allow_stale=Fals
             # Tổng 185–200 từ, phân bổ linh hoạt giữa hai đoạn.
             us_candidates = pools["USD"][0]
             groups = ({c.source_id for c in us_candidates}, {c.source_id for c in candidates})
-            prefix = opening + " " + US_SECOND_OPENING
-            picked = choose_sentences(us_candidates + candidates, snapshot, low, high,
-                                      prefix=prefix, required_groups=groups)
-            if not picked:  # thiếu hẳn một phía thì vẫn dùng tin phía còn lại
-                picked = choose_sentences(us_candidates + candidates, snapshot, low, high, prefix=opening)
+            # Như bản 20.10 đã duyệt: đoạn châu Âu là chính (~150 từ kể cả câu tỷ giá), đoạn Mỹ 1–2 câu (~40 từ).
+            parts = rules().get("eur_usd_parts", {"europe": [100, 125], "us": [25, 40]})
+            words = lambda items: count_words(resolve(" ".join(c.text for c in items), snapshot, safe=True))  # noqa: E731
+            fixed = count_words(resolve(opening + " " + US_SECOND_OPENING, snapshot, safe=True))
+            eu_pick = choose_sentences(candidates, snapshot, *parts["europe"])
+            used = fixed + words(eu_pick)
+            # Đoạn Mỹ bù cho đủ tổng 185–195 từ; ưu tiên 1–2 câu, thiếu thì cho thêm câu
+            us_low, us_high = max(parts["us"][0], low - used), max(parts["us"][1], high - used)
+            us_pick = (choose_sentences(us_candidates, snapshot, us_low, high - used, max_sentences=2)
+                       or choose_sentences(us_candidates, snapshot, us_low, min(us_high, high - used)))
+            picked = eu_pick + us_pick
+            if not low <= used + words(us_pick) <= high:
+                eu_pick = []                     # không đủ chữ theo cách phân bổ ưu tiên: phân bổ tự do bên dưới
+            if not eu_pick or not us_pick:   # thiếu hẳn một phía thì phân bổ tự do giữa hai phía
+                prefix = opening + " " + US_SECOND_OPENING
+                picked = choose_sentences(us_candidates + candidates, snapshot, low, high,
+                                          prefix=prefix, required_groups=groups)
+                if not picked:
+                    picked = choose_sentences(us_candidates + candidates, snapshot, low, high, prefix=opening)
             result[name] = eur_usd_section(snapshot, opening, picked, groups[1])
         else:
             lead_candidates = [c for c in candidates if candidates and c.source_id == candidates[0].source_id]
@@ -294,6 +353,7 @@ def gold_data_sentences(snapshot):
     return [Candidate(f"Giá vàng quốc tế {move} quanh mức {{{{GOLD}}}} USD/ounce.", gold.source_id, quoted=False)]
 
 
+OIL_QUOTE = re.compile(r"(?:tăng|giảm)\s+[\d.,]+\s*%\s*(?:,\s*)?(?:xuống|lên|còn|đạt)?\s*(?:mức\s+)?[\d.,]+\s*USD", re.I)
 GOLD_WORLD = re.compile(r"thế giới|quốc tế|ounce|/oz|\bFed\b|USD", re.I)
 SILVER = re.compile(r"\bbạc\b|silver|bạch kim|palladium", re.I)
 
@@ -562,6 +622,10 @@ def domestic_sections(snapshot, records):
         gold_picked = gold_data_sentences(snapshot)
     b_low, b_high = limits["brent"]
     oil = [c for c in oil if c.text not in {g.text for g in gold_picked} and not SILVER.search(c.text)]
+    # Chỉ một câu báo giá dầu (bài mới nhất); các bài khác nhau báo giá ở các thời điểm khác nhau làm đoạn văn
+    # lặp và mâu thuẫn số ("Tại thời điểm 7h15... giảm 0,27%" rồi "giảm 1,64%"). Ưu tiên câu nêu nguyên nhân.
+    quotes = [c for c in oil if OIL_QUOTE.search(c.text)]
+    oil = [c for c in oil if not OIL_QUOTE.search(c.text) or c is quotes[0]]
     oil_picked = choose_sentences(oil, snapshot, b_low, b_high)
     if not oil_picked and "BRENT" in snapshot.observations:
         cand_oil1 = observation_candidate(snapshot, "Giá dầu Brent thế giới biến động quanh mức {{BRENT}} USD/thùng.", ["BRENT"])

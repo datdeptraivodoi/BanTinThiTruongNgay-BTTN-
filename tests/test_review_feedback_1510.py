@@ -154,7 +154,9 @@ def test_eur_usd_has_europe_paragraph_then_us_paragraph(snap):
           "Sản lượng công nghiệp của Đức giảm 1,1% so với tháng trước, kém hơn mức kỳ vọng của thị trường. "
           "Chỉ số niềm tin kinh tế ZEW của Đức giảm xuống mức thấp nhất trong sáu tháng gần đây. "
           "Doanh số bán lẻ của khu vực đồng euro tăng 0,3% so với tháng trước nhờ chi tiêu cho dịch vụ. "
-          "Tỷ lệ thất nghiệp của khu vực đồng euro ổn định ở mức 6,3% trong tháng 8 vừa qua. ")
+          "Tỷ lệ thất nghiệp của khu vực đồng euro ổn định ở mức 6,3% trong tháng 8 vừa qua. "
+          "Lạm phát dịch vụ của khu vực đồng euro vẫn ở mức cao trong khi tăng trưởng tiền lương chưa hạ nhiệt "
+          "rõ rệt trong quý ba. ")
     records = dict([te("united-states", 1, 3, us), te("euro-area", 2, 5, eu), te("germany", 3, 20, eu)])
     result, audit = foreign_sections(snap, records)
     section = result["eur_usd"]
@@ -163,7 +165,9 @@ def test_eur_usd_has_europe_paragraph_then_us_paragraph(snap):
     assert first.startswith("Trong phiên giao dịch hôm qua, tính đến ngày")
     assert "khu vực đồng euro" in first or "Đức" in first
     assert second.startswith("- Về phía kinh tế Mỹ,") and "của Mỹ" in second
-    assert 185 <= count_words(resolve(first + " " + second, snap, safe=True)) <= 200, audit["eur_usd"]
+    from bttn.editorial import rules
+    low, high = rules()["word_limits"]["eur_usd"]
+    assert low <= count_words(resolve(first + " " + second, snap, safe=True)) <= high, audit["eur_usd"]
 
 
 def test_calendar_highlights_the_bulletin_date(snap, monkeypatch):
