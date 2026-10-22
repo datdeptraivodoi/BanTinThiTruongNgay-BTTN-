@@ -5,7 +5,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from bttn import editorial, vira
-from bttn.models import Observation, Snapshot, Source, VN_TZ
+from bttn.models import VN_TZ, Observation, Snapshot, Source
 from bttn.sources import vira_daily_interbank
 from bttn.validation import resolve
 
