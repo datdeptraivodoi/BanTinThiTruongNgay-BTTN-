@@ -936,6 +936,34 @@ def collect_china_news(http, snapshot):
         snapshot.add_issue("NIKKEI_NEWS", f"Nikkei: {type(exc).__name__}: {exc}")
 
 
+LNH_SEGMENT = re.compile(r"Lãi suất bình quân (?:LNH|liên ngân hàng) (VND|USD)(.*?)(?=Lãi suất bình quân (?:LNH|liên ngân hàng)|"
+                         r"Lợi suất|Trên thị trường mở|$)", re.I | re.S)
+LNH_RATE = re.compile(r"\b(ON|1W|2W|1M|3M|6M)\s+(\d{1,2},\d{1,2})\s*%")
+
+
+def vira_daily_interbank(snapshot) -> list[str]:
+    """Dự phòng khi bảng ảnh Market Watch không đọc được: lãi suất bình quân LNH VND/USD trong đoạn chữ của
+    "Bản tin Kinh tế - Tài chính ngày" VIRA (vd "giao dịch tại ON 8,50%; 1W 9,00%"), cho phiên liền trước ngày đăng.
+    Chỉ điền kỳ hạn còn thiếu; trả về danh sách mã đã điền."""
+    src = snapshot.sources.get("vira_daily")
+    if not src or "Tong-hop" in (src.url or ""):
+        return []
+    session = previous_weekday(src.published_at.astimezone(VN_TZ).date())
+    filled = []
+    for seg in LNH_SEGMENT.finditer(" ".join(src.text.split())):
+        group = seg.group(1).upper()
+        for tenor, value in LNH_RATE.findall(seg.group(2)):
+            key = f"{group}_{tenor}"
+            if key in snapshot.observations:
+                continue
+            snapshot.observations[key] = Observation(
+                id=key, label=key.replace("_", " "), value=Decimal(value.replace(",", ".")), unit="%/năm",
+                source_id="vira_daily", trading_date=session, tenor=tenor,
+                basis="Lãi suất bình quân LNH theo bản tin ngày VIRA (dự phòng khi Market Watch không đọc được)")
+            filled.append(key)
+    return filled
+
+
 def collect_snapshot(http, as_of):
     from .bonds import collect_bond_market
     from .calculations import derive_gold_spread, derive_swaps
@@ -963,6 +991,14 @@ def collect_snapshot(http, as_of):
             collector(http, snapshot)
         except Exception as exc:
             snapshot.add_issue(f"{name}_SOURCE", f"{name}: {type(exc).__name__}: {exc}")
+    if "VND_ON" not in snapshot.observations:
+        filled = vira_daily_interbank(snapshot)
+        if filled:
+            snapshot.add_issue("VIRA_INTERBANK_FALLBACK",
+                               "Không đọc được bảng Market Watch VIRA; lãi suất LNH lấy từ đoạn chữ bản tin ngày VIRA: "
+                               + ", ".join(filled))
+            from .vira import record_vnibor_history
+            record_vnibor_history(snapshot)
     derive_swaps(snapshot)
     try:
         derive_gold_spread(snapshot)

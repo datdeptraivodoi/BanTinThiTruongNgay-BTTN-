@@ -507,8 +507,29 @@ def usd_vnd_section(snapshot, records, *, exclude_sources=(), exclude_texts=()):
     return make_section(snapshot, [picked]), {"selected": [asdict(c) for c in picked]}
 
 
-def interbank_lead(snapshot):
-    """Câu mở đầu thứ Hai: lãi suất VND liên ngân hàng ON-2W theo VNIBOR mới nhất trên Market Watch của VIRA."""
+def interbank_move(snapshot, keys, previous=None):
+    """'tăng'/'tăng nhẹ'/'giảm'/'giảm nhẹ'/'đi ngang' theo thay đổi bình quân ON-2W (điểm cơ bản) so với phiên trước
+    trong lịch sử VNIBOR; không có phiên trước thì None."""
+    obs = snapshot.observations
+    if previous is None:
+        from .vira import previous_vnibor
+        previous = previous_vnibor(obs[keys[0]].trading_date)
+    if not previous:
+        return None
+    prev = previous[1]
+    deltas = [(obs[k].value - prev[k.split("_")[1]]) * 100 for k in keys if k.split("_")[1] in prev]
+    if not deltas:
+        return None
+    avg = sum(deltas) / len(deltas)
+    if abs(avg) < 3:
+        return "đi ngang"
+    word = "tăng" if avg > 0 else "giảm"
+    return f"{word} nhẹ" if abs(avg) < 10 else word
+
+
+def interbank_lead(snapshot, previous=None):
+    """Câu mở đầu mục liên ngân hàng (mọi ngày, góp ý 22.10): "Phiên ngày dd.mm.yyyy, thị trường interbank
+    tăng/giảm/đi ngang quanh vùng X%-Y% ở các kỳ hạn ngắn ON-2W", theo VNIBOR trên Market Watch của VIRA."""
     obs = snapshot.observations
     keys = [k for k in ("VND_ON", "VND_1W", "VND_2W") if k in obs]
     if len(keys) < 2:
@@ -516,11 +537,11 @@ def interbank_lead(snapshot):
     low_key = min(keys, key=lambda k: obs[k].value)
     high_key = max(keys, key=lambda k: obs[k].value)
     day = obs[keys[0]].trading_date.strftime("%d.%m.%Y")
-    if obs[low_key].value == obs[high_key].value:
-        text = f"Phiên {day}, lãi suất VND liên ngân hàng các kỳ hạn ngắn ON-2W ở mức {{{{{low_key}}}}}%."
-    else:
-        text = (f"Phiên {day}, lãi suất VND liên ngân hàng các kỳ hạn ngắn ON-2W dao động trong vùng "
-                f"{{{{{low_key}}}}}%-{{{{{high_key}}}}}%.")
+    move = interbank_move(snapshot, keys, previous)
+    verb = move if move else "giao dịch"
+    level = (f"quanh mức {{{{{low_key}}}}}%" if obs[low_key].value == obs[high_key].value
+             else f"quanh vùng {{{{{low_key}}}}}%-{{{{{high_key}}}}}%")
+    text = f"Phiên ngày {day}, thị trường interbank {verb} {level} ở các kỳ hạn ngắn ON-2W."
     return [Candidate(text, obs[keys[0]].source_id, quoted=False)]
 
 
@@ -577,11 +598,12 @@ def domestic_sections(snapshot, records):
     #    (lãi suất LNH, nghiệp vụ thị trường mở, trái phiếu). Không có VIRA thì chỉ dùng số liệu VNIBOR.
     weekly = "Tong-hop" in getattr(snapshot.sources.get("vira_daily"), "url", "")
     interbank_candidates = vira_candidates(snapshot, "vira_daily", WEEKLY_INTERBANK_WEIGHTS if weekly else INTERBANK_WEIGHTS)
-    lead = interbank_lead(snapshot) if weekly else []
-    if weekly:
-        # Bản tổng hợp tuần: bỏ câu lãi suất "Chốt ngày ..." (đã có câu số liệu VNIBOR mới nhất ở đầu đoạn)
+    lead = interbank_lead(snapshot)
+    if lead:
+        # Đã có câu VNIBOR mở đầu: bỏ câu lãi suất LNH của VIRA để không lặp số
         interbank_candidates = [c for c in interbank_candidates
-                                if not re.search(r"lãi suất (?:VND|USD) LNH|không chào thầu", c.text)]
+                                if not re.search(r"lãi suất (?:bình quân )?(?:VND|USD) (?:LNH|liên ngân hàng)|"
+                                                 r"không chào thầu", c.text, re.I)]
     if not interbank_candidates:
         c = observation_candidate(
             snapshot, "Lãi suất VND liên ngân hàng kỳ hạn qua đêm ở mức {{VND_ON}}%, kỳ hạn 1 tuần "

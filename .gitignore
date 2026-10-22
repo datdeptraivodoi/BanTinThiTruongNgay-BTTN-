@@ -49,3 +49,6 @@ scratch/
 data/weekly/
 # Ảnh Reuters team tải lên cho bản tin tuần thì được commit
 !inputs/weekly/**
+
+# Lịch sử VNIBOR ghi trên VPS mỗi lần chạy
+data/vnibor_history.json
