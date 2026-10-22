@@ -107,7 +107,7 @@ def test_monday_uses_vira_weekly_summary(snap):
                                    kind="news", text_scope="excerpt")
     result, audit = editorial.domestic_sections(snap, {})
     text = resolve(" ".join(result["interbank"].paragraphs), snap)
-    assert text.startswith("Phiên ") and "lãi suất VND liên ngân hàng các kỳ hạn ngắn ON-2W" in text
+    assert text.startswith("Phiên ngày ") and "thị trường interbank" in text and "ON-2W" in text
     assert "NHNN chào thầu 34.000 tỷ đồng" in text and "bơm ròng 8.188,63 tỷ đồng" in text
     assert "Chốt ngày 16/10, lãi suất VND LNH" not in text
     low, high = editorial.rules()["word_limits"]["interbank"]

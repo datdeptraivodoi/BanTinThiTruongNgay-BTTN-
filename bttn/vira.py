@@ -18,6 +18,8 @@ from bs4 import BeautifulSoup
 from .models import Observation, Snapshot, Source
 
 INDEX = "https://vira.org.vn/tin/Market-Watch.html"
+HISTORY = Path(__file__).resolve().parents[1] / "data" / "vnibor_history.json"
+SHORT_TENORS = ("ON", "1W", "2W")
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 TENORS = {"ON", "1W", "2W", "1M", "2M", "3M", "6M", "9M", "1Y", "SW"}
 
@@ -199,4 +201,40 @@ def collect_vira(http, snapshot: Snapshot, reader=None):
                 raise ValueError(f"Conflicting VIRA row: {key}")
             snapshot.observations[key] = Observation(id=key, label=key.replace("_", " "), value=value,
                 unit="%/năm", source_id=sid, trading_date=day, tenor=tenor, basis=basis)
+    record_vnibor_history(snapshot)
     snapshot.add_issue("SWAP_REFERENCE", "Swap = VNIBOR VND − VNIBOR USD cùng kỳ hạn/cùng ấn bản VIRA; USD Last không ghi ngày fixing. Đây là chênh lệch lãi suất tham khảo, không phải giá swap mua/bán.")
+
+
+def _load_history(path: Path = None) -> dict:
+    path = path or HISTORY
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def record_vnibor_history(snapshot: Snapshot, path: Path = None):
+    """Lưu VNIBOR VND ON/1W/2W theo ngày giao dịch để câu mở đầu so sánh tăng/giảm với phiên trước."""
+    path = path or HISTORY
+    obs = snapshot.observations
+    rows = {t: str(obs[f"VND_{t}"].value) for t in SHORT_TENORS if f"VND_{t}" in obs}
+    if len(rows) < 2:
+        return
+    day = obs[next(f"VND_{t}" for t in SHORT_TENORS if f"VND_{t}" in obs)].trading_date.isoformat()
+    history = _load_history(path)
+    history[day] = rows
+    keep = dict(sorted(history.items())[-60:])
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(keep, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def previous_vnibor(day, path: Path = None):
+    """(ngày, {kỳ hạn: Decimal}) của phiên gần nhất trước `day` trong lịch sử, hoặc None."""
+    earlier = [(d, r) for d, r in _load_history(path).items() if d < day.isoformat()]
+    if not earlier:
+        return None
+    d, rows = max(earlier)
+    return d, {t: Decimal(v) for t, v in rows.items()}
