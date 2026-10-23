@@ -227,7 +227,7 @@ def run(args):
         manifest["status"] = "word_created"
 
         if args.send:
-            recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn").split(",") if r.strip()]
+            recipients = [r.strip() for r in os.getenv("RECIPIENTS", "datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn,binhtn2@mbbank.com.vn").split(",") if r.strip()]
             manifest["recipients"] = recipients
             send_report(snapshot, [output], Path(args.state_dir), recipients)
             manifest["status"] = "sent"

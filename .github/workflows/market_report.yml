@@ -61,7 +61,7 @@ jobs:
           SWAP_DATA_URL: ${{ secrets.SWAP_DATA_URL || vars.SWAP_DATA_URL }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-          RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn' }}
+          RECIPIENTS: ${{ vars.RECIPIENTS || 'datnh1@mbbank.com.vn,trungnt@mbbank.com.vn,research.treasury@mbbank.com.vn,binhtn2@mbbank.com.vn' }}
           REVIEW_RECIPIENTS: ${{ vars.REVIEW_RECIPIENTS || 'datnh1@mbbank.com.vn' }}
           REPORT_ACTION: ${{ inputs.action || '3. Gửi bản review cho người duyệt' }}
         run: |
